@@ -1,0 +1,430 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Length 8405 >>
+stream
+0.6 0.6 0.6 RG 0.7 w 56.00 645.89 m 539.28 645.89 l S
+0.93 0.93 0.93 rg 50.00 592.89 495.28 21.00 re f
+0.93 0.93 0.93 rg 50.00 547.89 495.28 21.00 re f
+0.93 0.93 0.93 rg 50.00 502.89 495.28 21.00 re f
+0.93 0.93 0.93 rg 50.00 431.89 495.28 47.00 re f
+1.00 0.95 0.80 rg 50.00 373.89 495.28 34.00 re f
+0.93 0.93 0.93 rg 50.00 350.89 495.28 21.00 re f
+0.93 0.93 0.93 rg 50.00 277.89 495.28 21.00 re f
+1.00 0.95 0.80 rg 50.00 196.89 495.28 21.00 re f
+0.93 0.93 0.93 rg 50.00 173.89 495.28 21.00 re f
+0.93 0.93 0.93 rg 50.00 106.89 495.28 21.00 re f
+0 g
+BT
+/F2 22.00 Tf
+1 0 0 1 56.00 785.89 Tm (Procedure de connexion GitHub et recuperation du projet) Tj
+/F1 12.00 Tf
+1 0 0 1 56.00 755.89 Tm (WAZ_ELK_FACTORY - a transmettre tel quel a l'operateur/exploitant) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 729.89 Tm (Depot ) Tj
+1 0 0 1 89.00 729.89 Tm (: ) Tj
+1 0 0 1 100.00 729.89 Tm (https://github.com/ykeupssi123-ship-it/WEF ) Tj
+1 0 0 1 336.50 729.89 Tm (\(public\). ) Tj
+1 0 0 1 56.00 707.89 Tm (Ce ) Tj
+1 0 0 1 72.50 707.89 Tm (depot ) Tj
+1 0 0 1 105.50 707.89 Tm (etant ) Tj
+/F2 10.00 Tf
+1 0 0 1 138.50 707.89 Tm (public ) Tj
+/F1 10.00 Tf
+1 0 0 1 179.10 707.89 Tm (, ) Tj
+1 0 0 1 190.10 707.89 Tm (aucun ) Tj
+1 0 0 1 223.10 707.89 Tm (compte ) Tj
+1 0 0 1 261.60 707.89 Tm (GitHub ) Tj
+1 0 0 1 300.10 707.89 Tm (n'est ) Tj
+1 0 0 1 333.10 707.89 Tm (necessaire ) Tj
+1 0 0 1 393.60 707.89 Tm (pour ) Tj
+1 0 0 1 421.10 707.89 Tm (le ) Tj
+1 0 0 1 437.60 707.89 Tm (telecharger ) Tj
+1 0 0 1 503.60 707.89 Tm (- ) Tj
+1 0 0 1 514.60 707.89 Tm (un ) Tj
+1 0 0 1 56.00 693.89 Tm (compte ) Tj
+1 0 0 1 94.50 693.89 Tm (n'est ) Tj
+1 0 0 1 127.50 693.89 Tm (requis ) Tj
+1 0 0 1 166.00 693.89 Tm (que ) Tj
+1 0 0 1 188.00 693.89 Tm (pour ) Tj
+1 0 0 1 215.50 693.89 Tm (aller ) Tj
+1 0 0 1 248.50 693.89 Tm (plus ) Tj
+1 0 0 1 276.00 693.89 Tm (loin ) Tj
+1 0 0 1 303.50 693.89 Tm (\(fork, ) Tj
+1 0 0 1 342.00 693.89 Tm (contribution ) Tj
+1 0 0 1 413.50 693.89 Tm (personnelle\). ) Tj
+1 0 0 1 490.50 693.89 Tm (La ) Tj
+1 0 0 1 56.00 679.89 Tm (procedure ) Tj
+1 0 0 1 111.00 679.89 Tm (separe ) Tj
+1 0 0 1 149.50 679.89 Tm (donc ) Tj
+1 0 0 1 177.00 679.89 Tm (le ) Tj
+1 0 0 1 193.50 679.89 Tm (strict ) Tj
+1 0 0 1 232.00 679.89 Tm (necessaire ) Tj
+1 0 0 1 292.50 679.89 Tm (\(section ) Tj
+1 0 0 1 342.00 679.89 Tm (A\) ) Tj
+1 0 0 1 358.50 679.89 Tm (de ) Tj
+1 0 0 1 375.00 679.89 Tm (l'optionnel ) Tj
+1 0 0 1 441.00 679.89 Tm (\(section ) Tj
+1 0 0 1 490.50 679.89 Tm (C\). ) Tj
+/F2 15.00 Tf
+1 0 0 1 56.00 651.89 Tm (A. Cas normal - cloner directement sur les VM Linux \(VM1 et VM2\)) Tj
+/F2 12.00 Tf
+1 0 0 1 56.00 625.89 Tm (Etape 1 - Verifier que git est present) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 607.89 Tm (git --version) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 584.89 Tm (Si ) Tj
+1 0 0 1 72.50 584.89 Tm (la ) Tj
+1 0 0 1 89.00 584.89 Tm (commande ) Tj
+1 0 0 1 138.50 584.89 Tm (repond ) Tj
+1 0 0 1 177.00 584.89 Tm (« ) Tj
+1 0 0 1 188.00 584.89 Tm (command ) Tj
+1 0 0 1 232.00 584.89 Tm (not ) Tj
+1 0 0 1 254.00 584.89 Tm (found ) Tj
+1 0 0 1 287.00 584.89 Tm (» ) Tj
+1 0 0 1 298.00 584.89 Tm (: ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 562.89 Tm (sudo dnf install -y git) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 539.89 Tm (Verification ) Tj
+1 0 0 1 127.50 539.89 Tm (\(ne ) Tj
+1 0 0 1 149.50 539.89 Tm (pas ) Tj
+1 0 0 1 171.50 539.89 Tm (passer ) Tj
+1 0 0 1 210.00 539.89 Tm (a ) Tj
+1 0 0 1 221.00 539.89 Tm (l'etape ) Tj
+1 0 0 1 265.00 539.89 Tm (suivante ) Tj
+1 0 0 1 314.50 539.89 Tm (si ) Tj
+1 0 0 1 331.00 539.89 Tm (ca ) Tj
+1 0 0 1 347.50 539.89 Tm (echoue\) ) Tj
+1 0 0 1 391.50 539.89 Tm (: ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 517.89 Tm (git --version) Tj
+/F2 12.00 Tf
+1 0 0 1 56.00 490.89 Tm (Etape 2 - Cloner le depot) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 472.89 Tm (cd ~) Tj
+1 0 0 1 56.00 459.89 Tm (git clone https://github.com/ykeupssi123-ship-it/WEF.git) Tj
+1 0 0 1 56.00 446.89 Tm (cd WEF) Tj
+/F2 12.00 Tf
+1 0 0 1 56.00 419.89 Tm (Etape 3 - Verifier l'integrite du telechargement) Tj
+/F1 9.50 Tf
+1 0 0 1 56.00 401.89 Tm (ATTENTION : Ne jamais supposer qu'un clone silencieux a tout ramene - verifier) Tj
+1 0 0 1 56.00 388.89 Tm (systematiquement avant de continuer.) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 365.89 Tm (git status) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 342.89 Tm (Doit ) Tj
+1 0 0 1 83.50 342.89 Tm (afficher ) Tj
+1 0 0 1 133.00 342.89 Tm (« ) Tj
+1 0 0 1 144.00 342.89 Tm (On ) Tj
+1 0 0 1 160.50 342.89 Tm (branch ) Tj
+1 0 0 1 199.00 342.89 Tm (main ) Tj
+1 0 0 1 226.50 342.89 Tm (» ) Tj
+1 0 0 1 237.50 342.89 Tm (/ ) Tj
+1 0 0 1 248.50 342.89 Tm (« ) Tj
+1 0 0 1 259.50 342.89 Tm (nothing ) Tj
+1 0 0 1 303.50 342.89 Tm (to ) Tj
+1 0 0 1 320.00 342.89 Tm (commit, ) Tj
+1 0 0 1 364.00 342.89 Tm (working ) Tj
+1 0 0 1 408.00 342.89 Tm (tree ) Tj
+1 0 0 1 435.50 342.89 Tm (clean ) Tj
+1 0 0 1 468.50 342.89 Tm (». ) Tj
+1 0 0 1 485.00 342.89 Tm (Si ) Tj
+1 0 0 1 501.50 342.89 Tm (un ) Tj
+1 0 0 1 56.00 328.89 Tm (message ) Tj
+1 0 0 1 100.00 328.89 Tm (d'erreur ) Tj
+1 0 0 1 149.50 328.89 Tm (reseau ) Tj
+1 0 0 1 188.00 328.89 Tm (est ) Tj
+1 0 0 1 210.00 328.89 Tm (apparu ) Tj
+1 0 0 1 248.50 328.89 Tm (a ) Tj
+1 0 0 1 259.50 328.89 Tm (l'etape ) Tj
+1 0 0 1 303.50 328.89 Tm (2, ) Tj
+1 0 0 1 320.00 328.89 Tm (refaire ) Tj
+1 0 0 1 364.00 328.89 Tm (git ) Tj
+1 0 0 1 386.00 328.89 Tm (clone ) Tj
+1 0 0 1 419.00 328.89 Tm (- ) Tj
+1 0 0 1 430.00 328.89 Tm (ne ) Tj
+1 0 0 1 446.50 328.89 Tm (jamais ) Tj
+1 0 0 1 56.00 314.89 Tm (continuer ) Tj
+1 0 0 1 111.00 314.89 Tm (sur ) Tj
+1 0 0 1 133.00 314.89 Tm (un ) Tj
+1 0 0 1 149.50 314.89 Tm (clone ) Tj
+1 0 0 1 182.50 314.89 Tm (partiel. ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 292.89 Tm (find . -name "*.sh" | wc -l) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 269.89 Tm (Doit ) Tj
+1 0 0 1 83.50 269.89 Tm (renvoyer ) Tj
+1 0 0 1 133.00 269.89 Tm (un ) Tj
+1 0 0 1 149.50 269.89 Tm (nombre ) Tj
+1 0 0 1 188.00 269.89 Tm (proche ) Tj
+1 0 0 1 226.50 269.89 Tm (de ) Tj
+1 0 0 1 243.00 269.89 Tm (260 ) Tj
+1 0 0 1 265.00 269.89 Tm (\(jobs ) Tj
+1 0 0 1 298.00 269.89 Tm (Linux ) Tj
+1 0 0 1 331.00 269.89 Tm (+ ) Tj
+1 0 0 1 342.00 269.89 Tm (scripts ) Tj
+1 0 0 1 386.00 269.89 Tm (racine\). ) Tj
+1 0 0 1 435.50 269.89 Tm (Un ) Tj
+1 0 0 1 452.00 269.89 Tm (nombre ) Tj
+1 0 0 1 56.00 255.89 Tm (nettement ) Tj
+1 0 0 1 111.00 255.89 Tm (plus ) Tj
+1 0 0 1 138.50 255.89 Tm (bas ) Tj
+1 0 0 1 160.50 255.89 Tm (signifie ) Tj
+1 0 0 1 210.00 255.89 Tm (un ) Tj
+1 0 0 1 226.50 255.89 Tm (clone ) Tj
+1 0 0 1 259.50 255.89 Tm (incomplet. ) Tj
+/F2 12.00 Tf
+1 0 0 1 56.00 229.89 Tm (Etape 4 - Rendre les scripts executables) Tj
+/F1 9.50 Tf
+1 0 0 1 56.00 211.89 Tm (ATTENTION : Obligatoire : Git ne preserve pas les droits Unix depuis un clone HTTPS.) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 188.89 Tm (chmod +x orchestrator.sh jobs/*.sh) Tj
+/F2 12.00 Tf
+1 0 0 1 56.00 161.89 Tm (Etape 5 - Lancer) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 143.89 Tm (Sur ) Tj
+1 0 0 1 78.00 143.89 Tm (VM1, ) Tj
+1 0 0 1 105.50 143.89 Tm (ROLE=ELK_HOST ) Tj
+1 0 0 1 182.50 143.89 Tm (est ) Tj
+1 0 0 1 204.50 143.89 Tm (deja ) Tj
+1 0 0 1 232.00 143.89 Tm (la ) Tj
+1 0 0 1 248.50 143.89 Tm (valeur ) Tj
+1 0 0 1 287.00 143.89 Tm (par ) Tj
+1 0 0 1 309.00 143.89 Tm (defaut ) Tj
+1 0 0 1 347.50 143.89 Tm (dans ) Tj
+1 0 0 1 375.00 143.89 Tm (vars.conf ) Tj
+1 0 0 1 430.00 143.89 Tm (- ) Tj
+1 0 0 1 441.00 143.89 Tm (rien ) Tj
+1 0 0 1 468.50 143.89 Tm (a ) Tj
+1 0 0 1 479.50 143.89 Tm (changer. ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 121.89 Tm (./orchestrator.sh) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 98.89 Tm (Pour ) Tj
+1 0 0 1 83.50 98.89 Tm (VM2 ) Tj
+1 0 0 1 105.50 98.89 Tm (: ) Tj
+1 0 0 1 116.50 98.89 Tm (memes ) Tj
+1 0 0 1 149.50 98.89 Tm (etapes ) Tj
+1 0 0 1 188.00 98.89 Tm (1 ) Tj
+1 0 0 1 199.00 98.89 Tm (a ) Tj
+1 0 0 1 210.00 98.89 Tm (4, ) Tj
+1 0 0 1 226.50 98.89 Tm (puis ) Tj
+1 0 0 1 254.00 98.89 Tm (dans ) Tj
+1 0 0 1 281.50 98.89 Tm (vars.conf ) Tj
+1 0 0 1 336.50 98.89 Tm (changer ) Tj
+1 0 0 1 380.50 98.89 Tm (ROLE=AGENT_HOST ) Tj
+1 0 0 1 468.50 98.89 Tm (avant ) Tj
+1 0 0 1 56.00 84.89 Tm (l'etape ) Tj
+1 0 0 1 100.00 84.89 Tm (5 ) Tj
+1 0 0 1 111.00 84.89 Tm (\(detail ) Tj
+1 0 0 1 155.00 84.89 Tm (complet ) Tj
+1 0 0 1 199.00 84.89 Tm (: ) Tj
+1 0 0 1 210.00 84.89 Tm (GUIDE_EXPLOITATION.md ) Tj
+1 0 0 1 331.00 84.89 Tm (dans ) Tj
+1 0 0 1 358.50 84.89 Tm (le ) Tj
+1 0 0 1 375.00 84.89 Tm (depot, ) Tj
+1 0 0 1 413.50 84.89 Tm (feuille ) Tj
+1 0 0 1 457.50 84.89 Tm ('Deploiement ) Tj
+1 0 0 1 56.00 70.89 Tm (VM2' ) Tj
+1 0 0 1 83.50 70.89 Tm (du ) Tj
+1 0 0 1 100.00 70.89 Tm (classeur ) Tj
+1 0 0 1 149.50 70.89 Tm (Excel\). ) Tj
+ET
+
+endstream
+endobj
+5 0 obj
+<< /Length 5457 >>
+stream
+0.6 0.6 0.6 RG 0.7 w 56.00 773.89 m 539.28 773.89 l S
+0.93 0.93 0.93 rg 50.00 668.89 495.28 73.00 re f
+0.6 0.6 0.6 RG 0.7 w 56.00 648.89 m 539.28 648.89 l S
+0.93 0.93 0.93 rg 50.00 524.89 495.28 34.00 re f
+0.93 0.93 0.93 rg 50.00 443.89 495.28 21.00 re f
+0 g
+BT
+/F2 15.00 Tf
+1 0 0 1 56.00 779.89 Tm (B. Alternative sans git \(si son installation est refusee/impossible\)) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 757.89 Tm (Telechargement ) Tj
+1 0 0 1 138.50 757.89 Tm (direct ) Tj
+1 0 0 1 177.00 757.89 Tm (de ) Tj
+1 0 0 1 193.50 757.89 Tm (l'archive, ) Tj
+1 0 0 1 254.00 757.89 Tm (sans ) Tj
+1 0 0 1 281.50 757.89 Tm (clone ) Tj
+1 0 0 1 314.50 757.89 Tm (: ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 735.89 Tm (curl -L -o WEF.zip https://github.com/ykeupssi123-ship-it/WEF/archive/refs/heads/) Tj
+1 0 0 1 56.00 722.89 Tm (main.zip) Tj
+1 0 0 1 56.00 709.89 Tm (unzip WEF.zip) Tj
+1 0 0 1 56.00 696.89 Tm (cd WEF-main) Tj
+1 0 0 1 56.00 683.89 Tm (chmod +x orchestrator.sh jobs/*.sh) Tj
+/F2 15.00 Tf
+1 0 0 1 56.00 654.89 Tm (C. Optionnel - creer un compte GitHub personnel) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 632.89 Tm (Utile ) Tj
+1 0 0 1 89.00 632.89 Tm (si ) Tj
+1 0 0 1 105.50 632.89 Tm (la ) Tj
+1 0 0 1 122.00 632.89 Tm (personne ) Tj
+1 0 0 1 171.50 632.89 Tm (veut ) Tj
+1 0 0 1 199.00 632.89 Tm (forker/versionner ) Tj
+1 0 0 1 298.00 632.89 Tm (ses ) Tj
+1 0 0 1 320.00 632.89 Tm (propres ) Tj
+1 0 0 1 364.00 632.89 Tm (modifications ) Tj
+1 0 0 1 441.00 632.89 Tm (pour ) Tj
+1 0 0 1 468.50 632.89 Tm (sa ) Tj
+1 0 0 1 56.00 618.89 Tm (soutenance. ) Tj
+1 0 0 1 56.00 596.89 Tm (1. ) Tj
+1 0 0 1 72.50 596.89 Tm (https://github.com/signup ) Tj
+1 0 0 1 215.50 596.89 Tm (- ) Tj
+1 0 0 1 226.50 596.89 Tm (creer ) Tj
+1 0 0 1 259.50 596.89 Tm (le ) Tj
+1 0 0 1 276.00 596.89 Tm (compte. ) Tj
+1 0 0 1 56.00 574.89 Tm (2. ) Tj
+1 0 0 1 72.50 574.89 Tm (Configurer ) Tj
+1 0 0 1 133.00 574.89 Tm (l'identite ) Tj
+1 0 0 1 193.50 574.89 Tm (locale ) Tj
+1 0 0 1 232.00 574.89 Tm (sur ) Tj
+1 0 0 1 254.00 574.89 Tm (sa ) Tj
+1 0 0 1 270.50 574.89 Tm (machine ) Tj
+1 0 0 1 314.50 574.89 Tm (\(une ) Tj
+1 0 0 1 342.00 574.89 Tm (seule ) Tj
+1 0 0 1 375.00 574.89 Tm (fois\) ) Tj
+1 0 0 1 408.00 574.89 Tm (: ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 552.89 Tm (git config --global user.name "Prenom Nom") Tj
+1 0 0 1 56.00 539.89 Tm (git config --global user.email "email@exemple.com") Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 516.89 Tm (3. ) Tj
+1 0 0 1 72.50 516.89 Tm (Sur ) Tj
+1 0 0 1 94.50 516.89 Tm (la ) Tj
+1 0 0 1 111.00 516.89 Tm (page ) Tj
+1 0 0 1 138.50 516.89 Tm (du ) Tj
+1 0 0 1 155.00 516.89 Tm (depot ) Tj
+1 0 0 1 188.00 516.89 Tm (\(https://github.com/ykeupssi123-ship-it/WEF\), ) Tj
+1 0 0 1 441.00 516.89 Tm (bouton ) Tj
+/F2 10.00 Tf
+1 0 0 1 479.50 516.89 Tm (Fork ) Tj
+/F1 10.00 Tf
+1 0 0 1 508.50 516.89 Tm (en ) Tj
+1 0 0 1 56.00 502.89 Tm (haut ) Tj
+1 0 0 1 83.50 502.89 Tm (a ) Tj
+1 0 0 1 94.50 502.89 Tm (droite ) Tj
+1 0 0 1 133.00 502.89 Tm (-> ) Tj
+1 0 0 1 149.50 502.89 Tm (cree ) Tj
+1 0 0 1 177.00 502.89 Tm (sa ) Tj
+1 0 0 1 193.50 502.89 Tm (propre ) Tj
+1 0 0 1 232.00 502.89 Tm (copie ) Tj
+1 0 0 1 265.00 502.89 Tm (sous ) Tj
+1 0 0 1 292.50 502.89 Tm (son ) Tj
+1 0 0 1 314.50 502.89 Tm (compte. ) Tj
+1 0 0 1 56.00 480.89 Tm (4. ) Tj
+1 0 0 1 72.50 480.89 Tm (Cloner ) Tj
+1 0 0 1 111.00 480.89 Tm (sa ) Tj
+1 0 0 1 127.50 480.89 Tm (copie ) Tj
+1 0 0 1 160.50 480.89 Tm (\(remplacer ) Tj
+1 0 0 1 221.00 480.89 Tm (SON-COMPTE\) ) Tj
+1 0 0 1 287.00 480.89 Tm (: ) Tj
+/F3 9.50 Tf
+1 0 0 1 56.00 458.89 Tm (git clone https://github.com/SON-COMPTE/WEF.git) Tj
+/F1 10.00 Tf
+1 0 0 1 56.00 435.89 Tm (5. ) Tj
+1 0 0 1 72.50 435.89 Tm (Pour ) Tj
+1 0 0 1 100.00 435.89 Tm (pousser ) Tj
+1 0 0 1 144.00 435.89 Tm (ses ) Tj
+1 0 0 1 166.00 435.89 Tm (propres ) Tj
+1 0 0 1 210.00 435.89 Tm (changements ) Tj
+1 0 0 1 276.00 435.89 Tm (ensuite, ) Tj
+1 0 0 1 325.50 435.89 Tm (GitHub ) Tj
+1 0 0 1 364.00 435.89 Tm (demandera ) Tj
+1 0 0 1 419.00 435.89 Tm (une ) Tj
+1 0 0 1 441.00 435.89 Tm (authentification ) Tj
+1 0 0 1 56.00 421.89 Tm (par ) Tj
+/F2 10.00 Tf
+1 0 0 1 78.00 421.89 Tm (token ) Tj
+/F1 10.00 Tf
+1 0 0 1 112.80 421.89 Tm (\(pas ) Tj
+1 0 0 1 140.30 421.89 Tm (le ) Tj
+1 0 0 1 156.80 421.89 Tm (mot ) Tj
+1 0 0 1 178.80 421.89 Tm (de ) Tj
+1 0 0 1 195.30 421.89 Tm (passe ) Tj
+1 0 0 1 228.30 421.89 Tm (du ) Tj
+1 0 0 1 244.80 421.89 Tm (compte, ) Tj
+1 0 0 1 288.80 421.89 Tm (refuse ) Tj
+1 0 0 1 327.30 421.89 Tm (depuis ) Tj
+1 0 0 1 365.80 421.89 Tm (2021\) ) Tj
+1 0 0 1 398.80 421.89 Tm (: ) Tj
+1 0 0 1 409.80 421.89 Tm (Settings ) Tj
+1 0 0 1 459.30 421.89 Tm (-> ) Tj
+1 0 0 1 475.80 421.89 Tm (Developer ) Tj
+1 0 0 1 56.00 407.89 Tm (settings ) Tj
+1 0 0 1 105.50 407.89 Tm (-> ) Tj
+1 0 0 1 122.00 407.89 Tm (Personal ) Tj
+1 0 0 1 171.50 407.89 Tm (access ) Tj
+1 0 0 1 210.00 407.89 Tm (tokens ) Tj
+1 0 0 1 248.50 407.89 Tm (-> ) Tj
+1 0 0 1 265.00 407.89 Tm (generer ) Tj
+1 0 0 1 309.00 407.89 Tm (un ) Tj
+1 0 0 1 325.50 407.89 Tm (token, ) Tj
+1 0 0 1 364.00 407.89 Tm (l'utiliser ) Tj
+1 0 0 1 424.50 407.89 Tm (comme ) Tj
+1 0 0 1 457.50 407.89 Tm (mot ) Tj
+1 0 0 1 479.50 407.89 Tm (de ) Tj
+1 0 0 1 496.00 407.89 Tm (passe ) Tj
+1 0 0 1 56.00 393.89 Tm (au ) Tj
+1 0 0 1 72.50 393.89 Tm (premier ) Tj
+1 0 0 1 116.50 393.89 Tm (git ) Tj
+1 0 0 1 138.50 393.89 Tm (push ) Tj
+1 0 0 1 166.00 393.89 Tm (\(Windows/Git ) Tj
+1 0 0 1 237.50 393.89 Tm (Credential ) Tj
+1 0 0 1 298.00 393.89 Tm (Manager ) Tj
+1 0 0 1 342.00 393.89 Tm (le ) Tj
+1 0 0 1 358.50 393.89 Tm (retiendra ) Tj
+1 0 0 1 413.50 393.89 Tm (ensuite\). ) Tj
+ET
+
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 4 0 R >>
+endobj
+7 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 5 0 R >>
+endobj
+8 0 obj
+<< /Type /Pages /Kids [6 0 R 7 0 R] /Count 2 >>
+endobj
+9 0 obj
+<< /Type /Catalog /Pages 8 0 R >>
+endobj
+10 0 obj
+<< /Title (Procedure de connexion GitHub - WAZ_ELK_FACTORY) /Producer (WAZ_ELK_FACTORY gen_pdf.py) >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000112 00000 n 
+0000000214 00000 n 
+0000000309 00000 n 
+0000008766 00000 n 
+0000014275 00000 n 
+0000014427 00000 n 
+0000014579 00000 n 
+0000014642 00000 n 
+0000014691 00000 n 
+trailer
+<< /Size 11 /Root 9 0 R /Info 10 0 R >>
+startxref
+14809
+%%EOF

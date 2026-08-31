@@ -1,0 +1,257 @@
+JOB_ID,JOB_NAME,JOB_ROLE,COMPONENT,SCRIPT_FILE,DESC,IN_COND,OUT_COND
+PKI_001,WEF_PKI_BLD_GRPNEW,ELK_HOST,ALWAYS,PKI_001.sh,Raccordement : Création du groupe de confiance partagé de l'usine,NONE,PKI_GROUP_OK
+PKI_002,WEF_PKI_BLD_DIRNEW,ELK_HOST,ALWAYS,PKI_002.sh,Structures : Création du coffre-fort neutre d'ancrage des clés de l'usine,PKI_GROUP_OK,PKI_DIR_OK
+PKI_003,WEF_PKI_BLD_CAKEYGEN,ELK_HOST,ALWAYS,PKI_003.sh,Génération d'Ancre : Création de la clé privée de la CA racine globale,PKI_DIR_OK,PKI_CA_KEY_OK
+PKI_004,WEF_PKI_BLD_CACRTGEN,ELK_HOST,ALWAYS,PKI_004.sh,Génération d'Ancre : Création du certificat CA racine (FactoryRootCA),PKI_CA_KEY_OK,PKI_CA_CERT_OK
+PKI_005,WEF_PKI_BLD_SRVKEYGEN,ELK_HOST,ALWAYS,PKI_005.sh,Plomberie : Génération de la clé privée générique pour l'interface réseau,PKI_CA_CERT_OK,PKI_SRV_KEY_OK
+PKI_006,WEF_PKI_BLD_SRVCSRGEN,ELK_HOST,ALWAYS,PKI_006.sh,Plomberie : Génération de la CSR pour le nœud d'ingestion global,PKI_SRV_KEY_OK,PKI_SRV_CSR_OK
+PKI_007,WEF_PKI_BLD_SRVCRTSIGN,ELK_HOST,ALWAYS,PKI_007.sh,Signature Fédérée : Production du certificat serveur avec SAN local unifié,PKI_SRV_CSR_OK,PKI_SRV_CERT_OK
+PKI_008,WEF_PKI_BLD_CHAINGEN,ELK_HOST,ALWAYS,PKI_008.sh,Assemblage : Construction de la chaîne de confiance et de la fullchain d'usine,PKI_SRV_CERT_OK,PKI_CHAIN_READY
+PKI_009,WEF_PKI_BLD_SYSTEMTRUST,ELK_HOST,ALWAYS,PKI_009.sh,Ancrage Local : Injection de la CA d'usine dans le magasin de confiance de l'OS,PKI_CHAIN_READY,PKI_TRUST_OK
+PKI_010,WEF_PKI_BLD_CLEANCSR,ELK_HOST,ALWAYS,PKI_010.sh,Nettoyage : Évacuation des résidus de calcul éphémères du coffre central,PKI_TRUST_OK,PKI_CLEAN_OK
+PKI_011,WEF_PKI_BLD_PERMRSTRCT,ELK_HOST,ALWAYS,PKI_011.sh,Verrouillage Hermétique : Isolation et attribution des droits au groupe partagé,PKI_CLEAN_OK,PKI_CRYPTO_ARMED
+ES_001,WEF_ES_BLD_OSUPDATE,ELK_HOST,ALWAYS,ES_001.sh,Terrassement : Mise à jour OS Oracle Linux 8.10,PKI_CRYPTO_ARMED,ES_OS_UPDATED
+ES_B001_RAM_CHECK,WEF_ES_BLD_MINRAMVERIFY,ELK_HOST,ALWAYS,ES_B001_RAM_CHECK.sh,Contrôle Capacitaire : Vérification du seuil minimal de mémoire physique,ES_OS_UPDATED,ES_RAM_CONFIRMED
+ES_002,WEF_ES_BLD_OSLIMIT,ELK_HOST,ALWAYS,ES_002.sh,Durcissement : Fixation définitive ulimit -n 65536 et memlock unlimited,ES_RAM_CONFIRMED,ES_LIMITS_OK
+ES_003,WEF_ES_BLD_OSSWPPNS,ELK_HOST,ALWAYS,ES_003.sh,Durcissement : Fixation stable de vm.swappiness=1,ES_LIMITS_OK,ES_SWAP_OK
+ES_004,WEF_ES_BLD_OSTHP,ELK_HOST,ALWAYS,ES_004.sh,Durcissement : Désactivation permanente des THP via rc.local,ES_SWAP_OK,ES_KERNEL_READY
+ES_005,WEF_ES_BLD_OSMAXMAP,ELK_HOST,ALWAYS,ES_005.sh,Durcissement : Augmentation vm.max_map_count à 262144,ES_KERNEL_READY,ES_MAP_COUNT_OK
+ES_006,WEF_ES_BLD_USRNEW,ELK_HOST,ALWAYS,ES_006.sh,Isolation : Création sécurisée de l'utilisateur 'elasticsearch',ES_MAP_COUNT_OK,ES_USER_READY
+ES_007,WEF_ES_BLD_DIRSTRUCT,ELK_HOST,ALWAYS,ES_007.sh,Structures : Initialisation des répertoires de données - logs et conf,ES_USER_READY,ES_DIRS_OK
+ES_008,WEF_ES_BLD_DIROWNER2,ELK_HOST,ALWAYS,ES_008.sh,Droits : Alignement des permissions propriétaires sur les dossiers,ES_DIRS_OK,ES_OWNER_OK
+ES_009,WEF_ES_BLD_UTILSINSTLL,ELK_HOST,ALWAYS,ES_009.sh,Plomberie : Installation exclusive de wget - unzip et policycoreutils,ES_OWNER_OK,ES_ENV_READY
+ES_010,WEF_ES_BLD_TMPSECURE,ELK_HOST,ALWAYS,ES_010.sh,Durcissement : Sécurisation avec sticky bit du dossier /tmp,ES_ENV_READY,ES_TMP_ARMED
+ES_011,WEF_ES_BLD_FWARMING,ELK_HOST,ALWAYS,ES_011.sh,Périmètre : Activation permanente du pare-feu local,ES_TMP_ARMED,ES_FW_ACTIVE
+ES_012,WEF_ES_BLD_FWZONEDEF,ELK_HOST,ALWAYS,ES_012.sh,Châssis Réseau : Création de la zone d'ingestion permanente,ES_FW_ACTIVE,ES_FW_ZONE_OK
+ES_013,WEF_ES_BLD_FWOPEN9200,ELK_HOST,ALWAYS,ES_013.sh,Désoperculage Port : Ouverture persistante de la fiche locale 9200,ES_FW_ZONE_OK,ES_FW_9200_OK
+ES_014,WEF_ES_BLD_FWOPEN9300,ELK_HOST,ALWAYS,ES_014.sh,Désoperculage Port : Ouverture persistante de la fiche locale 9300,ES_FW_9200_OK,ES_FW_9300_OK
+ES_015,WEF_ES_BLD_FWAPPLY,ELK_HOST,ALWAYS,ES_015.sh,Mise en ligne Barrière : Application à chaud des règles OS,ES_FW_9300_OK,ES_FW_ARMED
+ES_B015_GPG,WEF_ES_BLD_GPGKEYIMPORT,ELK_HOST,ALWAYS,ES_B015_GPG.sh,Terrassement : Importation de la clé GPG officielle d'Elastic,ES_FW_ARMED,ES_GPG_OK
+ES_016,WEF_ES_BLD_REPOSET,ELK_HOST,ALWAYS,ES_016.sh,Acheminement : Configuration immuable du dépôt officiel,ES_GPG_OK,ES_REPO_OK
+ES_017,WEF_ES_BLD_BININST,ELK_HOST,ALWAYS,ES_017.sh,Pose Parpaings : Installation physique du paquet binaire,ES_REPO_OK,ES_BIN_OK
+ES_018,WEF_ES_BLD_CRYPCHK,ELK_HOST,ALWAYS,ES_018.sh,Validation Inter-Blocs : Contrôle d'accès au coffre neutre de l'usine,ES_BIN_OK,ES_PKI_READY
+ES_019,WEF_ES_BLD_ACLREAD,ELK_HOST,ALWAYS,ES_019.sh,Raccordement : Ajout de l'utilisateur 'elasticsearch' au groupe sécurisé,ES_PKI_READY,ES_CERTS_READY
+ES_020,WEF_ES_BLD_DIRSECU,ELK_HOST,ALWAYS,ES_020.sh,Structures : Nettoyage et verrouillage du dossier local certs,ES_CERTS_READY,ES_CRYPTO_ARMED
+ES_021,WEF_ES_BLD_KSTINIT,ELK_HOST,ALWAYS,ES_021.sh,Coffre Local : Initialisation du conteneur crypté,ES_CRYPTO_ARMED,ES_KEYSTORE_OK
+ES_022,WEF_ES_BLD_KSTARMED,ELK_HOST,ALWAYS,ES_022.sh,Sécurisation : Amorçage non-interactif des clés d'accès,ES_KEYSTORE_OK,ES_SECRETS_ARMED
+ES_023,WEF_ES_BLD_YMLTARGETCONF,ELK_HOST,ALWAYS,ES_023.sh,Câblage Cible : Isolation stricte sur 127.0.0.1 - raccordement aux ancres PKI et bootstrap.memory_lock,ES_SECRETS_ARMED,ES_YML_CONFIG_OK
+ES_024,WEF_ES_BLD_JVMOPTNS,ELK_HOST,ALWAYS,ES_024.sh,Raccordement : Fixation définitive du tas JVM à 4G,ES_YML_CONFIG_OK,ES_JVM_OK
+ES_025,WEF_ES_BLD_CLEANOLDCRYPTO,ELK_HOST,ALWAYS,ES_025.sh,Nettoyage : Évacuation définitive des artéfacts locaux obsolètes,ES_JVM_OK,ES_CLEAN_OK
+ES_026,WEF_ES_BLD_STARTENGINE,ELK_HOST,ALWAYS,ES_026.sh,Mise sous tension : Démarrage du démon d'infrastructure,ES_CLEAN_OK,ES_SERVICE_UP
+ES_027,WEF_ES_RUN_HLTPOLL,ELK_HOST,ALWAYS,ES_027.sh,Contrôle Pression : Polling local actif de l'API,ES_SERVICE_UP,ES_HEALTH_OK
+ES_028,WEF_ES_RUN_SOCKETJSON,ELK_HOST,ALWAYS,ES_028.sh,Fiche [USB 2.3] : Pipeline d'ingestion brute JSON,ES_HEALTH_OK,ES_SOCKET_JSON_OK
+ES_029,WEF_ES_RUN_SOCKETSYSLOG,ELK_HOST,ALWAYS,ES_029.sh,Fiche [USB 3.0] : Pipeline d'ingestion Syslog RFC5424,ES_SOCKET_JSON_OK,ES_SOCKET_SYSLOG_OK
+ES_030,WEF_ES_RUN_SOCKETCEF,ELK_HOST,ALWAYS,ES_030.sh,Fiche [RJ45 SEC] : Pipeline décodage Common Event Format,ES_SOCKET_SYSLOG_OK,ES_SOCKET_CEF_OK
+ES_031,WEF_ES_RUN_SOCKETCSV,ELK_HOST,ALWAYS,ES_031.sh,Fiche [SERIE / TEXT] : Pipeline de traitement de fichiers plats CSV,ES_SOCKET_CEF_OK,ES_SOCKET_CSV_OK
+ES_032,WEF_ES_RUN_SOCKETW7XML,ELK_HOST,ALWAYS,ES_032.sh,Fiche [SATELLITE] : Pipeline de décodage des structures XML Windows,ES_SOCKET_CSV_OK,ES_WINDOWS_XML_OK
+ES_033,WEF_ES_RUN_SOCKETIS8601,ELK_HOST,ALWAYS,ES_033.sh,Adaptateur Horloge : Normalisation universelle temporelle,ES_WINDOWS_XML_OK,ES_SOCKET_TIME_OK
+ES_034,WEF_ES_RUN_SOCKETANONYM,ELK_HOST,ALWAYS,ES_034.sh,Filtre Sécurité : Suppresseur universel de données sensibles,ES_SOCKET_TIME_OK,ES_SOCKET_MASK_OK
+ES_035,WEF_ES_RUN_SOCKETDRPPR,ELK_HOST,ALWAYS,ES_035.sh,Filtre Débit : Disjoncteur automatique de logs parasites,ES_SOCKET_MASK_OK,FACTORY_ES_READY
+ES_036,WEF_ES_RUN_COMPVFY,ELK_HOST,ALWAYS,ES_036.sh,Contrôle Raccordement : Validation fonctionnelle des fiches,FACTORY_ES_READY,ES_SOCKETS_VERIFIED
+ES_037,WEF_ES_RUN_ILMPOLGEN,ELK_HOST,ALWAYS,ES_037.sh,Cycle de Vie : Définition des règles de purge et de rollover,ES_SOCKETS_VERIFIED,ES_ILM_OK
+ES_038,WEF_ES_RUN_IDXTPL,ELK_HOST,ALWAYS,ES_038.sh,Châssis Logique : Paramètres d'indexation globaux (1 Shard),ES_ILM_OK,ES_COMP_TPL_OK
+ES_039,WEF_ES_RUN_MAPTPL,ELK_HOST,ALWAYS,ES_039.sh,Châssis Logique : Schéma de réception dynamic keyword,ES_COMP_TPL_OK,ES_COMP_MAP_OK
+ES_040,WEF_ES_RUN_IDXPATGEN,ELK_HOST,ALWAYS,ES_040.sh,Assemblage Prise : Création du gabarit d'interception log-*,ES_COMP_MAP_OK,ES_TEMPLATE_OK
+ES_041,WEF_ES_RUN_IDXLIMIT,ELK_HOST,ALWAYS,ES_041.sh,Disjoncteur Cluster : Verrouillage des index hors gabarit,ES_TEMPLATE_OK,ES_AUTO_BLOCK_OK
+ES_042,WEF_ES_BLD_DISCOSET,ELK_HOST,ALWAYS,ES_042.sh,Autonomie : Validation finale du mode single-node,ES_AUTO_BLOCK_OK,ES_DISCOVERY_OK
+ES_043,WEF_ES_RUN_MEMLOCKCHK,ELK_HOST,ALWAYS,ES_043.sh,Contrôle Rigueur : Validation du verrouillage mémoire RAM,ES_DISCOVERY_OK,ES_MEM_LOCK_OK
+ES_044,WEF_ES_RUN_OPENFILESVERIFY,ELK_HOST,ALWAYS,ES_044.sh,Contrôle Charge : Vérification réelle des descripteurs,ES_MEM_LOCK_OK,ES_PROC_LIMITS_OK
+ES_045,WEF_ES_RUN_SSLCONTEST,ELK_HOST,ALWAYS,ES_045.sh,Contrôle Isolation : Rejet des accès réseau non chiffrés,ES_PROC_LIMITS_OK,ES_SSL_VERIFIED
+ES_046,WEF_ES_RUN_STRESSTESTPIPE,ELK_HOST,ALWAYS,ES_046.sh,Épreuve de Pression : Simulation de charge d'ingestion,ES_SSL_VERIFIED,ES_STRESS_OK
+ES_047,WEF_ES_BLD_LGRTTSETUP,ELK_HOST,ALWAYS,ES_047.sh,Contrôle Traces : Configuration de la purge automatique OS,ES_STRESS_OK,ES_ROTATE_CONF_OK
+ES_048,WEF_ES_BLD_LGRTTVALID,ELK_HOST,ALWAYS,ES_048.sh,Contrôle Traces : Test d'exécution forcée de la rotation,ES_ROTATE_CONF_OK,ES_ROTATE_VALID_OK
+ES_049,WEF_ES_RUN_DISKCHK,ELK_HOST,ALWAYS,ES_049.sh,Contrôle Masse : Évaluation de la réserve physique utile,ES_ROTATE_VALID_OK,ES_DISK_CHECK_OK
+ES_050,WEF_ES_RUN_APIFCTRYUSER,ELK_HOST,ALWAYS,ES_050.sh,Prise Universelle : Armement du compte d'ingestion mutualisé,ES_DISK_CHECK_OK,ES_FACTORY_USER_OK
+ES_050B,WEF_ES_RUN_APIFCTRYPWD,ELK_HOST,ALWAYS,ES_050B.sh,Prise Universelle (alternative) : armement du compte d'ingestion par mot de passe,ES_DISK_CHECK_OK,ES_FACTORY_USER_PWD_OK
+ES_051,WEF_ES_RUN_CRASHTRGGR,ELK_HOST,ALWAYS,ES_051.sh,Simulation Sinistre : Arrêt brutal par destruction du PID,ES_FACTORY_USER_OK,ES_ENGINE_CRASHED
+ES_052,WEF_ES_RUN_SYSDRCVR,ELK_HOST,ALWAYS,ES_052.sh,Vérification Relance : Redémarrage après sinistre,ES_ENGINE_CRASHED,ES_RECOVERY_UP
+ES_053,WEF_ES_RUN_POSTCRASHPOLL,ELK_HOST,ALWAYS,ES_053.sh,Contrôle Santé : Réponse de l'API post-destruction,ES_RECOVERY_UP,ES_RECOVERY_HEALTH_OK
+ES_054,WEF_ES_RUN_PIPESURV,ELK_HOST,ALWAYS,ES_054.sh,Contrôle Mémoire : Persistance des ports logiques injectés,ES_RECOVERY_HEALTH_OK,ES_RECOVERY_PIPES_OK
+ES_055,WEF_ES_RUN_HARDRSTRTTEST,ELK_HOST,ALWAYS,ES_055.sh,Épreuve Volatile : Redémarrage complet à froid du démon de l'OS,ES_RECOVERY_PIPES_OK,ES_RESTART_DONE
+ES_056,WEF_ES_RUN_POSTRSTRTPOLL,ELK_HOST,ALWAYS,ES_056.sh,Épreuve Volatile : Polling de réactivité post-purge RAM,ES_RESTART_DONE,ES_POST_RESTART_OK
+ES_057,WEF_ES_RUN_FWSTATCHK,ELK_HOST,ALWAYS,ES_057.sh,Épreuve Volatile : Maintien de l'isolation du pare-feu,ES_POST_RESTART_OK,ES_POST_FW_OK
+ES_058,WEF_ES_RUN_SECSURV,ELK_HOST,ALWAYS,ES_058.sh,Épreuve Volatile : Persistance des identifiants maîtres,ES_POST_FW_OK,ES_SEC_SURVIVED
+ES_059,WEF_ES_BLD_CFGLOCK,ELK_HOST,ALWAYS,ES_059.sh,Sûreté : Passage des fichiers clés en mode immuable,ES_SEC_SURVIVED,ES_CONF_IMMUTABLE
+ES_060,WEF_ES_BLD_DMNRELOAD,ELK_HOST,ALWAYS,ES_060.sh,Fermeture Chantier : Figeage définitif du système,ES_CONF_IMMUTABLE,ES_DAEMONS_LOCKED
+ES_061,WEF_ES_RUN_GTECHASSIS,ELK_HOST,ALWAYS,ES_061.sh,Vanne Maîtresse : Émission de la condition globale,ES_DAEMONS_LOCKED,DALLE_ELASTIC_ONLINE
+LS_001,WEF_LS_BLD_OSPREP,ELK_HOST,ALWAYS,LS_001.sh,Terrassement : Alignement OS Oracle Linux 8.10 pour Logstash,DALLE_ELASTIC_ONLINE,LS_OS_READY
+LS_002,WEF_LS_BLD_JAVACHECK,ELK_HOST,ALWAYS,LS_002.sh,Vérification Plomberie : Validation du runtime OpenJDK 17,LS_OS_READY,LS_JAVA_OK
+LS_003,WEF_LS_BLD_USRNEW,ELK_HOST,ALWAYS,LS_003.sh,Isolation : Création de l'entité système confinée 'logstash',LS_JAVA_OK,LS_USER_READY
+LS_004,WEF_LS_BLD_DIRINIT,ELK_HOST,ALWAYS,LS_004.sh,Structures : Initialisation des répertoires de transit de données,LS_USER_READY,LS_DIRS_OK
+LS_005,WEF_LS_BLD_DIROWNER,ELK_HOST,ALWAYS,LS_005.sh,Droits : Alignement des permissions de l'entité confinée,LS_DIRS_OK,LS_OWNER_OK
+LS_006,WEF_LS_BLD_FWZONE,ELK_HOST,ALWAYS,LS_006.sh,Châssis Réseau : Déclaration de la zone étanche CollectZone,LS_OWNER_OK,LS_FW_ZONE_OK
+LS_007,WEF_LS_BLD_FWPORT514,ELK_HOST,ALWAYS,LS_007.sh,Désoperculage Fiche : Ouverture du port Syslog standard local 514,LS_FW_ZONE_OK,LS_FW_514_OK
+LS_008,WEF_LS_BLD_FWPORTUNVRSL,ELK_HOST,ALWAYS,LS_008.sh,Désoperculage Fiche : Ouverture du port de collecte sécurisé local 5044,LS_FW_514_OK,LS_FW_5044_OK
+LS_009,WEF_LS_BLD_FWAPPLY,ELK_HOST,ALWAYS,LS_009.sh,Mise en ligne Barrière : Fixation persistante des règles,LS_FW_5044_OK,LS_FW_ARMED
+LS_010,WEF_LS_BLD_REPOSET,ELK_HOST,ALWAYS,LS_010.sh,Acheminement : Configuration du dépôt officiel de confiance,LS_FW_ARMED,LS_REPO_OK
+LS_011,WEF_LS_BLD_BININST,ELK_HOST,ALWAYS,LS_011.sh,Pose Parpaings : Installation physique du paquet Logstash,LS_REPO_OK,LS_BIN_OK
+LS_012,WEF_LS_BLD_CRYPCHK,ELK_HOST,ALWAYS,LS_012.sh,Validation Inter-Blocs : Contrôle d'accès au coffre neutre de l'usine,LS_BIN_OK|PKI_CRYPTO_ARMED,LS_PKI_READY
+LS_013,WEF_LS_BLD_ACLREAD,ELK_HOST,ALWAYS,LS_013.sh,Raccordement : Inclusion de 'logstash' dans le groupe crypto partagé,LS_PKI_READY,LS_CERTS_READY
+LS_014,WEF_LS_BLD_DIRSECU,ELK_HOST,ALWAYS,LS_014.sh,Structures : Condamnation de l'ancien espace crypto local,LS_CERTS_READY,LS_CRYPTO_ARMED
+LS_015,WEF_LS_BLD_PQENABLE,ELK_HOST,ALWAYS,LS_015.sh,Amortisseur : Activation des Persistent Queues (PQ),LS_CRYPTO_ARMED,LS_PQ_ENABLED
+LS_016,WEF_LS_BLD_PQSIZE,ELK_HOST,ALWAYS,LS_016.sh,Amortisseur : Fixation de la taille limite de la queue à 10GB,LS_PQ_ENABLED,LS_PQ_SIZE_OK
+LS_017,WEF_LS_BLD_JVMTUNING,ELK_HOST,ALWAYS,LS_017.sh,Raccordement : Fixation de la mémoire allouée à la JVM (Xms4g/Xmx4g),LS_PQ_SIZE_OK,LS_JVM_TUNED
+LS_018,WEF_LS_BLD_DLQSETUP,ELK_HOST,ALWAYS,LS_018.sh,Disjoncteur : Activation de la Dead Letter Queue pour logs corrompus,LS_JVM_TUNED,LS_DLQ_OK
+LS_019,WEF_LS_BLD_PLGNSVAL,ELK_HOST,ALWAYS,LS_019.sh,Vanne Prises : Validation et installation des modules de sortie mondiaux,LS_DLQ_OK,LS_PLUGINS_OK
+LS_020,WEF_LS_BLD_INPUTUNVRSL,ELK_HOST,ALWAYS,LS_020.sh,Câblage Cible : Entrée SSL Universelle connectée sur le coffre neutre local,LS_PLUGINS_OK,LS_INPUT_READY
+LS_021,WEF_LS_RUN_FILTERMASKPCI,ELK_HOST,ALWAYS,LS_021.sh,Filtre Éthique : Anonymisation des cartes bancaires (PCI-DSS),LS_INPUT_READY,LS_PCI_MASK_OK
+LS_022,WEF_LS_RUN_FILTERMASKPWD,ELK_HOST,ALWAYS,LS_022.sh,Filtre Éthique : Suppression des mots de passe en clair,LS_PCI_MASK_OK,LS_PWD_MASK_OK
+LS_023,WEF_LS_RUN_FILTERGEOIP,ELK_HOST,ALWAYS,LS_023.sh,Enrichment : Activation du module GeoIP pour traçabilité,LS_PWD_MASK_OK,LS_GEOIP_OK
+LS_024,WEF_LS_BLD_OUTAGN,ELK_HOST,ALWAYS,LS_024.sh,Aiguillage Planétaire : Câblage direct vers la dalle locale,LS_GEOIP_OK,LS_OUTPUT_OK
+LS_B025_ARMED,WEF_LS_BLD_KSTSECRET,ELK_HOST,ALWAYS,LS_B025_ARMED.sh,Sécurisation : Injection du token d'ingestion usine dans le coffre local,LS_OUTPUT_OK,LS_KEYSTORE_ARMED
+LS_026_FINAL,WEF_LS_BLD_STARTLGSTSH,ELK_HOST,ALWAYS,LS_026_FINAL.sh,Mise sous tension Logstash : Lancement final du collecteur,LS_KEYSTORE_ARMED,FACTORY_LOGSTASH_ONLINE
+LS_027,WEF_LS_RUN_LOGPOLL,ELK_HOST,ALWAYS,LS_027.sh,Contrôle Pression : Analyse du fichier de démarrage,FACTORY_LOGSTASH_ONLINE,LS_BOOT_OK
+LS_028,WEF_LS_RUN_MTRPOLL,ELK_HOST,ALWAYS,LS_028.sh,Contrôle Raccordement : Polling de l'API locale (9600),LS_BOOT_OK,LS_HEALTH_OK
+LS_029,WEF_LS_RUN_SIMABS,ELK_HOST,ALWAYS,LS_029.sh,Crash Test : Simulation d'absence totale du moteur de stockage local,LS_HEALTH_OK,LS_STORAGE_ABSENT
+LS_030,WEF_LS_RUN_INJECTRAW,ELK_HOST,ALWAYS,LS_030.sh,Épreuve de Charge : Agression de la prise en mode isolé,LS_STORAGE_ABSENT,LS_DATA_INJECTED
+LS_031,WEF_LS_RUN_FLBKVFY,ELK_HOST,ALWAYS,LS_031.sh,Contrôle Dérivation : Vérification du stockage temporaire dans les Persistent Queues,LS_DATA_INJECTED,LS_FALLBACK_OK
+LS_032,WEF_LS_RUN_DLQVERIFY,ELK_HOST,ALWAYS,LS_032.sh,Contrôle Disjoncteur : Injection d'un log corrompu (Crash-test structure),LS_FALLBACK_OK,LS_DLQ_PROVED
+LS_033,WEF_LS_RUN_NETRST,ELK_HOST,ALWAYS,LS_033.sh,Rétablissement : Réouverture des vannes de communication locales,LS_DLQ_PROVED,LS_NETWORK_RESTORED
+LS_034,WEF_LS_BLD_LGRTTCONF,ELK_HOST,ALWAYS,LS_034.sh,Contrôle Traces : Alignement de la rotation des logs internes,LS_NETWORK_RESTORED,LS_ROTATE_OK
+LS_035_PREP,WEF_LS_RUN_GTERDY,ELK_HOST,ALWAYS,LS_035_PREP.sh,Vanne Maîtresse : Émission du signal d'indépendance absolue,LS_ROTATE_OK,LOGSTASH_COLLECTOR_ONLINE
+ES_059_FINAL,WEF_ES_BLD_VAULTSEAL,ELK_HOST,ALWAYS,ES_059_FINAL.sh,Sûreté Absolue : Passage du fichier clé Elastic en mode immuable,LOGSTASH_COLLECTOR_ONLINE,FACTORY_SHIELD_SEALED
+KB_001,WEF_KB_BLD_OSPREP,ELK_HOST,ALWAYS,KB_001.sh,Alignement OS Oracle Linux 8.10 pour Kibana Souverain,DALLE_ELASTIC_ONLINE,KB_OS_READY
+KB_002,WEF_KB_BLD_USRNEW,ELK_HOST,ALWAYS,KB_002.sh,Confinement : Création de l'entité système isolée 'kibana',KB_OS_READY,KB_USER_READY
+KB_003,WEF_KB_BLD_DIRINIT,ELK_HOST,ALWAYS,KB_003.sh,Structures : Initialisation des répertoires de stockage des objets,KB_USER_READY,KB_DIRS_OK
+KB_004,WEF_KB_BLD_REPOSET,ELK_HOST,ALWAYS,KB_004.sh,Acheminement : Configuration du dépôt officiel signé,KB_DIRS_OK,KB_REPO_OK
+KB_005,WEF_KB_BLD_BININST,ELK_HOST,ALWAYS,KB_005.sh,Pose Parpaings : Installation du paquet Kibana isolé,KB_REPO_OK,KB_BIN_OK
+KB_006,WEF_KB_BLD_FWZONE,ELK_HOST,ALWAYS,KB_006.sh,Châssis Réseau : Déclaration de la zone étanche UI_Zone,KB_BIN_OK,KB_FW_ZONE_OK
+KB_007,WEF_KB_BLD_FWPORT5601,ELK_HOST,ALWAYS,KB_007.sh,Désoperculage Prise : Ouverture de l'accès local et distant au port 5601,KB_FW_ZONE_OK,KB_FW_5601_OK
+KB_008,WEF_KB_BLD_FWAPPLY,ELK_HOST,ALWAYS,KB_008.sh,Mise en ligne Barrière : Fixation persistante des règles,KB_FW_5601_OK,KB_FW_ARMED
+KB_009,WEF_KB_BLD_CRYPCHK,ELK_HOST,ALWAYS,KB_009.sh,Validation Inter-Blocs : Contrôle d'accès au coffre neutre de l'usine,KB_FW_ARMED,KB_PKI_READY
+KB_010,WEF_KB_BLD_ACLREAD,ELK_HOST,ALWAYS,KB_010.sh,Raccordement : Inclusion de 'kibana' dans le groupe crypto partagé,KB_PKI_READY,KB_CERTS_READY
+KB_011,WEF_KB_BLD_DIRSECU,ELK_HOST,ALWAYS,KB_011.sh,Structures : Condamnation de l'ancien espace crypto local isolé,KB_CERTS_READY,KB_CRYPTO_ARMED
+KB_012,WEF_KB_BLD_SERVERBIND,ELK_HOST,ALWAYS,KB_012.sh,Libération des ondes : Liaison sur toutes les interfaces locales de l'hôte,KB_CRYPTO_ARMED,KB_BIND_OK
+KB_013,WEF_KB_BLD_STNDLNMOD,ELK_HOST,ALWAYS,KB_013.sh,Configuration Autonome : Initialisation du Core en mode asynchrone,KB_BIND_OK,KB_DECOUPLED_OK
+KB_014,WEF_KB_BLD_TLSENABLE,ELK_HOST,ALWAYS,KB_014.sh,Blindage Cible : Raccordement HTTPS de l'UI sur le coffre de l'usine,KB_DECOUPLED_OK,KB_HTTPS_ENABLED
+KB_015,WEF_KB_BLD_XSRFHRDNNG,ELK_HOST,ALWAYS,KB_015.sh,Durcissement Hub : Sécurisation stricte des requêtes API transverses,KB_HTTPS_ENABLED,KB_XSRF_OK
+KB_016,WEF_KB_BLD_PROXYREADY,ELK_HOST,ALWAYS,KB_016.sh,Aiguillage Sortie : Restriction locale des cibles d'alerting,KB_XSRF_OK,KB_ROUTING_OK
+KB_017,WEF_KB_BLD_KSTINIT,ELK_HOST,ALWAYS,KB_017.sh,Coffre de Secrets : Initialisation du conteneur crypté pour jetons,KB_ROUTING_OK,KB_KEYSTORE_OK
+KB_018,WEF_KB_BLD_SVCSTART,ELK_HOST,ALWAYS,KB_018.sh,Mise sous tension : Démarrage de l'interface isolée,KB_KEYSTORE_OK,KB_SERVICE_UP
+KB_019,WEF_KB_RUN_PORTPOLL,ELK_HOST,ALWAYS,KB_019.sh,Contrôle Pression : Vérification de l'écoute du port 5601,KB_SERVICE_UP,KB_PORT_OK
+KB_020,WEF_KB_RUN_UIHEALTH,ELK_HOST,ALWAYS,KB_020.sh,Contrôle Lucidité : Polling de l'API de statut interne,KB_PORT_OK,KB_HEALTH_OK
+KB_021,WEF_KB_RUN_ISLTDB,ELK_HOST,ALWAYS,KB_021.sh,Crash Test : Blocage artificiel du port local de la base de données,KB_HEALTH_OK,KB_DB_ISOLATED
+KB_022,WEF_KB_RUN_ACCESSTEST,ELK_HOST,ALWAYS,KB_022.sh,Épreuve de Solidité : Tentative d'accès à l'interface pendant l'isolement,KB_DB_ISOLATED,KB_UI_SURVIVED
+KB_023,WEF_KB_BLD_CABLENMNL,ELK_HOST,ALWAYS,KB_023.sh,Raccordement nominal sur le compte d'ingestion usine local,KB_UI_SURVIVED,KB_NOMINAL_OK
+KB_024,WEF_KB_BLD_CABLEFLLBCK,ELK_HOST,ALWAYS,KB_024.sh,Vérification de la liaison locale stricte,KB_NOMINAL_OK,KB_FALLBACK_READY
+KB_025,WEF_KB_RUN_EXPORTDASH,ELK_HOST,ALWAYS,KB_025.sh,Prise de Sortie : Extraction instantanée des structures de rendu,KB_FALLBACK_READY,KB_EXPORT_OK
+KB_026,WEF_KB_RUN_IMPORTDATA,ELK_HOST,ALWAYS,KB_026.sh,Prise d'Entrée : Injection à chaud de configurations à vocation industrielle,KB_EXPORT_OK,KB_INTEGRATION_OK
+KB_027,WEF_KB_BLD_LOGROT,ELK_HOST,ALWAYS,KB_027.sh,Contrôle Traces : Alignement de la rotation des journaux d'accès web,KB_INTEGRATION_OK,KB_ROTATE_OK
+LS_036_FINAL,WEF_LS_BLD_IMMTBLRULES,ELK_HOST,ALWAYS,LS_036_FINAL.sh,Sûreté Logstash : Passage des règles de filtrage en mode immuable,KB_ROTATE_OK,LS_RULES_LOCKED
+KB_028_FINAL,WEF_KB_BLD_LOCKCONF,ELK_HOST,ALWAYS,KB_028_FINAL.sh,Sûreté Kibana : Scellage complet de la matrice et de ses structures de rendu,LS_RULES_LOCKED,KB_CONF_LOCKED
+KB_029,WEF_KB_RUN_GTEOPEN,ELK_HOST,ALWAYS,KB_029.sh,Vanne Maîtresse : Émission du signal de disponibilité du Hub,KB_CONF_LOCKED,KIBANA_HUB_ONLINE
+FB_001,WEF_FB_BLD_OSPREP,AGENT_HOST,FILEBEAT,FB_001.sh,Terrassement : Alignement OS Oracle Linux 8.10 pour Filebeat,NONE,FB_OS_READY
+FB_002,WEF_FB_BLD_DIRINIT,AGENT_HOST,FILEBEAT,FB_002.sh,Structures : Initialisation des répertoires de transit et de registres,FB_OS_READY,FB_DIRS_OK
+FB_003,WEF_FB_BLD_REPOSET,AGENT_HOST,FILEBEAT,FB_003.sh,Acheminement : Configuration du dépôt officiel certifié,FB_DIRS_OK,FB_REPO_OK
+FB_004,WEF_FB_BLD_BININST,AGENT_HOST,FILEBEAT,FB_004.sh,Pose Parpaings : Installation physique du paquet Filebeat isolé,FB_REPO_OK,FB_BIN_OK
+FB_005,WEF_FB_BLD_CRYPCHK,AGENT_HOST,FILEBEAT,FB_005.sh,Validation Inter-Blocs : Contrôle d'accès au coffre neutre de l'usine,FB_BIN_OK|CA_DISTRIBUTED_OK,FB_PKI_READY
+FB_006,WEF_FB_BLD_ACLREAD,AGENT_HOST,FILEBEAT,FB_006.sh,Raccordement : Inclusion de 'filebeat' dans le groupe crypto partagé,FB_PKI_READY,FB_CERTS_READY
+FB_007,WEF_FB_BLD_INPUTGNRC,AGENT_HOST,FILEBEAT,FB_007.sh,Prise d'Entrée Locale : Configuration des entrées de traçabilité de l'hôte,FB_CERTS_READY,FB_INPUT_OK
+FB_008,WEF_FB_BLD_DYNMCPROBE,AGENT_HOST,FILEBEAT,FB_008.sh,Modularité à chaud : Activation du rechargement dynamique des cibles,FB_INPUT_OK,FB_DYNAMIC_OK
+FB_011,WEF_FB_BLD_MEMBUF,AGENT_HOST,FILEBEAT,FB_011.sh,Amortisseur Interne : Calibrage de la mémoire tampon d'urgence locale,FB_DYNAMIC_OK,FB_BUFFER_OK
+FB_012,WEF_FB_BLD_OUTGLB,AGENT_HOST,FILEBEAT,FB_012.sh,Raccordement de Sortie Étanche : Liaison sur la boucle locale Logstash,FB_BUFFER_OK,FB_OUTPUT_OK
+FB_013,WEF_FB_BLD_SVCSTART,AGENT_HOST,FILEBEAT,FB_013.sh,Mise sous tension : Démarrage du capteur de l'hôte unique,FB_OUTPUT_OK,FB_SERVICE_UP
+FB_014,WEF_FB_BLD_LOGPOLL,AGENT_HOST,FILEBEAT,FB_014.sh,Contrôle Pression : Analyse du démarrage sans erreur,FB_SERVICE_UP,FB_BOOT_OK
+FB_015,WEF_FB_RUN_SIMABS,AGENT_HOST,FILEBEAT,FB_015.sh,Crash Test : Simulation d'extinction du monde extérieur,FB_BOOT_OK,FB_WORLD_ABSENT
+FB_016,WEF_FB_RUN_INJECTRAW,AGENT_HOST,FILEBEAT,FB_016.sh,Épreuve de Charge : Agression des entrées en mode isolé,FB_WORLD_ABSENT,FB_DATA_INJECTED
+FB_017,WEF_FB_RUN_RGSTRYCHECK,AGENT_HOST,FILEBEAT,FB_017.sh,Contrôle Mémoire : Validation du pointeur de lecture local,FB_DATA_INJECTED,FB_REGISTRY_OK
+FB_018,WEF_FB_RUN_FLBKVFY,AGENT_HOST,FILEBEAT,FB_018.sh,Contrôle Dérivation : Vérification du maintien de la structure,FB_REGISTRY_OK,FB_FALLBACK_OK
+FB_019,WEF_FB_BLD_NETRST,AGENT_HOST,FILEBEAT,FB_019.sh,Rétablissement : Réouverture des vannes de communication,FB_FALLBACK_OK,FB_NET_RESTORED
+FB_020,WEF_FB_BLD_LOGROT,AGENT_HOST,FILEBEAT,FB_020.sh,Contrôle Traces : Alignement de la rotation des diagnostics,FB_NET_RESTORED,FB_ROTATE_OK
+FB_021,WEF_FB_BLD_PERMLOCK,AGENT_HOST,FILEBEAT,FB_021.sh,Sécurisation Finale : Droits stricts sur le Keystore et le YML,FB_ROTATE_OK,FB_PERM_LOCKED
+FB_022,WEF_FB_BLD_IMMLOCK,AGENT_HOST,FILEBEAT,FB_022.sh,Sûreté : Passage de la configuration de capture en mode immuable,FB_PERM_LOCKED,FB_SENSORS_LOCKED
+FB_023,WEF_FB_BLD_GTERDY,AGENT_HOST,FILEBEAT,FB_023.sh,Vanne Maîtresse : Émission du signal d'extraction souveraine,FB_SENSORS_LOCKED,FILEBEAT_SENSOR_ONLINE
+MB_001,WEF_MB_BLD_OSPREP,AGENT_HOST,METRICBEAT,MB_001.sh,Terrassement : Alignement OS Oracle Linux 8.10 pour Metricbeat,FILEBEAT_SENSOR_ONLINE,MB_OS_READY
+MB_002,WEF_MB_BLD_DIRINIT,AGENT_HOST,METRICBEAT,MB_002.sh,Structures : Initialisation des répertoires de stockage des modules,MB_OS_READY,MB_DIRS_OK
+MB_003,WEF_MB_BLD_REPOSET,AGENT_HOST,METRICBEAT,MB_003.sh,Acheminement : Configuration du dépôt officiel signé,MB_DIRS_OK,MB_REPO_OK
+MB_004,WEF_MB_BLD_BININST,AGENT_HOST,METRICBEAT,MB_004.sh,Pose Parpaings : Installation physique du paquet Metricbeat isolé,MB_REPO_OK,MB_BIN_OK
+MB_005,WEF_MB_BLD_CRYPCHK,AGENT_HOST,METRICBEAT,MB_005.sh,Validation Inter-Blocs : Contrôle d'accès au coffre neutre de l'usine,MB_BIN_OK|CA_DISTRIBUTED_OK,MB_PKI_READY
+MB_006,WEF_MB_BLD_ACLREAD,AGENT_HOST,METRICBEAT,MB_006.sh,Raccordement : Inclusion de 'metricbeat' dans le groupe crypto partagé,MB_PKI_READY,MB_CERTS_READY
+MB_007,WEF_MB_BLD_MODSYSTEM,AGENT_HOST,METRICBEAT,MB_007.sh,Activation Sondes : Surveillance agnostique CPU - RAM - IO - FS,MB_CERTS_READY,MB_MOD_SYSTEM_OK
+MB_008,WEF_MB_BLD_DYNMCMOD,AGENT_HOST,METRICBEAT,MB_008.sh,Modularité à chaud : Activation du rechargement dynamique des sondes,MB_MOD_SYSTEM_OK,MB_DYNAMIC_OK
+MB_011,WEF_MB_BLD_MEMBUF,AGENT_HOST,METRICBEAT,MB_011.sh,Amortisseur Interne : Calibrage de la mémoire de rétention immédiate,MB_DYNAMIC_OK,MB_BUFFER_OK
+MB_012,WEF_MB_BLD_OUTGLB,AGENT_HOST,METRICBEAT,MB_012.sh,Raccordement de Sortie Étanche : Liaison exclusive sur le Logstash local,MB_BUFFER_OK,MB_OUTPUT_OK
+MB_013,WEF_MB_BLD_SVCSTART,AGENT_HOST,METRICBEAT,MB_013.sh,Mise sous tension : Démarrage du capteur souverain,MB_OUTPUT_OK,MB_SERVICE_UP
+MB_014,WEF_MB_BLD_LOGPOLL,AGENT_HOST,METRICBEAT,MB_014.sh,Contrôle Pression : Analyse du démarrage sans erreur,MB_SERVICE_UP,MB_BOOT_OK
+MB_015,WEF_MB_RUN_SIMABS,AGENT_HOST,METRICBEAT,MB_015.sh,Crash Test : Simulation de disparition de l'infrastructure réseau,MB_BOOT_OK,MB_WORLD_ABSENT
+MB_016,WEF_MB_RUN_STRESSTEST,AGENT_HOST,METRICBEAT,MB_016.sh,Épreuve de Charge : Génération de faux pics d'activité système en isolation,MB_WORLD_ABSENT,MB_DATA_INJECTED
+MB_017,WEF_MB_RUN_SPOOLVERIFY,AGENT_HOST,METRICBEAT,MB_017.sh,Contrôle Rétention : Vérification de la non-perte des paquets de télémétrie,MB_DATA_INJECTED,MB_SPOOL_OK
+MB_018,WEF_MB_BLD_NETRST,AGENT_HOST,METRICBEAT,MB_018.sh,Rétablissement Network : Réouverture des canaux d'exportation,MB_SPOOL_OK,MB_NET_RESTORED
+MB_019,WEF_MB_BLD_LOGROT,AGENT_HOST,METRICBEAT,MB_019.sh,Contrôle Traces : Alignement de la rotation des diagnostics internes,MB_NET_RESTORED,MB_ROTATE_OK
+MB_020,WEF_MB_BLD_PERMLOCK,AGENT_HOST,METRICBEAT,MB_020.sh,Sécurisation Finale : Droits drastiques sur le Keystore,MB_ROTATE_OK,MB_PERM_LOCKED
+MB_021,WEF_MB_BLD_IMMLOCK,AGENT_HOST,METRICBEAT,MB_021.sh,Sûreté : Passage des définitions de sondes en mode immuable,MB_PERM_LOCKED,MB_SENSORS_LOCKED
+MB_022,WEF_MB_BLD_GTERDY,AGENT_HOST,METRICBEAT,MB_022.sh,Vanne Maîtresse : Émission du signal d'telemetrie souveraine,MB_SENSORS_LOCKED,METRICBEAT_SENSOR_ONLINE
+WAZ_001,WEF_WAZ_BLD_OSLIMIT,ELK_HOST,ALWAYS,WAZ_001.sh,Durcissement : Fixation ulimit -n 65536 et memlock unlimited pour les moteurs Wazuh,KIBANA_HUB_ONLINE,WAZ_LIMITS_OK
+WAZ_002,WEF_WAZ_BLD_OSMAXMAP,ELK_HOST,ALWAYS,WAZ_002.sh,Durcissement : Augmentation vm.max_map_count pour cohabitation de dalles,WAZ_LIMITS_OK,WAZ_MAP_COUNT_OK
+WAZ_003,WEF_WAZ_BLD_USRNEW,ELK_HOST,ALWAYS,WAZ_003.sh,Confinement : Création des utilisateurs systèmes wazuh et wazuh_indexer,WAZ_MAP_COUNT_OK,WAZ_USER_READY
+WAZ_004,WEF_WAZ_BLD_DIRSTRUCT,ELK_HOST,ALWAYS,WAZ_004.sh,Structures : Initialisation des répertoires de données et d'alertes de l'usine,WAZ_USER_READY,WAZ_DIRS_OK
+WAZ_005,WEF_WAZ_BLD_INTRFC,ELK_HOST,ALWAYS,WAZ_005.sh,Châssis Réseau : Liaison permanente des fiches d'interconnexion locales,WAZ_DIRS_OK,WAZ_FW_ZONE_OK
+WAZ_006,WEF_WAZ_BLD_FWINDXR,ELK_HOST,ALWAYS,WAZ_006.sh,Désoperculage Port : Ouverture permanente du port d'ingestion direct local,WAZ_FW_ZONE_OK,WAZ_FW_OK
+WAZ_007,WEF_WAZ_BLD_PKICHECK,ELK_HOST,ALWAYS,WAZ_007.sh,Validation Inter-Blocs : Vérification de la présence des ancres de l'usine,WAZ_FW_OK,WAZ_PKI_READY
+WAZ_008,WEF_WAZ_BLD_ACLJOIN,ELK_HOST,ALWAYS,WAZ_008.sh,Raccordement : Inclusion de wazuh au groupe de confiance factory_crypto,WAZ_PKI_READY,WAZ_CERTS_READY
+WAZ_009,WEF_WAZ_BLD_REPOSET,ELK_HOST,ALWAYS,WAZ_009.sh,Acheminement : Configuration du dépôt officiel certifié Wazuh,WAZ_CERTS_READY,WAZ_REPO_OK
+WAZ_010,WEF_WAZ_BLD_INDXRINSTLL,ELK_HOST,ALWAYS,WAZ_010.sh,Pose Parpaings : Installation du moteur d'indexation Wazuh Indexer,WAZ_REPO_OK,WAZ_INDEXER_BIN_OK
+WAZ_011,WEF_WAZ_BLD_MNGRINSTLL,ELK_HOST,ALWAYS,WAZ_011.sh,Pose Parpaings : Installation du moteur d'analyse central Wazuh Manager,WAZ_INDEXER_BIN_OK,WAZ_MANAGER_BIN_OK
+WAZ_012,WEF_WAZ_BLD_DASHINSTLL,ELK_HOST,ALWAYS,WAZ_012.sh,Pose Parpaings : Installation du Dashboard natif Wazuh,WAZ_MANAGER_BIN_OK,WAZ_DASH_BIN_OK
+WAZ_013,WEF_WAZ_BLD_CONFAMVBL,ELK_HOST,ALWAYS,WAZ_013.sh,Châssis Config : Initialisation de la boucle locale stricte et ports isolés,WAZ_DASH_BIN_OK,WAZ_CONFIG_OK
+WAZ_013A_INDXR_CERTS,WEF_WAZ_BLD_INDXRCERTS,ELK_HOST,ALWAYS,WAZ_013A_INDXR_CERTS.sh,Raccordement PKI : Copie locale des certificats du moteur de stockage,WAZ_CONFIG_OK,WAZ_INDXR_CERTS_OK
+WAZ_013B_INDXR_JVMOPTNS,WEF_WAZ_BLD_INDXRJVMOPTNS,ELK_HOST,ALWAYS,WAZ_013B_INDXR_JVMOPTNS.sh,Dimensionnement : Fixation explicite du heap JVM du moteur de stockage (WAZ_INDEXER_JVM_HEAP_SIZE),WAZ_INDXR_CERTS_OK,WAZ_INDXR_JVM_OK
+WAZ_013C_INDXR_ADMINCERT,WEF_WAZ_BLD_INDXRADMINCERT,ELK_HOST,ALWAYS,WAZ_013C_INDXR_ADMINCERT.sh,Raccordement PKI : Génération du certificat client admin du moteur de stockage,WAZ_INDXR_JVM_OK,WAZ_INDXR_ADMINCERT_OK
+WAZ_014,WEF_WAZ_BLD_STARTINDXR,ELK_HOST,ALWAYS,WAZ_014.sh,Mise sous tension : Démarrage du moteur de stockage autonome,WAZ_INDXR_ADMINCERT_OK,WAZ_INDEXER_UP
+WAZ_014A_INDXR_ADMINPW,WEF_WAZ_RUN_INDXRADMINPW,ELK_HOST,ALWAYS,WAZ_014A_INDXR_ADMINPW.sh,Authentification : Alignement du mot de passe admin réel du moteur de stockage sur vars.conf,WAZ_INDEXER_UP,WAZ_INDXR_ADMINPW_OK
+WAZ_014C_ALERTS_TEMPLATE,WEF_WAZ_BLD_ALERTSTMPL,ELK_HOST,ALWAYS,WAZ_014C_ALERTS_TEMPLATE.sh,Modèle d'index officiel wazuh-alerts-4.x-*/wazuh-archives-4.x-* (mappage correct pour le Dashboard),WAZ_INDXR_ADMINPW_OK,WAZ_ALERTS_TEMPLATE_OK
+WAZ_014B_ALERTS_TO_INDEXER,WEF_WAZ_BLD_ALERTSTOIDXR,ELK_HOST,ALWAYS,WAZ_014B_ALERTS_TO_INDEXER.sh,Raccordement : Pipeline Logstash dédié qui achemine les alertes du manager vers l'indexeur,WAZ_ALERTS_TEMPLATE_OK,WAZ_ALERTS_PIPELINE_OK
+WAZ_014D_ALERTS_RETENTION,WEF_WAZ_BLD_ALERTSRETAIN,ELK_HOST,ALWAYS,WAZ_014D_ALERTS_RETENTION.sh,Exploitation continue : politique ISM de purge des index d'alertes après rétention,WAZ_ALERTS_TEMPLATE_OK,WAZ_ALERTS_RETENTION_OK
+WAZ_014E_INDEXER_CONNECTOR,WEF_WAZ_BLD_IDXCONNECTOR,ELK_HOST,ALWAYS,WAZ_014E_INDEXER_CONNECTOR.sh,Correctif réel : connecteur natif indexeur (inventaire/vulnérabilités) reconfiguré avec le PKI d'usine réel,WAZ_INDXR_ADMINPW_OK,WAZ_IDXCONNECTOR_OK
+WAZ_014F_DEBUG_WORKAROUND,WEF_WAZ_BLD_DBGWORKAROUND,ELK_HOST,ALWAYS,WAZ_014F_DEBUG_WORKAROUND.sh,Correctif réel : contournement d'un bug de lecture XML des daemons manager au niveau de debug par défaut,NONE,WAZ_DEBUG_WORKAROUND_OK
+WAZ_015,WEF_WAZ_BLD_STARTMNGR,ELK_HOST,ALWAYS,WAZ_015.sh,Mise sous tension : Démarrage du cerveau d'analyse,WAZ_INDXR_ADMINPW_OK|WAZ_DEBUG_WORKAROUND_OK,WAZ_MANAGER_UP
+WAZ_016,WEF_WAZ_BLD_STARTDSHBRD,ELK_HOST,ALWAYS,WAZ_016.sh,Mise sous tension : Démarrage de l'interface native isolée,WAZ_MANAGER_UP,WAZ_DASHBOARD_UP
+WAZ_017,WEF_WAZ_BLD_HEALTHCHECK,ELK_HOST,ALWAYS,WAZ_017.sh,Contrôle Rigueur : Vérification de la vivacité globale de l'écosystème,WAZ_DASHBOARD_UP,WAZ_HEALTH_OK
+WAZ_017B_AUTHMODE_CHECK,WEF_WAZ_BLD_AUTHMODECHECK,ELK_HOST,ALWAYS,WAZ_017B_AUTHMODE_CHECK.sh,Authentification (optionnel) : validation des parametres du mode choisi (KIBANA_AUTH_MODE),WAZ_HEALTH_OK,WAZ_AUTHMODE_VALID
+WAZ_017C_AUTHCONFIG,WEF_WAZ_BLD_AUTHCONFIG,ELK_HOST,ALWAYS,WAZ_017C_AUTHCONFIG.sh,Authentification (optionnel) : regeneration complete config.yml + opensearch_dashboards.yml selon KIBANA_AUTH_MODE (internal/ldap/saml) - switch propre sans residu,WAZ_AUTHMODE_VALID,WAZ_AUTHCONFIG_OK
+WAZ_017E_AUTHAPPLY,WEF_WAZ_RUN_AUTHAPPLY,ELK_HOST,ALWAYS,WAZ_017E_AUTHAPPLY.sh,Authentification (optionnel) : application du mode choisi (redemarrage des services),WAZ_AUTHCONFIG_OK,WAZ_AUTH_READY
+WAZ_018_NET,WEF_WAZ_RUN_CRASHTESTNET,ELK_HOST,ALWAYS,WAZ_018_NET.sh,Crash Test Réseau : Rupture artificielle des flux réseau sortants,WAZ_AUTH_READY,WAZ_NET_ISOLATED
+WAZ_019_FLOOD,WEF_WAZ_RUN_AGENTFLOOD,ELK_HOST,ALWAYS,WAZ_019_FLOOD.sh,Épreuve de Charge : Simulation d'un déluge massif d'événements,WAZ_NET_ISOLATED,WAZ_FLOOD_OK
+WAZ_020_VERIFY,WEF_WAZ_RUN_INDEXVERIFY,ELK_HOST,ALWAYS,WAZ_020_VERIFY.sh,Contrôle Rétention : Vérification de la bonne inscription locale,WAZ_FLOOD_OK|WAZ_ALERTS_PIPELINE_OK,WAZ_INDEX_OK
+WAZ_021_RECOVER,WEF_WAZ_BLD_RCVRNET,ELK_HOST,ALWAYS,WAZ_021_RECOVER.sh,Rétablissement Network : Levée des barrières réseau de test,WAZ_INDEX_OK,WAZ_NET_RESTORED
+WAZ_022,WEF_WAZ_BLD_APIKEYGEN,ELK_HOST,ALWAYS,WAZ_022.sh,Génération de la valve d'accès : Création du token d'interconnexion,WAZ_NET_RESTORED,WAZ_API_KEY_OK
+WAZ_023,WEF_WAZ_BLD_LOGINTGRT,ELK_HOST,ALWAYS,WAZ_023.sh,Aiguillage : Liaison locale de collecte vers le Logstash local,WAZ_API_KEY_OK,WAZ_LOGSTASH_LINK_OK
+WAZ_024,WEF_WAZ_BLD_VALVCHK,ELK_HOST,ALWAYS,WAZ_024.sh,Contrôle d'étanchéité : Validation du flux inter-démons local,WAZ_LOGSTASH_LINK_OK,WAZ_VALVE_OK
+WAZ_025,WEF_WAZ_BLD_RULEADDCUSTOM,ELK_HOST,ALWAYS,WAZ_025.sh,Adaptabilité : Injection de la politique de détection specifique usine,WAZ_VALVE_OK,WAZ_RULES_CUSTOM_OK
+WAZ_026,WEF_WAZ_BLD_RULETESTER,ELK_HOST,ALWAYS,WAZ_026.sh,Validation Logique : Test de conformité des règles injectées,WAZ_RULES_CUSTOM_OK,WAZ_TEST_RULES_OK
+WAZ_027,WEF_WAZ_RUN_CRASHTEST,ELK_HOST,ALWAYS,WAZ_027.sh,Simulation Sinistre : Arrêt brutal du manager par destruction de PID,WAZ_TEST_RULES_OK,WAZ_CRASHED
+WAZ_028,WEF_WAZ_RUN_RCVPOLL,ELK_HOST,ALWAYS,WAZ_028.sh,Vérification Relance : Redémarrage et contrôle post-sinistre,WAZ_CRASHED,WAZ_RECOVERY_OK
+WAZ_029,WEF_WAZ_BLD_LGRTTMGR,ELK_HOST,ALWAYS,WAZ_029.sh,Contrôle Traces : Alignement de la rotation des alertes et archives,WAZ_RECOVERY_OK,WAZ_ROTATE_MGR_OK
+WAZ_030,WEF_WAZ_BLD_LGRTTIDX,ELK_HOST,ALWAYS,WAZ_030.sh,Contrôle Traces : Alignement des historiques système de la base,WAZ_ROTATE_MGR_OK,WAZ_ROTATE_IDX_OK
+WAZ_031,WEF_WAZ_BLD_LGRTTDSH,ELK_HOST,ALWAYS,WAZ_031.sh,Contrôle Traces : Alignement de la rotation des logs d'accès de l'UI,WAZ_ROTATE_IDX_OK,WAZ_DISK_OK
+WAZ_032,WEF_WAZ_BLD_IMMTBLBASE,ELK_HOST,ALWAYS,WAZ_032.sh,Sûreté : Verrouillage des fichiers d'exécution fondamentaux de sécurité,WAZ_DISK_OK,WAZ_BASE_IMMUTABLE
+WAZ_033,WEF_WAZ_BLD_DAEMONLOCKED,ELK_HOST,ALWAYS,WAZ_033.sh,Fermeture Chantier : Figeage de la configuration globale de sécurité,WAZ_BASE_IMMUTABLE,WAZ_SERVICES_LOCKED
+WAZ_034,WEF_WAZ_BLD_GTESOUVRN,ELK_HOST,ALWAYS,WAZ_034.sh,Vanne Maîtresse : Émission du signal d'étanchéité absolue de la sécurité,WAZ_SERVICES_LOCKED,WAZ_SECURITY_ONLINE
+WAZ_035_MODE_CONVERGENT,WEF_WAZ_RUN_SWTOKIB,ELK_HOST,ALWAYS,WAZ_035_MODE_CONVERGENT.sh,Vanne Un-Clic (rejouable à la demande) : bascule EXCLUSIVE des alertes wazuh-indexer -> Elasticsearch/Kibana avec migration réelle de l'historique et extinction du Dashboard natif (wazuh-indexer reste actif pour le reste de l'exploitation),WAZ_SECURITY_ONLINE,WAZ_PIPELINE_ELK_ACTIVE
+WAZ_036_KIBANA_INDEX,WEF_WAZ_BLD_KBIDXNEW,ELK_HOST,ALWAYS,WAZ_036_KIBANA_INDEX.sh,Forage Kibana : Création et initialisation du Data View 'wazuh-alerts-*',WAZ_PIPELINE_ELK_ACTIVE,WAZ_INDEX_KIBANA_OK
+WAZ_037_CONVERGENT_TEST,WEF_WAZ_RUN_INJECTCNVRGN,ELK_HOST,ALWAYS,WAZ_037_CONVERGENT_TEST.sh,Preuve Réelle Convergence : injecte une alerte réelle (règle canari 100101) et vérifie sa présence dans Elasticsearch,WAZ_INDEX_KIBANA_OK,WAZ_CONVERGENT_FLOW_OK
+WAZ_038_KIBANA_VERIFY,WEF_WAZ_RUN_KBALIVE,ELK_HOST,ALWAYS,WAZ_038_KIBANA_VERIFY.sh,Contrôle Présence : Vérification de la vivacité de l'index usine,WAZ_CONVERGENT_FLOW_OK,WAZ_KIBANA_LOUD
+WAZ_039_MODE_SOUVERAIN,WEF_WAZ_RUN_SWTOSOV,ELK_HOST,ALWAYS,WAZ_039_MODE_SOUVERAIN.sh,Vanne Un-Clic Réversible (rejouable à la demande) : bascule EXCLUSIVE des alertes Elasticsearch -> wazuh-indexer avec migration réelle de l'historique et réallumage du Dashboard natif,WAZ_KIBANA_LOUD,WAZ_PIPELINE_SOUVERAIN_ACTIVE
+WAZ_040_KIBANA_SILENT,WEF_WAZ_RUN_KBSILENT,ELK_HOST,ALWAYS,WAZ_040_KIBANA_SILENT.sh,Contrôle Étanchéité : injecte une nouvelle alerte réelle puis vérifie qu'elle part vers wazuh-indexer ET plus du tout vers Elasticsearch,WAZ_PIPELINE_SOUVERAIN_ACTIVE,WAZ_KIBANA_MUTED
+WAZ_041_ALERT_CANARY,WEF_WAZ_RUN_ALERTCANARY,ELK_HOST,ALWAYS,WAZ_041_ALERT_CANARY.sh,Exploitation continue : test d'alerte synthétique quotidien (preuve de vie de bout en bout du pipeline),WAZ_PIPELINE_SOUVERAIN_ACTIVE,WAZ_ALERT_CANARY_OK
+WAZ_042_INDEXER_UNLOCK,WEF_WAZ_RUN_IDXUNLOCK,ELK_HOST,ALWAYS,WAZ_042_INDEXER_UNLOCK.sh,Exploitation continue : lève les verrous lecture-seule (flood-stage) laissés par un épisode de disque plein,WAZ_INDXR_ADMINPW_OK,WAZ_IDXUNLOCK_OK
+WAZ_043_DASHBOARD_FIELDS_REFRESH,WEF_WAZ_RUN_FIELDREFRESH,ELK_HOST,ALWAYS,WAZ_043_DASHBOARD_FIELDS_REFRESH.sh,Exploitation continue : purge le cache de champs périmé du Dashboard (rejouable à la demande - ex. panneaux MITRE en erreur),WAZ_INDXR_ADMINPW_OK,WAZ_FIELDREFRESH_OK
+WAZ_044_VD_SAFE_RETRY,WEF_WAZ_RUN_VDRETRY,ELK_HOST,ALWAYS,WAZ_044_VD_SAFE_RETRY.sh,Exploitation continue : relance surveillée du module Vulnerability Detector (vérifie la marge disque avant de relancer),WAZ_MANAGER_UP,WAZ_VDRETRY_OK
+DIST_001,WEF_BEATS_BLD_CADIST,AGENT_HOST,FILEBEAT|METRICBEAT,DIST_001.sh,Distribution : Copie du certificat de la CA d'usine depuis ELK_HOST vers BEATS_HOST,FB_BIN_OK,CA_DISTRIBUTED_OK
+INFRA_001,WEF_INFRA_BLD_RENAMEELK,ELK_HOST,ALWAYS,INFRA_001.sh,[PROJET-SPECIFIQUE - SUPPRIMABLE] Renommage de la VM ELK_HOST avec un nom explicite,NONE,ELK_HOSTNAME_SET
+INFRA_002,WEF_INFRA_BLD_RENAMEBEATS,AGENT_HOST,HOSTNAME_RENAME,INFRA_002.sh,[PROJET-SPECIFIQUE - SUPPRIMABLE] Renommage de la VM BEATS_HOST avec un nom explicite,NONE,BEATS_HOSTNAME_SET
+INFRA_003_DEVNULL_GUARDIAN,WEF_INFRA_BLD_DEVNULLGRD,ALL,ALWAYS,INFRA_003_DEVNULL_GUARDIAN.sh,Résilience : gardes permanentes contre la corruption récurrente de /dev/null (timer 3s) et le remplissage disque du cache CVE Vulnerability Detector (timer 60s),NONE,DEVNULL_GUARDIAN_OK
+INFRA_004_HEALTH_GUARDIAN,WEF_INFRA_RUN_HEALTHGRD,ALL,ALWAYS,INFRA_004_HEALTH_GUARDIAN.sh,Exploitation continue : contrôle de santé fonctionnelle toutes les 5 min (services/DNS/certificat PKI/disque),NONE,HEALTH_GUARDIAN_OK
+INFRA_005_DISK_HYGIENE,WEF_INFRA_RUN_DISKHYG,ALL,ALWAYS,INFRA_005_DISK_HYGIENE.sh,Exploitation continue : désactivation de PCP (inutilisé) et purge cache dnf - entretien hebdomadaire permanent,NONE,DISK_HYGIENE_OK
+DNS_001_INSTALL,WEF_DNS_BLD_INSTALL,ELK_HOST,ALWAYS,DNS_001_INSTALL.sh,DNS interne : installation de dnsmasq + bind-utils,NONE,DNS_INSTALLED_OK
+DNS_002_ZONE,WEF_DNS_BLD_ZONE,ELK_HOST,ALWAYS,DNS_002_ZONE.sh,DNS interne : déclaration de la zone (un FQDN par service),DNS_INSTALLED_OK,DNS_ZONE_OK
+DNS_003_FIREWALL,WEF_DNS_BLD_FIREWALL,ELK_HOST,ALWAYS,DNS_003_FIREWALL.sh,DNS interne : ouverture du port 53 (tcp+udp) sur la zone active,DNS_ZONE_OK,DNS_FW_OK
+DNS_004_START,WEF_DNS_RUN_STARTVERIFY,ELK_HOST,ALWAYS,DNS_004_START.sh,DNS interne : démarrage + vérification réelle de la résolution des 5 FQDN,DNS_FW_OK,DNS_SERVICE_OK
+ES_062_SNAPSHOTS3REPO,WEF_ES_RUN_S3REPOSET,ELK_HOST,ALWAYS,ES_062_SNAPSHOTS3REPO.sh,Sauvegarde (optionnelle) : enregistrement du depot de snapshots S3 OVH,DALLE_ELASTIC_ONLINE,ES_SNAPSHOT_REPO_OK
+ES_063_SNAPSHOTPOLICY,WEF_ES_RUN_S3SNAPPOL,ELK_HOST,ALWAYS,ES_063_SNAPSHOTPOLICY.sh,Sauvegarde (optionnelle) : politique de cycle de vie des snapshots (SLM),ES_SNAPSHOT_REPO_OK,ES_SNAPSHOT_POLICY_OK
+WAG_001,WEF_WAG_BLD_PREREQ,AGENT_HOST,WAZUH_AGENT,WAG_001.sh,Verification de connectivite vers le manager Wazuh,NONE,WAG_PREREQ_OK
+WAG_002,WEF_WAG_BLD_REPOSET,AGENT_HOST,WAZUH_AGENT,WAG_002.sh,Depot officiel Wazuh (agent),WAG_PREREQ_OK,WAG_REPO_OK
+WAG_003,WEF_WAG_BLD_BININST,AGENT_HOST,WAZUH_AGENT,WAG_003.sh,Installation du paquet wazuh-agent,WAG_REPO_OK,WAG_INSTALL_OK
+WAG_004,WEF_WAG_BLD_CONFIGURE,AGENT_HOST,WAZUH_AGENT,WAG_004.sh,Configuration adresse manager + nom agent,WAG_INSTALL_OK,WAG_CONFIG_OK
+WAG_005,WEF_WAG_BLD_SVCSTART,AGENT_HOST,WAZUH_AGENT,WAG_005.sh,Activation et demarrage du service wazuh-agent,WAG_CONFIG_OK,WAG_SVC_UP
+WAG_006,WEF_WAG_RUN_VERIFY,AGENT_HOST,WAZUH_AGENT,WAG_006.sh,Verification enregistrement et rapport final,WAG_SVC_UP,WAG_READY

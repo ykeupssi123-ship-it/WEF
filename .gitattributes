@@ -1,0 +1,14 @@
+# Force LF partout, quelle que soit la config core.autocrlf de qui clone/
+# commite ce depot. Bug reel deja rencontre sur ce projet (voir
+# docs/JOURNAL_TECHNIQUE.md) : jobs_table.csv converti en CRLF a bloque
+# silencieusement toute la chaine de dependances de l'orchestrateur (bash
+# "read" preserve le \r, contrairement a un lecteur Python qui le
+# normalise). Ne jamais laisser Git deviner un comportement par plateforme
+# pour ce projet.
+* text=auto eol=lf
+*.sh text eol=lf
+*.csv text eol=lf
+*.conf text eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+*.xlsx binary

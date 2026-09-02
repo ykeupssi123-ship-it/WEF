@@ -52,9 +52,55 @@ if ! dnf install -y "$PKG_SPEC"; then
   # avant d'abandonner, jamais impose d'emblee pour ne pas ralentir un
   # reseau IPv6 qui fonctionne correctement ailleurs.
   echo "[WAZ_010] AVERTISSEMENT : dnf install a echoue, nouvel essai en forcant l'IPv4 (--setopt=ip_resolve=4, cas connu : IPv6 casse sur certains reseaux/hotspots)..."
-  if ! dnf install -y --setopt=ip_resolve=4 "$PKG_SPEC"; then
-    echo "[WAZ_010] ERREUR : dnf install a echoue meme en IPv4 force (voir le message dnf ci-dessus, souvent un depot injoignable/DNS)." >&2
-    exit 1
+  DNF_OUT2="$(dnf install -y --setopt=ip_resolve=4 "$PKG_SPEC" 2>&1)"
+  DNF_RC2=$?
+  echo "$DNF_OUT2"
+  if [ "$DNF_RC2" -ne 0 ]; then
+    # CORRECTIF 2026-09-03 (incident reel, deploiement VM ELK_HOST Oracle
+    # Linux 8) : echec distinct des deux precedents, rien a voir avec le
+    # reseau/DNS/IPv6 - "Erreur de la transaction de test" avec une
+    # longue liste de fichiers /usr/lib/.build-id/xx/... "entre en
+    # conflit avec le fichier du paquet logstash". Cause reelle : Wazuh
+    # Indexer et Logstash embarquent chacun leur propre JVM (OpenJDK)
+    # dans leur paquet ; quand les deux paquets embarquent par coincidence
+    # exactement la meme version d'OpenJDK, RPM genere pour chacun un lien
+    # de debogage /usr/lib/.build-id/<hash>/... au MEME chemin (le hash
+    # depend du binaire JVM, identique puisque meme version) mais pointant
+    # vers l'installation de CHAQUE paquet (/usr/share/logstash/jdk/...
+    # vs /usr/share/wazuh-indexer/jdk/...) - RPM refuse par prudence
+    # qu'un second paquet ecrase un fichier deja possede par un autre.
+    # Ces liens ne sont que des metadonnees de debogage (utilisees par des
+    # outils d'analyse de crash), jamais executees ni chargees au
+    # demarrage - les remplacer n'affecte en rien le fonctionnement reel
+    # de Logstash ou de Wazuh Indexer, seulement la capacite a deboguer
+    # un eventuel crash natif de l'un des deux avec le binaire de l'autre
+    # (cas marginal, jamais rencontre sur ce projet). Corrige, en dernier
+    # recours et seulement quand la signature exacte du conflit
+    # (chemin non traduit, donc fiable independamment de la langue du
+    # systeme) est reconnue : installation directe du paquet deja mis en
+    # cache par dnf via "rpm --replacefiles", qui autorise explicitement
+    # ce remplacement au lieu du refus par defaut de dnf.
+    # Honnetete sur la certitude de ce correctif : bonne comprehension du
+    # mecanisme RPM et des paquets concernes, pas verifiee sur toutes les
+    # combinaisons de versions Logstash/Wazuh Indexer possibles - a
+    # surveiller si une machine future presente un conflit .build-id avec
+    # un AUTRE paquet que logstash.
+    if echo "$DNF_OUT2" | grep -q '/usr/lib/\.build-id/'; then
+      echo "[WAZ_010] AVERTISSEMENT : conflit detecte sur des liens de debogage /usr/lib/.build-id/ (JVM embarquee partagee avec un autre paquet Elastic/Wazuh deja installe) - tentative de contournement via rpm --replacefiles sur le paquet deja mis en cache..."
+      CACHED_RPM="$(find /var/cache/dnf -name "${PKG_SPEC}-*.rpm" 2>/dev/null | head -1)"
+      if [ -z "$CACHED_RPM" ]; then
+        echo "[WAZ_010] ERREUR : conflit .build-id detecte mais aucun paquet mis en cache trouve sous /var/cache/dnf (nom recherche : ${PKG_SPEC}-*.rpm) - impossible de tenter le contournement." >&2
+        exit 1
+      fi
+      echo "[WAZ_010] Paquet en cache trouve : ${CACHED_RPM} - installation directe (rpm -Uvh --replacefiles)..."
+      if ! rpm -Uvh --replacefiles "$CACHED_RPM"; then
+        echo "[WAZ_010] ERREUR : rpm --replacefiles a lui aussi echoue, voir le message rpm ci-dessus." >&2
+        exit 1
+      fi
+    else
+      echo "[WAZ_010] ERREUR : dnf install a echoue meme en IPv4 force (voir le message dnf ci-dessus, souvent un depot injoignable/DNS)." >&2
+      exit 1
+    fi
   fi
 fi
 if ! rpm -q wazuh-indexer &>/dev/null; then

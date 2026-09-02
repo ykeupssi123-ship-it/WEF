@@ -198,5 +198,33 @@ else
   echo "[LS_B025_ARMED] AVERTISSEMENT : ${OUT_CONF} introuvable (LS_024 a-t-il bien tourne avant ce job ?) - verification croisee ignoree."
 fi
 
+# CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle
+# Linux 8) : ce job (comme tout ce qui invoque "logstash-keystore" via
+# LS_B025_ARMED, quel que soit le sous-chemin emprunte plus haut - create/
+# add/remove/list) tourne en root (service systemd wef-orchestrateur,
+# User=root). Or "logstash-keystore" partage la meme configuration
+# log4j2 que Logstash lui-meme et ecrit dans les MEMES fichiers
+# /var/log/logstash/*.log. Consequence reelle observee : ces fichiers se
+# retrouvent crees/touches par root (proprietaire root:root), alors que
+# le service logstash.service tourne lui sous l'utilisateur systeme non
+# privilegie "logstash" (paquet Elastic standard) - qui n'a alors plus le
+# droit d'ECRIRE dedans. Logstash demarre pourtant parfaitement (confirme
+# via `journalctl -u logstash`, independant des fichiers), mais plus rien
+# n'est ecrit dans logstash-plain.log : LS_027.sh, qui detecte le
+# demarrage reussi par un grep sur ce fichier, timeoute alors a tort au
+# bout de 5 minutes en croyant le pipeline bloque, alors qu'il tourne
+# deja normalement. Symptome distinctif en diagnostic : `journalctl -u
+# logstash` montre "Pipelines running" et aucune erreur, mais le fichier
+# grepe par LS_027 reste muet/perime. Corrige ici, juste avant de rendre
+# la main (donc apres TOUTE operation "logstash-keystore" executee plus
+# haut dans ce job) : on redonne la propriete de ces fichiers a
+# l'utilisateur "logstash" avant que LS_026_FINAL ne (re)demarre le vrai
+# service - best-effort (2>/dev/null || true) pour rester sans effet si
+# les fichiers n'existent pas encore ou si l'utilisateur "logstash"
+# n'existe pas encore a ce stade.
+if id logstash &>/dev/null; then
+  chown logstash: /var/log/logstash/*.log 2>/dev/null || true
+fi
+
 echo "[LS_B025_ARMED] OK (confirme present dans 'logstash-keystore list')."
 exit 0

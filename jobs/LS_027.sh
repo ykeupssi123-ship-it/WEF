@@ -29,11 +29,39 @@
 # alors que "Pipelines running" apparaissait dans les logs des la
 # 2e seconde de polling. Corrige : recherche desormais "Pipelines
 # running" (le pluriel exact ecrit par logstash.agent).
+#
+# CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle
+# Linux 8, decouvert le meme jour que le correctif ci-dessus dans
+# jobs/LS_B025_ARMED.sh) : ce job ne regardait QUE le fichier
+# logstash-plain.log. Or ce fichier peut se retrouver root:root (voir
+# correctif LS_B025_ARMED) et devenir illisible en ecriture par le
+# service logstash - alors que Logstash tourne en realite tres bien et
+# ecrit bel et bien "Pipelines running", simplement ailleurs (journald,
+# capture via `journalctl -u logstash`, non affecte par ce probleme de
+# permissions car independant du systeme de fichiers). Resultat reel
+# observe : 5 minutes de timeout complet, diagnostic final affichant
+# pourtant "Pipelines running" dans son propre extrait `journalctl`,
+# preuve que la detection cherchait au mauvais endroit. Le correctif
+# LS_B025_ARMED regle la cause racine (proprietaire des fichiers) pour
+# tout nouveau deploiement, mais on fiabilise EN PLUS la detection
+# elle-meme ici, en profondeur ("belt and suspenders") : on verifie
+# desormais le fichier ET journalctl a chaque iteration, n'importe lequel
+# des deux suffit - ainsi un probleme de permissions futur, une rotation
+# de logs, ou tout autre souci propre au fichier ne pourra plus a lui
+# seul bloquer silencieusement cette detection alors que Logstash tourne
+# normalement.
 set -uo pipefail
 source "$VARS_FILE"
 echo "[LS_027] Attente du log 'Pipelines running'..."
 for i in $(seq 1 60); do
-  grep -q "Pipelines running" /var/log/logstash/logstash-plain.log 2>/dev/null && { echo "[LS_027] OK."; exit 0; }
+  if grep -q "Pipelines running" /var/log/logstash/logstash-plain.log 2>/dev/null; then
+    echo "[LS_027] OK (detecte via le fichier logstash-plain.log)."
+    exit 0
+  fi
+  if journalctl -u logstash --no-pager 2>/dev/null | grep -q "Pipelines running"; then
+    echo "[LS_027] OK (detecte via journalctl -u logstash - fichier logstash-plain.log inaccessible ou en retard, voir correctif 2026-09-02 dans jobs/LS_B025_ARMED.sh)."
+    exit 0
+  fi
   sleep 5
 done
 echo "[LS_027] ERREUR : timeout, pipeline non demarre. Diagnostic automatique :" >&2

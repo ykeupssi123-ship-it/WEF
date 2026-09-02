@@ -132,7 +132,8 @@ JOB_LOG="$HISTORY_DIR/$JOB_ID/${JOB_TS}.log"
 } > "$JOB_LOG"
 
 JOB_START_EPOCH=$(date +%s)
-bash "$SCRIPT_PATH" >> "$JOB_LOG" 2>&1 &
+# < /dev/null : meme correctif que orchestrator.sh (voir docs/JOURNAL_TECHNIQUE.md, 2026-09-01)
+bash "$SCRIPT_PATH" >> "$JOB_LOG" 2>&1 < /dev/null &
 JOB_PID=$!
 echo "$(date -Iseconds),$JOB_PID,$C_JOB_NAME (FORCE)" > "$RUNNING_DIR/${JOB_ID}.running"
 wait "$JOB_PID"

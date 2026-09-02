@@ -1552,6 +1552,62 @@ wazuh_factory_3/
 └── logs/                 journaux d'execution (un par run)
 ```
 
+## 2026-09-01 - Echec reel ES_021 chez une etudiante deployant depuis GitHub
+
+**Constat reel** : une etudiante a clone le depot public et lance
+`./orchestrator.sh` sur sa propre machine (premier deploiement
+independant de ce projet, jamais teste jusque-la) - `ES_021` (creation
+du keystore Elasticsearch) a echoue, de facon identique et reproductible
+sur deux tentatives successives (capture d'ecran transmise).
+
+**Diagnostic, sans acces a la machine reelle (VM de reference
+192.168.50.128 eteinte au moment du diagnostic)** : lecture du code
+source du job + connaissance reelle du produit Elasticsearch, deux
+defauts cumules identifies :
+
+1. `elasticsearch-keystore create` s'executait en root, jamais la
+   methode documentee officiellement par Elastic (`sudo -u
+   elasticsearch ...`) - le proprietaire reel de `/etc/elasticsearch`
+   est `elasticsearch:elasticsearch` depuis ES_008/ES_020 ; une
+   incoherence entre l'utilisateur executant la commande et le
+   proprietaire du dossier est une cause plausible et courante d'echec
+   silencieux de ce type d'outil.
+2. La sortie reelle (stdout/stderr) de la commande n'etait jamais
+   capturee ni affichee en cas d'echec - impossible de confirmer la
+   cause exacte sans deviner, le job se contentait de constater
+   l'absence du fichier.
+
+**Meme audit etendu a `KB_017.sh` (Kibana)** : meme motif exact
+(`kibana-keystore create` en root, aucune sortie capturee) - corrige de
+la meme facon par coherence, avant qu'un futur deploiement ne tombe sur
+le meme probleme cote Kibana.
+
+**Correction appliquee (ES_021.sh, KB_017.sh)** : execution desormais
+comme l'utilisateur reel du service (`ES_USER`/`KB_USER`), sortie
+complete capturee et affichee sur tout echec pour que le PROCHAIN
+incident soit diagnosticable sans deviner.
+
+**Honnetete sur la certitude de ce correctif** : cause la plus probable
+identifiee par lecture de code et connaissance du produit, PAS
+confirmee par reproduction directe (VM de reference indisponible au
+moment du correctif). A verifier reellement des que possible sur une
+VM Oracle Linux 8 fraiche.
+
+**Corrige au meme moment, bug latent distinct trouve en marge** : le
+correctif du 2026-09-01 sur ERP_CRM_FACTORY (partage de descripteur
+stdin entre un job lance en arriere-plan et la boucle `while read` de
+l'orchestrateur, code source d'origine partage entre les deux projets)
+n'avait jamais ete reporte sur WAZ_ELK_FACTORY - fait maintenant, sur
+`orchestrator.sh` et `forcer_job.sh`.
+
+**Audit croise AGENT_HOST** (demande explicite du client, verifier que
+FB_009.sh/MB_009.sh mentionnes dans un commentaire de LS_B025_ARMED.sh
+portaient le meme defaut) : aucun des deux fichiers n'existe plus dans
+ce depot (`filebeat-keystore create`/`metricbeat-keystore create`
+introuvables dans jobs/ - le commentaire etait une reference obsolete a
+une iteration anterieure du projet). Rien a corriger cote AGENT_HOST
+pour cette classe de bug precise.
+
 ## Prochaine etape
 
 Execution reelle contre les 2 VM (`./orchestrator.sh` sur chaque machine,

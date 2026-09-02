@@ -12,10 +12,22 @@ if [ -f /etc/kibana/kibana.keystore ]; then
   echo "[KB_017] OK."
   exit 0
 fi
-echo "[KB_017] Creation du keystore Kibana..."
-/usr/share/kibana/bin/kibana-keystore create
+# CORRIGE le 2026-09-01 (meme defaut reel trouve et corrige sur
+# ES_021.sh le meme jour - meme cause, meme classe de bug - voir
+# docs/JOURNAL_TECHNIQUE.md) : execute desormais comme KB_USER (jamais
+# root), coherent avec le proprietaire reel de /etc/kibana, et la sortie
+# reelle de la commande est desormais capturee et affichee en cas
+# d'echec plutot que de deviner apres coup.
+echo "[KB_017] Creation du keystore Kibana (utilisateur ${KB_USER})..."
+KEYSTORE_OUT="$(sudo -u "${KB_USER}" /usr/share/kibana/bin/kibana-keystore create < /dev/null 2>&1)"
+KEYSTORE_RC=$?
+echo "$KEYSTORE_OUT"
+if [ $KEYSTORE_RC -ne 0 ]; then
+  echo "[KB_017] ERREUR : 'kibana-keystore create' a rendu le code ${KEYSTORE_RC}. Sortie ci-dessus." >&2
+  exit 1
+fi
 if [ ! -f /etc/kibana/kibana.keystore ]; then
-  echo "[KB_017] ERREUR : /etc/kibana/kibana.keystore n'existe toujours pas apres 'kibana-keystore create'." >&2
+  echo "[KB_017] ERREUR : /etc/kibana/kibana.keystore n'existe toujours pas apres 'kibana-keystore create' (code sortie ${KEYSTORE_RC})." >&2
   exit 1
 fi
 echo "[KB_017] OK (fichier confirme present)."

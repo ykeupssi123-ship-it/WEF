@@ -230,8 +230,17 @@ for pass in $(seq 1 $MAX_PASSES); do
     # marqueur EN_COURS est encore vivant) - orchestrator.sh reste
     # sequentiel : le "wait" juste apres bloque jusqu'a la fin du job,
     # exactement comme un appel synchrone.
+    # CORRIGE le 2026-09-01 (meme classe de bug diagnostiquee et corrigee
+    # le meme jour sur ERP_CRM_FACTORY, code source d'origine partage
+    # entre les deux projets - voir docs/JOURNAL_TECHNIQUE.md) : sans
+    # "< /dev/null", le job herite du MEME descripteur stdin que la
+    # boucle "while read ... done < jobs_table.csv" qui pilote
+    # l'orchestrateur - si le job (ou un sous-processus qu'il lance) lit
+    # ne serait-ce qu'un octet sur stdin, cet octet est vole directement
+    # dans le flux du CSV en cours de lecture, decalant silencieusement
+    # la position de lecture pour toutes les lignes suivantes.
     JOB_START_EPOCH=$(date +%s)
-    bash "$SCRIPT_PATH" > "$JOB_LOG" 2>&1 &
+    bash "$SCRIPT_PATH" > "$JOB_LOG" 2>&1 < /dev/null &
     JOB_PID=$!
     CURRENT_JOB_MARK="$RUNNING_DIR/${JOB_ID}.running"
     echo "$(date -Iseconds),$JOB_PID,$JOB_NAME" > "$CURRENT_JOB_MARK"

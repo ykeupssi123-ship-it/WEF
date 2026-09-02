@@ -1,0 +1,178 @@
+diff --git a/GUIDE_EXPLOITATION.md b/GUIDE_EXPLOITATION.md
+index 582bb65..62eb264 100644
+--- a/GUIDE_EXPLOITATION.md
++++ b/GUIDE_EXPLOITATION.md
+@@ -49,7 +49,7 @@ variables dans `vars.conf`).
+ 3. Ouvrez `vars.conf`, vérifiez la ligne `ROLE=ELK_HOST` (déjà la valeur
+    par défaut — rien à changer sauf si vous voulez ajuster IP/versions/
+    mots de passe).
+-4. `chmod +x orchestrator.sh jobs/*.sh`
++4. `chmod +x *.sh jobs/*.sh`
+ 5. `./orchestrator.sh`
+    → installe et configure Elasticsearch, Logstash, Kibana, Wazuh.
+ 
+@@ -60,7 +60,7 @@ variables dans `vars.conf`).
+    que `AGENT_COMPONENTS` contient bien les 3 :
+    `AGENT_COMPONENTS="FILEBEAT,METRICBEAT,WAZUH_AGENT,HOSTNAME_RENAME"`
+    (valeur par défaut — les 3 agents tournent **sur la même machine**).
+-3. `chmod +x orchestrator.sh jobs/*.sh`
++3. `chmod +x *.sh jobs/*.sh`
+ 4. `./orchestrator.sh`
+    → installe Filebeat, Metricbeat **et** l'agent Wazuh, tous connectés à VM1.
+ 
+@@ -71,7 +71,7 @@ variables dans `vars.conf`).
+ 3. Choisissez `AGENT_COMPONENTS` selon ce que vous voulez sur cet hôte,
+    ex. uniquement l'agent Wazuh : `AGENT_COMPONENTS="WAZUH_AGENT"`.
+ 4. Changez aussi `AGENT_NAME` (doit être unique par machine).
+-5. `chmod +x orchestrator.sh jobs/*.sh && ./orchestrator.sh`
++5. `chmod +x *.sh jobs/*.sh && ./orchestrator.sh`
+ 
+ Répétez ces 5 étapes sur chaque nouvel hôte Linux à surveiller.
+ 
+diff --git a/README.md b/README.md
+index 6dfbd20..557dfd6 100644
+--- a/README.md
++++ b/README.md
+@@ -33,7 +33,7 @@ feuille *Correspondance Control-M* du classeur d'exploitation.
+    de démonstration).
+ 3. Sur VM1 :
+    ```bash
+-   chmod +x orchestrator.sh jobs/*.sh
++   chmod +x *.sh jobs/*.sh
+    ./orchestrator.sh
+    ```
+ 
+diff --git a/docs/JOURNAL_TECHNIQUE.md b/docs/JOURNAL_TECHNIQUE.md
+index 43016cd..d34ac5e 100644
+--- a/docs/JOURNAL_TECHNIQUE.md
++++ b/docs/JOURNAL_TECHNIQUE.md
+@@ -184,7 +184,17 @@ Tous les scripts sont en pur LF (pas de CRLF), sans BOM, shebang
+ `cat -A`. Aucun probleme de conversion attendu au transfert vers Oracle
+ Linux. Seul point a faire systematiquement apres tout transfert (copie
+ reseau, cle USB, etc.) : redonner les droits d'execution, deja couvert
+-par la commande `chmod +x orchestrator.sh jobs/*.sh` ci-dessous.
++par la commande `chmod +x *.sh jobs/*.sh` ci-dessous.
++
++**CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST)** :
++la commande etait auparavant `chmod +x orchestrator.sh jobs/*.sh` -
++elle ne couvrait que `orchestrator.sh` a la racine, oubliant les
++autres scripts racine executes directement par l'operateur ou par
++orchestrator.sh lui-meme (`notifier.sh`, `statut_live.sh`,
++`historique_job.sh`, `reprise_deploiement.sh`...). Consequence reelle
++observee : `./notifier.sh --test` a echoue avec "Permission non
++accordee" juste apres un clone frais. Corrige en `chmod +x *.sh
++jobs/*.sh`, qui couvre tous les scripts racine en plus de `jobs/`.
+ 
+ **Meme regle d'or que wazuh_factory_2** : aucun script ne contient de
+ valeur en dur (IP, nom, chemin specifique). Tout vient de `vars.conf`.
+@@ -207,7 +217,7 @@ Avant le premier lancement, remplir dans `vars.conf` :
+ ## Lancer
+ 
+ ```bash
+-chmod +x orchestrator.sh jobs/*.sh
++chmod +x *.sh jobs/*.sh
+ ./orchestrator.sh
+ ```
+ 
+diff --git a/installer_service_orchestrateur.sh b/installer_service_orchestrateur.sh
+index ffb8e26..3cb88c7 100644
+--- a/installer_service_orchestrateur.sh
++++ b/installer_service_orchestrateur.sh
+@@ -68,6 +68,41 @@ if [ ! -x "${SCRIPT_DIR}/orchestrator.sh" ]; then
+   exit 1
+ fi
+ 
++# CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle Linux
++# 8, SELinux Enforcing par defaut) : quand ce dossier vit sous /root (clone
++# fait en tant que root dans son propre home, cas le plus courant), les
++# fichiers heritent du contexte SELinux "admin_home_t". Un service systemd
++# tourne dans le domaine "init_t", qui n'a PAS le droit d'executer du
++# contenu "admin_home_t" - "systemctl start" echoue alors immediatement
++# avec "status=203/EXEC" (le fichier a pourtant les bons droits Unix +x,
++# rien a voir avec des permissions classiques). Confirme en reel via
++# `ausearch -m avc -ts recent` : "denied { execute } ... scontext=...
++# init_t ... tcontext=... admin_home_t". Plutot que de laisser chaque
++# operateur decouvrir et diagnostiquer ca a la main (vecu : plusieurs
++# heures de debogage en direct), on relabelle nous-memes, en amont,
++# UNIQUEMENT si SELinux est actif et si le contexte actuel n'est pas deja
++# un contexte "executable par un service" (bin_t/usr_t couvrent les deux
++# emplacements usuels /root et /opt) - idempotent, sans effet si SELinux
++# est absent/desactive (autres distributions) ou si le contexte est deja
++# correct (ex: dossier deja sous /opt, relabel automatique par restorecon).
++if command -v getenforce &>/dev/null && [ "$(getenforce 2>/dev/null)" = "Enforcing" ]; then
++  CURRENT_CTX="$(stat -c '%C' "${SCRIPT_DIR}/orchestrator.sh" 2>/dev/null | cut -d: -f3)"
++  if [ "$CURRENT_CTX" != "bin_t" ] && [ "$CURRENT_CTX" != "usr_t" ]; then
++    echo "[installer_service_orchestrateur] SELinux Enforcing detecte, contexte actuel '${CURRENT_CTX:-inconnu}' non executable par un service - application du contexte 'bin_t' sur ${SCRIPT_DIR}..."
++    if ! command -v semanage &>/dev/null; then
++      echo "[installer_service_orchestrateur] 'semanage' absent - installation de policycoreutils-python-utils..."
++      dnf install -y policycoreutils-python-utils >/dev/null 2>&1 || yum install -y policycoreutils-python-utils >/dev/null 2>&1 || true
++    fi
++    if command -v semanage &>/dev/null && command -v restorecon &>/dev/null; then
++      semanage fcontext -a -t bin_t "${SCRIPT_DIR}(/.*)?" 2>/dev/null || true
++      restorecon -Rv "${SCRIPT_DIR}" >/dev/null
++      echo "[installer_service_orchestrateur] Contexte SELinux corrige."
++    else
++      echo "[installer_service_orchestrateur] ATTENTION : impossible d'installer/utiliser semanage+restorecon - si 'systemctl start' echoue ensuite avec status=203/EXEC, c'est SELinux (voir ausearch -m avc -ts recent) ; corrigez manuellement ou deplacez ce dossier sous /opt." >&2
++    fi
++  fi
++fi
++
+ cat > "$UNIT_PATH" << UNITEOF
+ [Unit]
+ Description=WAZ_ELK_FACTORY - Orchestrateur (ordonnanceur de jobs)
+diff --git a/jobs/LS_B025_ARMED.sh b/jobs/LS_B025_ARMED.sh
+index a55a5d1..edd0b7b 100644
+--- a/jobs/LS_B025_ARMED.sh
++++ b/jobs/LS_B025_ARMED.sh
+@@ -129,7 +129,25 @@ else
+   SECRET_FILE="${STATE_DIR}/factory_ingest_apikey.secret"
+   [ -f "$SECRET_FILE" ] || { echo "[LS_B025_ARMED] ERREUR : $SECRET_FILE absent (ES_050 doit avoir tourne sur ELK_HOST)."; exit 1; }
+   echo "[LS_B025_ARMED] Armement du keystore Logstash (mode token)..."
+-  keystore_set factory_ingest_token "cat '${SECRET_FILE}'"
++  # CORRECTIF 2026-09-02 (incident reel, nouvelle VM ELK_HOST) : ES_050.sh
++  # stocke dans SECRET_FILE le champ "encoded" renvoye par
++  # POST _security/api_key - une chaine DEJA en base64, directement
++  # utilisable telle quelle dans un header HTTP "Authorization: ApiKey ..."
++  # (c'est ce que fait un appel curl/REST direct). Mais le plugin
++  # logstash-output-elasticsearch attend, lui, le format BRUT "id:api_key"
++  # (non encode) dans son option api_key - c'est le plugin lui-meme qui
++  # fait ensuite Base64.strict_encode64(api_key.value) avant d'emettre le
++  # header (voir logstash-output-elasticsearch/.../http_client_builder.rb,
++  # methode setup_api_key - verifie en direct sur le paquet installe,
++  # version 11.22.13). En armant le keystore avec le blob DEJA encode de
++  # SECRET_FILE (ancien comportement, "cat" brut), le plugin le
++  # re-encodait une seconde fois par-dessus -> valeur totalement invalide
++  # -> Elasticsearch repondait 401 "API key: invalid ApiKey value" a
++  # chaque tentative, alors qu'un curl direct avec le meme fichier
++  # reussissait (preuve trompeuse que "la cle est bonne"). Corrige en
++  # decodant le base64 AVANT de l'armer, pour redonner au plugin le
++  # format brut "id:api_key" qu'il attend et qu'il encodera lui-meme.
++  keystore_set factory_ingest_token "base64 -d '${SECRET_FILE}'"
+   if ! keystore_has factory_ingest_token; then
+     echo "[LS_B025_ARMED] ERREUR : verification post-ecriture echouee - factory_ingest_token absent de 'logstash-keystore list' apres l'ajout." >&2
+     "$KEYSTORE_BIN" "${KEYSTORE_PATH_ARGS[@]}" list 2>&1 >&2 || true
+diff --git a/reprise_deploiement.sh b/reprise_deploiement.sh
+index 817f51d..bec174b 100644
+--- a/reprise_deploiement.sh
++++ b/reprise_deploiement.sh
+@@ -39,7 +39,19 @@ fi
+ 
+ echo ""
+ echo "--- Paquets ELK/Wazuh deja presents sur cette machine ---"
+-FOUND_PKG=$(rpm -qa 2>/dev/null | grep -Ei 'wazuh|elastic|logstash|kibana|filebeat|metricbeat|opensearch' || true)
++# CORRECTIF 2026-09-02 (incident reel, nouvelle VM ELK_HOST vierge) : le
++# motif precedent ('elastic' sans ancrage) matchait aussi les paquets
++# PCP par defaut d'Oracle/RHEL 8 - pcp-pmda-elasticsearch et
++# pcp-export-pcp2elasticsearch (plugins de supervision PCP, aucun rapport
++# avec un vrai ELK) - presents de base sur certaines images, meme sur une
++# machine totalement vierge cote deploiement WEF. Consequence reelle
++# observee : le script rendait un faux verdict "paquets deja presents",
++# recommandant a tort MNT_purge_complete_reinstall.sh sur une VM ou
++# aucun job n'avait encore tourne (0 .ok dans state/). Corrige en
++# ancrant le motif sur le DEBUT du nom de paquet (^) : un vrai paquet
++# ELK/Wazuh commence toujours par son nom de produit (elasticsearch-,
++# logstash-, wazuh-manager-...), jamais par "pcp-".
++FOUND_PKG=$(rpm -qa 2>/dev/null | grep -Ei '^(wazuh|elasticsearch|logstash|kibana|filebeat|metricbeat|opensearch)' || true)
+ if [ -z "$FOUND_PKG" ]; then
+   echo "(aucun - machine vierge cote paquets)"
+ else

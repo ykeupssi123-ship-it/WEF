@@ -129,7 +129,25 @@ else
   SECRET_FILE="${STATE_DIR}/factory_ingest_apikey.secret"
   [ -f "$SECRET_FILE" ] || { echo "[LS_B025_ARMED] ERREUR : $SECRET_FILE absent (ES_050 doit avoir tourne sur ELK_HOST)."; exit 1; }
   echo "[LS_B025_ARMED] Armement du keystore Logstash (mode token)..."
-  keystore_set factory_ingest_token "cat '${SECRET_FILE}'"
+  # CORRECTIF 2026-09-02 (incident reel, nouvelle VM ELK_HOST) : ES_050.sh
+  # stocke dans SECRET_FILE le champ "encoded" renvoye par
+  # POST _security/api_key - une chaine DEJA en base64, directement
+  # utilisable telle quelle dans un header HTTP "Authorization: ApiKey ..."
+  # (c'est ce que fait un appel curl/REST direct). Mais le plugin
+  # logstash-output-elasticsearch attend, lui, le format BRUT "id:api_key"
+  # (non encode) dans son option api_key - c'est le plugin lui-meme qui
+  # fait ensuite Base64.strict_encode64(api_key.value) avant d'emettre le
+  # header (voir logstash-output-elasticsearch/.../http_client_builder.rb,
+  # methode setup_api_key - verifie en direct sur le paquet installe,
+  # version 11.22.13). En armant le keystore avec le blob DEJA encode de
+  # SECRET_FILE (ancien comportement, "cat" brut), le plugin le
+  # re-encodait une seconde fois par-dessus -> valeur totalement invalide
+  # -> Elasticsearch repondait 401 "API key: invalid ApiKey value" a
+  # chaque tentative, alors qu'un curl direct avec le meme fichier
+  # reussissait (preuve trompeuse que "la cle est bonne"). Corrige en
+  # decodant le base64 AVANT de l'armer, pour redonner au plugin le
+  # format brut "id:api_key" qu'il attend et qu'il encodera lui-meme.
+  keystore_set factory_ingest_token "base64 -d '${SECRET_FILE}'"
   if ! keystore_has factory_ingest_token; then
     echo "[LS_B025_ARMED] ERREUR : verification post-ecriture echouee - factory_ingest_token absent de 'logstash-keystore list' apres l'ajout." >&2
     "$KEYSTORE_BIN" "${KEYSTORE_PATH_ARGS[@]}" list 2>&1 >&2 || true

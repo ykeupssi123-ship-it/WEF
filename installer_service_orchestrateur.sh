@@ -68,6 +68,41 @@ if [ ! -x "${SCRIPT_DIR}/orchestrator.sh" ]; then
   exit 1
 fi
 
+# CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle Linux
+# 8, SELinux Enforcing par defaut) : quand ce dossier vit sous /root (clone
+# fait en tant que root dans son propre home, cas le plus courant), les
+# fichiers heritent du contexte SELinux "admin_home_t". Un service systemd
+# tourne dans le domaine "init_t", qui n'a PAS le droit d'executer du
+# contenu "admin_home_t" - "systemctl start" echoue alors immediatement
+# avec "status=203/EXEC" (le fichier a pourtant les bons droits Unix +x,
+# rien a voir avec des permissions classiques). Confirme en reel via
+# `ausearch -m avc -ts recent` : "denied { execute } ... scontext=...
+# init_t ... tcontext=... admin_home_t". Plutot que de laisser chaque
+# operateur decouvrir et diagnostiquer ca a la main (vecu : plusieurs
+# heures de debogage en direct), on relabelle nous-memes, en amont,
+# UNIQUEMENT si SELinux est actif et si le contexte actuel n'est pas deja
+# un contexte "executable par un service" (bin_t/usr_t couvrent les deux
+# emplacements usuels /root et /opt) - idempotent, sans effet si SELinux
+# est absent/desactive (autres distributions) ou si le contexte est deja
+# correct (ex: dossier deja sous /opt, relabel automatique par restorecon).
+if command -v getenforce &>/dev/null && [ "$(getenforce 2>/dev/null)" = "Enforcing" ]; then
+  CURRENT_CTX="$(stat -c '%C' "${SCRIPT_DIR}/orchestrator.sh" 2>/dev/null | cut -d: -f3)"
+  if [ "$CURRENT_CTX" != "bin_t" ] && [ "$CURRENT_CTX" != "usr_t" ]; then
+    echo "[installer_service_orchestrateur] SELinux Enforcing detecte, contexte actuel '${CURRENT_CTX:-inconnu}' non executable par un service - application du contexte 'bin_t' sur ${SCRIPT_DIR}..."
+    if ! command -v semanage &>/dev/null; then
+      echo "[installer_service_orchestrateur] 'semanage' absent - installation de policycoreutils-python-utils..."
+      dnf install -y policycoreutils-python-utils >/dev/null 2>&1 || yum install -y policycoreutils-python-utils >/dev/null 2>&1 || true
+    fi
+    if command -v semanage &>/dev/null && command -v restorecon &>/dev/null; then
+      semanage fcontext -a -t bin_t "${SCRIPT_DIR}(/.*)?" 2>/dev/null || true
+      restorecon -Rv "${SCRIPT_DIR}" >/dev/null
+      echo "[installer_service_orchestrateur] Contexte SELinux corrige."
+    else
+      echo "[installer_service_orchestrateur] ATTENTION : impossible d'installer/utiliser semanage+restorecon - si 'systemctl start' echoue ensuite avec status=203/EXEC, c'est SELinux (voir ausearch -m avc -ts recent) ; corrigez manuellement ou deplacez ce dossier sous /opt." >&2
+    fi
+  fi
+fi
+
 cat > "$UNIT_PATH" << UNITEOF
 [Unit]
 Description=WAZ_ELK_FACTORY - Orchestrateur (ordonnanceur de jobs)

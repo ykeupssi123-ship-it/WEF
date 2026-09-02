@@ -33,7 +33,7 @@ feuille *Correspondance Control-M* du classeur d'exploitation.
    de démonstration).
 3. Sur VM1 :
    ```bash
-   chmod +x orchestrator.sh jobs/*.sh
+   chmod +x *.sh jobs/*.sh
    ./orchestrator.sh
    ```
 

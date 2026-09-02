@@ -39,7 +39,19 @@ fi
 
 echo ""
 echo "--- Paquets ELK/Wazuh deja presents sur cette machine ---"
-FOUND_PKG=$(rpm -qa 2>/dev/null | grep -Ei 'wazuh|elastic|logstash|kibana|filebeat|metricbeat|opensearch' || true)
+# CORRECTIF 2026-09-02 (incident reel, nouvelle VM ELK_HOST vierge) : le
+# motif precedent ('elastic' sans ancrage) matchait aussi les paquets
+# PCP par defaut d'Oracle/RHEL 8 - pcp-pmda-elasticsearch et
+# pcp-export-pcp2elasticsearch (plugins de supervision PCP, aucun rapport
+# avec un vrai ELK) - presents de base sur certaines images, meme sur une
+# machine totalement vierge cote deploiement WEF. Consequence reelle
+# observee : le script rendait un faux verdict "paquets deja presents",
+# recommandant a tort MNT_purge_complete_reinstall.sh sur une VM ou
+# aucun job n'avait encore tourne (0 .ok dans state/). Corrige en
+# ancrant le motif sur le DEBUT du nom de paquet (^) : un vrai paquet
+# ELK/Wazuh commence toujours par son nom de produit (elasticsearch-,
+# logstash-, wazuh-manager-...), jamais par "pcp-".
+FOUND_PKG=$(rpm -qa 2>/dev/null | grep -Ei '^(wazuh|elasticsearch|logstash|kibana|filebeat|metricbeat|opensearch)' || true)
 if [ -z "$FOUND_PKG" ]; then
   echo "(aucun - machine vierge cote paquets)"
 else

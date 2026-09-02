@@ -184,7 +184,17 @@ Tous les scripts sont en pur LF (pas de CRLF), sans BOM, shebang
 `cat -A`. Aucun probleme de conversion attendu au transfert vers Oracle
 Linux. Seul point a faire systematiquement apres tout transfert (copie
 reseau, cle USB, etc.) : redonner les droits d'execution, deja couvert
-par la commande `chmod +x orchestrator.sh jobs/*.sh` ci-dessous.
+par la commande `chmod +x *.sh jobs/*.sh` ci-dessous.
+
+**CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST)** :
+la commande etait auparavant `chmod +x orchestrator.sh jobs/*.sh` -
+elle ne couvrait que `orchestrator.sh` a la racine, oubliant les
+autres scripts racine executes directement par l'operateur ou par
+orchestrator.sh lui-meme (`notifier.sh`, `statut_live.sh`,
+`historique_job.sh`, `reprise_deploiement.sh`...). Consequence reelle
+observee : `./notifier.sh --test` a echoue avec "Permission non
+accordee" juste apres un clone frais. Corrige en `chmod +x *.sh
+jobs/*.sh`, qui couvre tous les scripts racine en plus de `jobs/`.
 
 **Meme regle d'or que wazuh_factory_2** : aucun script ne contient de
 valeur en dur (IP, nom, chemin specifique). Tout vient de `vars.conf`.
@@ -207,7 +217,7 @@ Avant le premier lancement, remplir dans `vars.conf` :
 ## Lancer
 
 ```bash
-chmod +x orchestrator.sh jobs/*.sh
+chmod +x *.sh jobs/*.sh
 ./orchestrator.sh
 ```
 

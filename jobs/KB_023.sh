@@ -82,6 +82,29 @@
 set -uo pipefail
 source "$VARS_FILE"
 
+# CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle
+# Linux 8) : ce job a besoin de contacter Elasticsearch (creation du
+# jeton de compte de service / de l'utilisateur dedie, plus bas) mais le
+# blocage reseau pose par KB_021 (crash-test WEF_KB_RUN_ISLTDB, "iptables
+# -A OUTPUT -p tcp --dport ${ES_PORT} -j DROP") n'etait leve que dans
+# KB_024, qui s'execute APRES ce job - KB_023 tentait donc de joindre
+# Elasticsearch alors que la regle DROP posee par KB_021 etait encore
+# active. Symptome reel observe : la commande curl de creation du jeton
+# restait bloquee puis expirait ("Failed to connect ... Connexion
+# terminee par expiration du delai d'attente" - signature typique d'un
+# DROP silencieux, a distinguer d'un REJECT qui aurait echoue
+# immediatement), produisant un fichier reponse VIDE, que le python3 -c
+# suivant ne pouvait alors que rejeter avec "json.decoder.JSONDecodeError:
+# Expecting value: line 1 column 1 (char 0)" - message qui, pris seul,
+# ne montrait pas la vraie cause reseau. Corrige : la levee de
+# l'isolement (deja faite, de facon idempotente, par KB_024 juste apres)
+# est desormais AUSSI faite ici, en tout debut de job, avant toute
+# tentative de contact avec Elasticsearch - sans effet si elle a deja
+# ete levee ailleurs (regle absente -> "|| true"). KB_024 la relevera de
+# toute facon sans risque, exactement comme avant.
+echo "[KB_023] Levee prealable du blocage reseau pose par KB_021 (isolement crash-test) - necessaire avant tout contact avec Elasticsearch..."
+iptables -D OUTPUT -p tcp --dport ${ES_PORT} -j DROP || true
+
 BOOTSTRAP_PW_FILE="${STATE_DIR}/es_bootstrap_password.secret"
 mkdir -p "${STATE_DIR}"
 

@@ -164,7 +164,39 @@ if [ "${ES_AUTH_MODE:-token}" = "password" ]; then
 else
   SECRET_FILE="${STATE_DIR}/factory_kibana_service_token.secret"
 
-  if [ ! -f "$SECRET_FILE" ]; then
+  # CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle
+  # Linux 8, decouvert juste apres le correctif ci-dessus sur l'isolement
+  # reseau KB_021/KB_023/KB_024) : "[ ! -f "$SECRET_FILE" ]" traite
+  # l'EXISTENCE du fichier comme preuve qu'un vrai jeton y est deja
+  # range - or "python3 -c '...' > '$SECRET_FILE'" cree/vide ce fichier
+  # AVANT MEME que python3 ne s'execute (comportement normal de la
+  # redirection ">" en bash), qu'il reussisse ou non. Lors de la
+  # 1ere tentative reelle (reseau encore bloque par le crash-test KB_021,
+  # voir correctif juste au-dessus), la reponse HTTP etait vide, python3
+  # levait "JSONDecodeError" et sortait en erreur (job arrete
+  # correctement) - MAIS un fichier VIDE restait deja cree sur le disque.
+  # A la tentative suivante (reseau debloque), ce fichier vide EXISTAIT
+  # deja : la condition "[ ! -f ... ]" etait donc fausse, le job a
+  # affiche a tort "deja arme localement, reutilise tel quel" et a
+  # arme le keystore Kibana avec une chaine VIDE. Consequence reelle
+  # observee : KB_023 se declarait "OK" (la seule verification faite
+  # etait la PRESENCE de la cle dans 'kibana-keystore list', jamais que
+  # sa VALEUR soit non-vide), mais KB_024 juste apres restait bloque 5
+  # minutes puis echouait avec Kibana actif mais jamais
+  # status.overall.level=available - confirme en reel par Elasticsearch
+  # lui-meme : requete /_security/_authenticate avec ce jeton rejetee en
+  # 401 "missing authentication credentials" (jeton vide, pas invalide -
+  # aucune donnee n'etait envoyee du tout). Corrige : (1) "-f" remplace
+  # par "-s" (fichier present ET non-vide) pour ne plus jamais considerer
+  # un residu vide comme un etat valide deja arme ; (2) le fichier n'est
+  # plus ecrit qu'APRES verification que la valeur recuperee est non-vide
+  # (capture dans une variable shell d'abord, jamais une redirection
+  # directe qui creerait le fichier avant meme de savoir si la commande
+  # va reussir).
+  if [ ! -s "$SECRET_FILE" ]; then
+    if [ -f "$SECRET_FILE" ]; then
+      echo "[KB_023] ATTENTION : ${SECRET_FILE} existe deja mais est VIDE (tentative precedente interrompue avant d'ecrire un vrai jeton) - creation d'un jeton frais."
+    fi
     echo "[KB_023] Creation du jeton de compte de service dedie elastic/kibana (factory_kibana_token)..."
     # Idempotence : un jeton de compte de service est immuable une fois
     # cree (pas de mise a jour possible, contrairement a une cle API) - si
@@ -181,8 +213,13 @@ else
       -X POST "https://127.0.0.1:${ES_PORT}/_security/service/elastic/kibana/credential/token/factory_kibana_token" \
       > ${WORK_TMP_DIR}/kb023_token.json
 
-    python3 -c "import json,sys; d=json.load(open('${WORK_TMP_DIR}/kb023_token.json')); sys.stdout.write(d['token']['value'])" > "$SECRET_FILE" \
+    TOKEN_VALUE="$(python3 -c "import json,sys; d=json.load(open('${WORK_TMP_DIR}/kb023_token.json')); sys.stdout.write(d['token']['value'])")" \
       || { echo "[KB_023] ERREUR : reponse API inattendue lors de la creation du jeton, voir ${WORK_TMP_DIR}/kb023_token.json"; exit 1; }
+    if [ -z "$TOKEN_VALUE" ]; then
+      echo "[KB_023] ERREUR : jeton recupere mais VIDE (reponse API inattendue), voir ${WORK_TMP_DIR}/kb023_token.json" >&2
+      exit 1
+    fi
+    printf '%s' "$TOKEN_VALUE" > "$SECRET_FILE"
     chmod 600 "$SECRET_FILE"
     rm -f ${WORK_TMP_DIR}/kb023_token.json
   else

@@ -108,8 +108,20 @@ write_report() {
     fi
     echo ""
     echo "--- JOBS TERMINES AVEC SUCCES (${STATE_DIR}/*.ok) ---"
-    if ls "$STATE_DIR"/*.ok >/dev/null 2>&1; then
-      ls "$STATE_DIR"/*.ok | xargs -n1 basename | sed 's/\.ok$//'
+    # CORRIGE LE 2026-09-03 (incident reel WAZ_014A, voir docs/JOURNAL_TECHNIQUE.md) :
+    # l'ancien "ls ... >/dev/null 2>&1" pour tester l'existence de fichiers
+    # est dangereux si /dev/null n'est plus, a cet instant precis, un
+    # peripherique caractere (bug deja connu, voir INFRA_003_DEVNULL_GUARDIAN.sh) :
+    # la redirection ">" RECREE alors /dev/null comme fichier ordinaire et le
+    # vrai contenu de ls (la liste des chemins state/*.ok) s'ecrit DEDANS au
+    # lieu d'etre jete - constate en reel (fichier de 5209 octets contenant
+    # exactement cette liste). Remplace par un test purement bash (nullglob),
+    # qui ne touche jamais /dev/null.
+    shopt -s nullglob
+    OK_FILES=("$STATE_DIR"/*.ok)
+    shopt -u nullglob
+    if [ "${#OK_FILES[@]}" -gt 0 ]; then
+      printf '%s\n' "${OK_FILES[@]}" | xargs -n1 basename | sed 's/\.ok$//'
     else
       echo "(aucun)"
     fi

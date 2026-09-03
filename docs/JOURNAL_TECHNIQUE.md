@@ -1846,6 +1846,21 @@ WAZ_019_FLOOD -> WAZ_020_VERIFY rejouee de bout en bout avec succes
 reel - `WAZ_020_VERIFY -> OK (WAZ_INDEX_OK)`, confirme par le marqueur
 d'etat de l'orchestrateur, pas suppose.
 
+**WAZ_022 (secret operateur, pas un bug de job)** : `secrets/
+wazuh_api_password.txt` absent sur cette VM (fraiche pour ce cycle de
+deploiement). Le job lit ce secret en lecture seule par conception (son
+propre en-tete l'explique : en generer un ici casserait
+l'authentification au lieu de la reparer, aucun job de cette usine ne
+pousse ce mot de passe cote wazuh-apid). Verifie en reel : les
+identifiants par defaut du paquet `wazuh-manager` pour une installation
+RPM manuelle (`wazuh`/`wazuh`, PAS d'auto-generation contrairement a
+l'assistant d'installation tout-en-un) fonctionnent toujours -
+confirme par un vrai jeton JWT recu via `/security/user/authenticate`.
+Secret cree en consequence (`echo -n 'wazuh' > secrets/
+wazuh_api_password.txt`, chmod 600). A changer par l'operateur en
+production reelle (identifiants par defaut, jamais a garder tels quels
+hors environnement de test).
+
 **Incident de la coupure VM (04:39-04:48) : cause trouvee par la suite,
 en reel, pas seulement soupçonnee.** Laisse d'abord ouvert faute de
 preuve suffisante (voir plus haut : `vmware.log` montrait des ecritures

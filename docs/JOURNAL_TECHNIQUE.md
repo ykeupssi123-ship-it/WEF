@@ -1749,6 +1749,37 @@ dernier l'aurait ecrasee silencieusement. Corrige avec le meme principe
 additif deja etabli par `WAZ_041_ALERT_CANARY.sh` (grep avant d'inserer,
 jamais un `cat >` brut sur un fichier partage entre plusieurs jobs).
 
+**Regression reelle introduite par le correctif ci-dessus, corrigee dans
+la foulee** : le premier correctif de `WAZ_019_FLOOD.sh` (celui qui
+ajoute la regle 100102) utilisait `sed -i 's#</group>#...#'` SANS
+ancrage de ligne, en supposant a tort que `</group>` n'apparait qu'une
+seule fois dans `local_rules.xml` (la fermeture du groupe englobant en
+fin de fichier). Faux sur une VM fraiche : `local_rules.xml` est livre
+par defaut avec un exemple (regle 100001, detection SSH) dont le tag de
+classification interne (`<group>authentication_failed,pci_dss_10.2.4,
+pci_dss_10.2.5,</group>`) se termine LUI AUSSI par `</group>`, sur sa
+propre ligne, plus tot dans le fichier. Confirme en reel sur la VM
+MIPREL : `sed` a remplace cette ligne-la (la premiere rencontree), pas
+la fermeture finale - corrompant la regle 100001 existante (le texte de
+la regle 100102 s'est retrouve concatene au milieu du tag de
+classification de la 100001). Meme bug latent identifie par relecture
+dans `WAZ_041_ALERT_CANARY.sh` (meme motif exact, ligne 70) - n'a pas
+encore corrompu quoi que ce soit sur cette VM uniquement parce que ce
+job (numerote 041, tout en fin de chaine) n'a pas encore tourne.
+**Corrige** (`WAZ_019_FLOOD.sh`, `WAZ_025.sh`) : `sed -i '$s#</group>#...#'`
+(adresse `$` = derniere ligne du fichier UNIQUEMENT, quel que soit le
+nombre d'autres `</group>` ailleurs), plus une verification `grep`
+explicite apres chaque ecriture (fichier ossec.conf ET local_rules.xml)
+qui fait echouer le job avec un message clair si l'insertion n'a pas
+reellement eu lieu - jamais suppose reussi. Meme session : `ossec.conf`
+lui-meme n'avait PAS ete modifie du tout par le premier correctif (echec
+silencieux d'un `sed` multi-lignes en guillemets doubles, `set -uo
+pipefail` sans `set -e` ne detecte pas un `sed` qui echoue sans modifier
+le fichier) - remplace par une insertion `awk` (variable passee
+proprement via `-v`, aucune fragilite d'echappement de guillemets/
+retours a la ligne) avec la meme verification `grep` obligatoire apres
+coup.
+
 **Incident non elucide en parallele, laisse ouvert honnetement** : entre
 la fin propre de l'orchestrateur (04:39:50, rapport ecrit normalement,
 PAS un crash) et le prochain acces reseau (04:47:59), la VM elle-meme

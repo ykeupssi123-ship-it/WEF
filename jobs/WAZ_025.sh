@@ -22,7 +22,21 @@ if [ ! -f "$RULES_FILE" ]; then
 RULEEOF
 fi
 if ! grep -q 'id="100100"' "$RULES_FILE" 2>/dev/null; then
-  sed -i 's#</group>#  <rule id="100100" level="7">\n    <if_group>syscheck</if_group>\n    <description>Modification detectee sur un fichier surveille de la Forge</description>\n  </rule>\n</group>#' "$RULES_FILE"
+  # CORRIGE LE 2026-09-03 (incident reel, voir docs/JOURNAL_TECHNIQUE.md,
+  # meme bug decouvert et corrige au meme moment dans WAZ_019_FLOOD.sh) :
+  # sur une VM fraiche, ce fichier est celui d'EXEMPLE livre par defaut
+  # avec wazuh-manager (regle 100001), dont le groupe de classification
+  # interne se termine aussi par "</group>" sur sa propre ligne. Un "sed
+  # 's#</group>#...#'" sans ancrage remplace la PREMIERE ligne
+  # correspondante du fichier - pas forcement la fermeture du groupe
+  # englobant en fin de fichier - et corrompt la regle existante. Corrige
+  # avec "$s#...#" (adresse "$" = derniere ligne UNIQUEMENT) +
+  # verification explicite apres coup.
+  sed -i '$s#</group>#  <rule id="100100" level="7">\n    <if_group>syscheck</if_group>\n    <description>Modification detectee sur un fichier surveille de la Forge</description>\n  </rule>\n</group>#' "$RULES_FILE"
+  if ! grep -q 'id="100100"' "$RULES_FILE"; then
+    echo "[WAZ_025] ERREUR : l'ajout de la regle 100100 a echoue (non retrouvee apres ecriture - la derniere ligne de ${RULES_FILE} n'est peut-etre pas '</group>')." >&2
+    exit 1
+  fi
 else
   echo "[WAZ_025] Regle 100100 deja presente, ignore."
 fi

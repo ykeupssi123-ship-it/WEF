@@ -38,11 +38,33 @@ chmod 644 "$FLOOD_LOG"
 
 if ! grep -q "$FLOOD_LOG" /var/ossec/etc/ossec.conf 2>/dev/null; then
   echo "[WAZ_019_FLOOD] Ajout de la surveillance de ${FLOOD_LOG} dans ossec.conf..."
-  sed -i "/<\/ossec_config>/i\\
-  <localfile>\\
-    <log_format>syslog</log_format>\\
-    <location>${FLOOD_LOG}</location>\\
-  </localfile>" /var/ossec/etc/ossec.conf
+  # CORRIGE LE 2026-09-03 (incident reel, meme deploiement) : la version
+  # precedente utilisait "sed -i "...i\\..." /path" en guillemets doubles
+  # pour interpoler ${FLOOD_LOG} - l'insertion n'a PAS eu lieu du tout sur
+  # la VM reelle (echec silencieux, "set -uo pipefail" sans "set -e" ne
+  # detecte pas un sed qui echoue sans modifier le fichier). Remplace par
+  # awk (variable passee proprement via -v, aucune fragilite
+  # d'echappement de guillemets/retours a la ligne) + verification
+  # explicite apres coup - plus jamais suppose, toujours confirme par
+  # grep avant de continuer.
+  TMP_OSSEC="$(mktemp)"
+  awk -v loc="$FLOOD_LOG" '
+    /<\/ossec_config>/ && !done {
+      print "  <localfile>"
+      print "    <log_format>syslog</log_format>"
+      print "    <location>" loc "</location>"
+      print "  </localfile>"
+      print ""
+      done=1
+    }
+    { print }
+  ' /var/ossec/etc/ossec.conf > "$TMP_OSSEC"
+  cp "$TMP_OSSEC" /var/ossec/etc/ossec.conf
+  rm -f "$TMP_OSSEC"
+  if ! grep -q "$FLOOD_LOG" /var/ossec/etc/ossec.conf; then
+    echo "[WAZ_019_FLOOD] ERREUR : l'ajout de ${FLOOD_LOG} dans ossec.conf a echoue (non retrouve apres ecriture)." >&2
+    exit 1
+  fi
   NEED_RESTART=1
 else
   echo "[WAZ_019_FLOOD] Surveillance de ${FLOOD_LOG} deja presente dans ossec.conf, ignore."
@@ -61,7 +83,25 @@ RULEEOF
 fi
 if ! grep -q 'id="100102"' "$RULES_FILE" 2>/dev/null; then
   echo "[WAZ_019_FLOOD] Pose de la regle dediee au test de charge (id 100102, niveau 7)..."
-  sed -i 's#</group>#  <rule id="100102" level="7">\n    <match>wazuh-test-flood</match>\n    <description>Evenement synthetique du test de charge (WAZ_019_FLOOD) - ignorer, jamais un incident reel.</description>\n    <group>flood_test,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  # CORRIGE LE 2026-09-03 (incident reel, meme deploiement) : ce fichier
+  # n'est PAS toujours celui cree par ce projet - sur une VM fraiche,
+  # c'est le fichier d'EXEMPLE livre par defaut avec wazuh-manager (regle
+  # 100001, groupe interne de classification PCI-DSS SUR SA PROPRE LIGNE
+  # se terminant aussi par "</group>"). L'ancien "sed 's#</group>#...#'"
+  # (sans ancrage de ligne) remplaçait la PREMIERE ligne du fichier
+  # contenant "</group>" - qui s'est averee etre cette balise interne de
+  # la regle 100001, pas la fermeture du groupe englobant en fin de
+  # fichier - corrompant la regle existante (confirme en reel : capture
+  # du fichier corrompu, "<group>authentication_failed,...,<rule
+  # id="100102"...>" concatenes sur la meme ligne). Corrige : "$s#...#"
+  # (adresse sed "$" = derniere ligne du fichier UNIQUEMENT, quel que
+  # soit le nombre d'autres "</group>" ailleurs) + verification explicite
+  # apres coup.
+  sed -i '$s#</group>#  <rule id="100102" level="7">\n    <match>wazuh-test-flood</match>\n    <description>Evenement synthetique du test de charge (WAZ_019_FLOOD) - ignorer, jamais un incident reel.</description>\n    <group>flood_test,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  if ! grep -q 'id="100102"' "$RULES_FILE"; then
+    echo "[WAZ_019_FLOOD] ERREUR : l'ajout de la regle 100102 a echoue (non retrouvee apres ecriture - la derniere ligne de ${RULES_FILE} n'est peut-etre pas '</group>')." >&2
+    exit 1
+  fi
   NEED_RESTART=1
 else
   echo "[WAZ_019_FLOOD] Regle 100102 deja presente, ignore."

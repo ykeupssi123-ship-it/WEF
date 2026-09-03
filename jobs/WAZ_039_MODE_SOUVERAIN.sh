@@ -1,4 +1,8 @@
 #!/bin/bash
+# SUPERSEDE LE 2026-09-03 - plus reference dans jobs_table.csv. Remplace
+# par la cascade granulaire WAZ_039_WAZUH_TRIGGER/039A/039B/039C/039D
+# (voir docs/JOURNAL_TECHNIQUE.md pour le diagnostic complet). Conserve
+# ici seulement comme trace historique - ne pas rejouer directement.
 # WAZ_039_MODE_SOUVERAIN - WEF_WAZ_RUN_SWTOSOV
 # Vanne un-clic inverse de WAZ_035_MODE_CONVERGENT : bascule EXCLUSIVE
 # des alertes Wazuh de retour vers wazuh-indexer (et reallumage du

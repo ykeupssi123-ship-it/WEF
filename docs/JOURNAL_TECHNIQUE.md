@@ -1861,6 +1861,103 @@ wazuh_api_password.txt`, chmod 600). A changer par l'operateur en
 production reelle (identifiants par defaut, jamais a garder tels quels
 hors environnement de test).
 
+## Refonte complete de la bascule Kibana<->Wazuh (2026-09-03, demande explicite utilisateur)
+
+**Constat de depart** : l'ancien `WAZ_035_MODE_CONVERGENT.sh`/
+`WAZ_039_MODE_SOUVERAIN.sh` (monolithiques, un seul gros script par
+sens) ne correspondaient plus a ce que l'utilisateur voulait
+reellement :
+  1. wazuh-indexer restait TOUJOURS actif en mode Kibana (choix
+     deliberement documente le 2026-08-31, pour ne pas casser WAZ_014D/
+     WAZ_014E/WAZ_042/WAZ_043/INFRA_004_HEALTH_GUARDIAN qui en
+     dependent) - l'utilisateur veut au contraire un mode EXCLUSIF ou
+     wazuh-dashboard ET wazuh-indexer sont reellement arretes.
+  2. La migration d'historique etait une COPIE (scroll+bulk), jamais
+     une COUPURE - la source restait peuplee des deux cotes.
+  3. Chaque bascule etait UN SEUL job - impossible de geler
+     individuellement une seule etape (ex: juste la coupure de donnees)
+     via SKIP_JOBS sans geler toute la bascule.
+
+**Decisions prises avec l'utilisateur (AskUserQuestion, 2026-09-03)** :
+  - Les jobs dependants de wazuh-indexer sont mis en pause pendant le
+    mode Kibana (SKIP_JOBS pour WAZ_014D/WAZ_014E/WAZ_042/WAZ_043) et
+    reactives au retour. CAS A PART trouve en verifiant le code :
+    INFRA_004_HEALTH_GUARDIAN n'est PAS repris par SKIP_JOBS (c'est un
+    INSTALLATEUR one-shot d'un timer systemd independant qui ne
+    consulte jamais SKIP_JOBS) - suspendu/reactive directement via
+    `systemctl stop/start wef-health-guardian.timer`.
+  - "Couper" signifie reellement supprimer les documents source apres
+    verification stricte que la copie est complete (jamais de
+    suppression optimiste - voir jobs/lib/cut_migrate.sh).
+  - L'ancien WAZ_037_CONVERGENT_TEST (qui echouait ce soir-la) est
+    remplace par la nouvelle chaine plutot que diagnostique isolement.
+
+**Nouvelle architecture** (chaque etape = un job independant,
+individuellement gelable via SKIP_JOBS, meme convention de nommage que
+le reste du projet) :
+
+Bascule vers Kibana (remplace WAZ_035_MODE_CONVERGENT.sh) :
+`WAZ_035_KIBANA_TRIGGER` (point d'entree, rejouable via forcer_job.sh) ->
+`WAZ_035A_PAUSE_DEP_JOBS` -> `WAZ_035B_CUT_INDEXER_TO_ES` (coupure
+reelle) -> `WAZ_035C_REROUTE_PIPELINE_ES` -> `WAZ_035D_STOP_WAZUI`
+(arret reel de wazuh-dashboard ET wazuh-indexer, ecrit
+WAZ_ALERTS_ROUTE.state=ELASTICSEARCH) -> WAZ_036/037/038 (inchanges).
+
+Retour vers Wazuh (remplace WAZ_039_MODE_SOUVERAIN.sh) :
+`WAZ_039_WAZUH_TRIGGER` -> `WAZ_039A_START_WAZUI` (redemarre
+wazuh-indexer PUIS wazuh-dashboard) -> `WAZ_039B_REROUTE_PIPELINE_INDEXER`
+-> `WAZ_039C_CUT_ES_TO_INDEXER` (coupure reelle inverse) ->
+`WAZ_039D_RESUME_DEP_JOBS` (leve SKIP_JOBS + reactive le timer, ecrit
+WAZ_ALERTS_ROUTE.state=INDEXER) -> WAZ_040/041 (inchanges).
+
+Seul `WAZ_036_KIBANA_INDEX` (IN_COND) a du etre touche parmi les jobs
+existants deja eprouves - tout le reste de la chaine (037/038/040/041)
+garde EXACTEMENT les memes noms de marqueurs qu'avant, zero autre
+modification necessaire.
+
+**Nouveaux outils partages** (`jobs/lib/`) :
+  - `cut_migrate.sh` : logique scroll+bulk (reprise a l'identique du
+    code deja PROUVE fonctionnel du 2026-08-31) + etape de suppression
+    source ajoutee, jamais tentee avant confirmation stricte que le
+    compte destination >= compte source.
+  - `skip_jobs_toggle.sh` : ajout/retrait cible de JOB_ID precis dans
+    SKIP_JOBS (vars.conf), jamais les autres entrees deja presentes
+    (ex. `SKIP_JOBS="ES_001"` de base) - sauvegarde + verification apres
+    coup, meme discipline que chaque edition de fichier critique cette
+    nuit.
+  - `test_data_tools.sh` : `seed_test_alerts` (charge un volume
+    configurable - defaut 50000, `WAZ_SEED_COUNT` - de documents
+    synthetiques marques `"wef_test_seed": true`, jamais confondus avec
+    une vraie alerte) et `purge_index_pattern` (delete_by_query +
+    verification stricte a 0 apres coup).
+
+**Nouveaux jobs de test/nettoyage** (demande separee de l'utilisateur,
+JAMAIS dans la chaine automatique - `IN_COND=WAZ_PURGE_MANUAL_GATE`,
+une condition qu'aucun job ne produit jamais - usage EXCLUSIVEMENT via
+`forcer_job.sh`, qui tolere un IN_COND non satisfait apres confirmation
+explicite tapee par l'operateur) : `WAZ_045A_SEED_INDEXER_DATA`,
+`WAZ_045B_SEED_ES_DATA`, `WAZ_046_PURGE_INDEXER_DATA` (destructeur,
+irreversible), `WAZ_047_PURGE_ES_DATA` (destructeur, irreversible).
+
+**BUG REEL TROUVE ET CORRIGE avant meme le premier test en direct** : le
+parseur CSV de ce projet (`orchestrator.sh`, `forcer_job.sh` : simple
+`read -r ... IFS=','`, aucune gestion de guillemets) casse des qu'un
+champ DESC contient une virgule litterale - un texte comme "coupe, non
+copie" aurait decale IN_COND/OUT_COND de deux jobs et corrompu
+silencieusement leur chainage de dependances. Trouve par verification
+systematique (`awk -F',' 'NF!=8'` sur tout `jobs_table.csv`) avant de
+livrer, jamais suppose correct - convention du projet confirmee :
+utiliser un tiret "-", jamais une virgule, dans une description.
+
+**PAS ENCORE TESTE EN REEL sur la VM** (contrairement au reste de cette
+nuit) - a verifier au premier `./orchestrator.sh` : la cascade complete
+vers Kibana, le retour vers Wazuh, et separement les jobs de
+seed/purge. Honnete : la syntaxe bash de chaque script est verifiee
+(`bash -n`), mais la logique Python embarquee (scroll+bulk+delete,
+bulk-seed) n'a pu etre testee que par relecture (aucun interpreteur
+Python disponible sur la machine Windows locale) - premiere execution
+reelle a surveiller de pres.
+
 **Incident de la coupure VM (04:39-04:48) : cause trouvee par la suite,
 en reel, pas seulement soupçonnee.** Laisse d'abord ouvert faute de
 preuve suffisante (voir plus haut : `vmware.log` montrait des ecritures

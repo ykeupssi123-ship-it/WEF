@@ -1,4 +1,8 @@
 #!/bin/bash
+# SUPERSEDE LE 2026-09-03 - plus reference dans jobs_table.csv. Remplace
+# par la cascade granulaire WAZ_035_KIBANA_TRIGGER/035A/035B/035C/035D
+# (voir docs/JOURNAL_TECHNIQUE.md pour le diagnostic complet). Conserve
+# ici seulement comme trace historique - ne pas rejouer directement.
 # WAZ_035_MODE_CONVERGENT - WEF_WAZ_RUN_SWTOKIB
 # Vanne un-clic REVERSIBLE : bascule EXCLUSIVE des alertes Wazuh vers
 # Elasticsearch/Kibana (et extinction du Dashboard natif Wazuh, devenu

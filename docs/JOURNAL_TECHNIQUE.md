@@ -1811,6 +1811,41 @@ de `WAZ_014B` (2026-08-30), jamais alignee avec les deux autres jobs qui
 utilisent la meme variable. **Corrige** : `:-9201`, comme ses deux
 jobs freres.
 
+**Correctif ci-dessus incomplet, corrige honnetement dans la foulee -
+la vraie cause etait ailleurs.** Apres avoir pousse le correctif de port
+et confirme sa presence sur la VM, Logstash visait TOUJOURS le port
+9200 en pratique. Verification faite (pas supposee) : `vars.conf`
+definit explicitement `WAZ_INDEXER_PORT=9200` (ligne 450) - cette
+valeur explicite prime TOUJOURS sur un `${VAR:-defaut}` dans n'importe
+quel job, donc le correctif de port ci-dessus n'a jamais eu d'effet
+reel (inoffensif, mais base sur une supposition non verifiee - le
+`:-9201` des jobs "freres" ne s'appliquait deja pas non plus en
+pratique). 9200 est le vrai port REST de wazuh-indexer sur cette usine.
+La vraie cause du "Connexion refusee" : **`wazuh-indexer` etait
+completement en panne** (`systemctl status` : "failed (Result:
+timeout)"), independamment de tout numero de port. `journalctl -u
+wazuh-indexer` a revele l'erreur reelle : `java.security.
+AccessControlException: access denied (java.lang.RuntimePermission
+setContextClassLoader)` pendant l'initialisation de log4j - le fichier
+de politique de securite JVM du module Performance Analyzer
+(`/etc/wazuh-indexer/opensearch-performance-analyzer/
+opensearch_security.policy`) n'accorde jamais cette permission (verifie
+intact, non corrompu : taille/date d'origine du paquet inchangees,
+confirme par `rpm -V`) - un defaut de compatibilite du produit
+wazuh-indexer 4.14.7 lui-meme, pas une erreur de configuration de cette
+usine. **Corrige** : ajout de la permission manquante au fichier de
+politique (correctif standard documente pour cette classe
+d'AccessControlException sur les produits bases OpenSearch), verifie en
+reel - `wazuh-indexer` redemarre et reste actif, port 9200 en ecoute
+confirme (`ss -tlnp`). Applique aussi dans `WAZ_014.sh`
+(WEF_WAZ_BLD_STARTINDXR, le job qui demarre wazuh-indexer) AVANT la
+premiere tentative de demarrage, pour qu'un futur deploiement propre
+(VM fraiche, meme version du paquet) n'entre jamais dans cette boucle
+de crash. **Resultat final verifie** : chaine complete WAZ_014B ->
+WAZ_019_FLOOD -> WAZ_020_VERIFY rejouee de bout en bout avec succes
+reel - `WAZ_020_VERIFY -> OK (WAZ_INDEX_OK)`, confirme par le marqueur
+d'etat de l'orchestrateur, pas suppose.
+
 **Incident de la coupure VM (04:39-04:48) : cause trouvee par la suite,
 en reel, pas seulement soupçonnee.** Laisse d'abord ouvert faute de
 preuve suffisante (voir plus haut : `vmware.log` montrait des ecritures

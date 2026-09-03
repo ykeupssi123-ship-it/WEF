@@ -42,7 +42,17 @@ PROJECT_ROOT="$(dirname "$VARS_FILE")"
 source "$PROJECT_ROOT/lib/commun.sh"
 
 WAZUH_INDEXER_ADMIN_PW="$(read_or_generate_secret "$WAZ_INDEXER_ADMIN_PASSWORD_FILE" non)" || exit 1
-WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9200}"
+# CORRIGE LE 2026-09-03 (incident reel deploiement MIPREL, voir
+# docs/JOURNAL_TECHNIQUE.md) : valeur par defaut fausse ici (9200,
+# le port Elasticsearch classique) alors que WAZ_014A_INDXR_ADMINPW.sh
+# et WAZ_020_VERIFY.sh utilisent tous deux 9201 par defaut pour cette
+# meme variable (le vrai port REST de wazuh-indexer sur cette usine,
+# voir WAZ_013D_INDXR_PORTS.sh). Preuve directe : Logstash journalisait
+# en boucle "Could not fetch URL https://127.0.0.1:9200/... Connexion
+# refusee" alors que le manager generait bien de vraies alertes
+# localement (6140 confirmees dans alerts.log) - rien n'ecoute en HTTP
+# sur 9200 dans ce deploiement.
+WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9201}"
 LS_CERTS="/etc/logstash/certs"
 PIPELINE_CONF="/etc/logstash/wazuh-alerts.conf"
 PIPELINES_YML="/etc/logstash/pipelines.yml"

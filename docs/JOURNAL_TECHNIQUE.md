@@ -1795,6 +1795,22 @@ temporaire si necessaire, puis `chown root:wazuh` + `chmod 640` +
 `chattr +i` systematique en sortie - jamais laisser le fichier
 deverrouille.
 
+**Dernier maillon de la chaine WAZ_020_VERIFY, trouve apres verification
+complete du pipeline** : le manager generait bien de vraies alertes
+localement (6140 confirmees dans `alerts.log`/`alerts.json`, SELinux
+correct), mais rien n'arrivait dans wazuh-indexer. `journalctl -u
+logstash` montrait en boucle `Could not fetch URL
+https://127.0.0.1:9200/... Connexion refusee`. Cause trouvee dans le
+code : `jobs/WAZ_014B_ALERTS_TO_INDEXER.sh` ligne 45,
+`WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9200}"` - valeur par defaut
+fausse (9200, le port Elasticsearch classique), alors que
+`WAZ_014A_INDXR_ADMINPW.sh` et `WAZ_020_VERIFY.sh` utilisent tous deux
+`:-9201` par defaut pour cette meme variable (le vrai port REST de
+wazuh-indexer sur cette usine). Incoherence introduite lors de l'ajout
+de `WAZ_014B` (2026-08-30), jamais alignee avec les deux autres jobs qui
+utilisent la meme variable. **Corrige** : `:-9201`, comme ses deux
+jobs freres.
+
 **Incident de la coupure VM (04:39-04:48) : cause trouvee par la suite,
 en reel, pas seulement soupçonnee.** Laisse d'abord ouvert faute de
 preuve suffisante (voir plus haut : `vmware.log` montrait des ecritures

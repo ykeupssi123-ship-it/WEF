@@ -1780,23 +1780,46 @@ proprement via `-v`, aucune fragilite d'echappement de guillemets/
 retours a la ligne) avec la meme verification `grep` obligatoire apres
 coup.
 
-**Incident non elucide en parallele, laisse ouvert honnetement** : entre
-la fin propre de l'orchestrateur (04:39:50, rapport ecrit normalement,
-PAS un crash) et le prochain acces reseau (04:47:59), la VM elle-meme
-s'est retrouvee eteinte (constate par l'operateur directement dans
-VMware Workstation). `journalctl` cote invite ne contenait aucun
-historique de demarrage precedent (journal non persistant - active
-maintenant pour la prochaine fois). Cote hote, `vmware.log` montre des
-ecritures disque anormalement lentes (1,4 a 2,8 secondes par commande
-WRITE, tres au-dessus de la normale) mais sur une fenetre horaire
-(02h56-03h00) qui precede largement la coupure (04h39-04h48) - preuve
-insuffisante pour conclure avec certitude a un lien de cause a effet.
-Piste retenue mais NON confirmee : ressources de la machine hote
-(RAM/disque du PC portable) insuffisantes pour la charge cumulee de
-plusieurs VM + la pile complete ELK/Wazuh (5,6 Gio alloues, seulement
-2,0 Gio disponibles au repos). A surveiller lors du prochain test de
-charge, avec le journal persistant desormais actif pour capturer une
-preuve directe si ca se reproduit.
+**Encore une regression, corrigee dans la foulee** : meme apres le
+correctif ci-dessus, l'ecriture dans `ossec.conf` echouait toujours en
+reel (`cp: impossible de creer le fichier standard '...': Operation non
+permise`). `lsattr` confirme : `----i---------------` - le fichier est
+verrouille en immuable (`chattr +i`), un geste **volontaire** de
+durcissement deja pose par `WAZ_014E_INDEXER_CONNECTOR.sh` (execute
+plus tot dans cette meme session) et par `WAZ_032.sh`, PAS un accident.
+`WAZ_019_FLOOD.sh` ne le savait pas et n'avait aucun mecanisme pour
+gerer ce cas. **Corrige** avec exactement le meme geste deja etabli par
+`WAZ_014E_INDEXER_CONNECTOR.sh` (seul autre job du projet a devoir deja
+gerer ce cas) : detection via `lsattr` avant d'ecrire, `chattr -i`
+temporaire si necessaire, puis `chown root:wazuh` + `chmod 640` +
+`chattr +i` systematique en sortie - jamais laisser le fichier
+deverrouille.
+
+**Incident de la coupure VM (04:39-04:48) : cause trouvee par la suite,
+en reel, pas seulement soupçonnee.** Laisse d'abord ouvert faute de
+preuve suffisante (voir plus haut : `vmware.log` montrait des ecritures
+disque anormalement lentes, 1,4 a 2,8 secondes par commande WRITE, mais
+sur une fenetre horaire qui ne recouvrait pas exactement la coupure).
+Confirmation reelle obtenue une heure plus tard, meme session : VMware
+Workstation a affiche en direct "The operation on the file
+'...Oracle Linux 8 64-bit-000001-s009.vmdk' failed (Espace insuffisant
+sur le disque)" - **le disque physique du PC hote etait plein**. Cause
+racine du "crash" initial ET des ecritures lentes observees plus tot
+(un disque presque plein degrade fortement les performances d'ecriture
+avant meme d'etre totalement plein). Facteur aggravant identifie : un
+**snapshot VMware actif** sur cette VM, dont le disque differentiel
+grossit a chaque ecriture (une quinzaine de fichiers
+`-000001-s0XX.vmdk`, plusieurs dizaines de Go cumules) - explique a la
+fois la croissance rapide de l'espace disque au fil de cette session ET
+le ralentissement des ecritures (un disque differentiel est plus lent
+qu'un disque plat). Deblocage immediat : suppression de 2 VM inutilisees
+par l'operateur (89,4 Gio liberes), operation reprise avec succes.
+Recommandation laissee a l'operateur (pas d'action prise sans son
+accord) : supprimer le snapshot une fois le deploiement stabilise et
+verifie, pour recuperer l'espace et retrouver des performances
+d'ecriture normales - un snapshot actif de tres longue duree sur une VM
+qui ecrit beaucoup (comme un deploiement complet ELK/Wazuh) n'est pas un
+usage sain de cette fonctionnalite.
 
 ## Prochaine etape
 

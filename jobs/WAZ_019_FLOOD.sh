@@ -47,6 +47,23 @@ if ! grep -q "$FLOOD_LOG" /var/ossec/etc/ossec.conf 2>/dev/null; then
   # d'echappement de guillemets/retours a la ligne) + verification
   # explicite apres coup - plus jamais suppose, toujours confirme par
   # grep avant de continuer.
+  #
+  # CORRIGE ENCORE LE 2026-09-03 (meme diagnostic, VM reelle MIPREL) :
+  # meme avec awk, l'ecriture echoue si ossec.conf est deja verrouille en
+  # immuable par WAZ_014E_INDEXER_CONNECTOR.sh / WAZ_032.sh (chattr +i,
+  # geste volontaire de durcissement en fin de chaine, PAS un accident -
+  # confirme par lsattr : "----i---------------"). Meme principe exact
+  # que WAZ_014E_INDEXER_CONNECTOR.sh (seul autre job du projet a deja
+  # devoir gerer ce cas) : deverrouiller si necessaire avant d'ecrire,
+  # reverrouiller systematiquement apres (jamais laisser le fichier
+  # deverrouille en sortie de job).
+  WAS_IMMUTABLE=0
+  if [ -e /var/ossec/etc/ossec.conf ] && lsattr /var/ossec/etc/ossec.conf 2>/dev/null | grep -q '^....i'; then
+    echo "[WAZ_019_FLOOD] ossec.conf est immuable (deja verrouille) - deverrouillage temporaire avant reecriture."
+    chattr -i /var/ossec/etc/ossec.conf
+    WAS_IMMUTABLE=1
+  fi
+
   TMP_OSSEC="$(mktemp)"
   awk -v loc="$FLOOD_LOG" '
     /<\/ossec_config>/ && !done {
@@ -63,7 +80,15 @@ if ! grep -q "$FLOOD_LOG" /var/ossec/etc/ossec.conf 2>/dev/null; then
   rm -f "$TMP_OSSEC"
   if ! grep -q "$FLOOD_LOG" /var/ossec/etc/ossec.conf; then
     echo "[WAZ_019_FLOOD] ERREUR : l'ajout de ${FLOOD_LOG} dans ossec.conf a echoue (non retrouve apres ecriture)." >&2
+    [ "$WAS_IMMUTABLE" -eq 1 ] && chattr +i /var/ossec/etc/ossec.conf
     exit 1
+  fi
+
+  if [ "$WAS_IMMUTABLE" -eq 1 ]; then
+    echo "[WAZ_019_FLOOD] Reverrouillage de ossec.conf (chattr +i)..."
+    chown root:wazuh /var/ossec/etc/ossec.conf
+    chmod 640 /var/ossec/etc/ossec.conf
+    chattr +i /var/ossec/etc/ossec.conf
   fi
   NEED_RESTART=1
 else

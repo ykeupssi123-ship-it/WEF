@@ -1703,6 +1703,70 @@ correctif d'auto-guerison rend cette question moins critique : quelle
 que soit la cause initiale exacte, le symptome (fichier vide) est
 desormais detecte et repare automatiquement avant de faire des degats.
 
+## 2026-09-03 (suite) - `WAZ_020_VERIFY` echoue toujours (0 alerte) meme apres correctif WAZ_014A
+
+Meme session, immediatement apres le correctif WAZ_014A ci-dessus :
+l'orchestrateur relance avec succes jusqu'a `WAZ_019_FLOOD` (OK) puis
+`WAZ_020_VERIFY` echoue (0 alerte indexee apres 6 tentatives / 30s).
+
+**Preuve directe (pas suppose)** :
+- `grep -c "wazuh-test-flood" /var/log/messages` -> **20000** (les
+  messages de test sont bien arrives, intacts, au niveau syslog).
+- `journalctl -t auth --since ... --until ...` -> **0** (aucun n'est
+  entre dans journald).
+- `grep -c "wazuh-test-flood" /var/ossec/logs/archives/archives.log` ->
+  **0** (l'agent Wazuh n'en a collecte aucun).
+- `ossec.conf` ne surveille que `journald` + `/var/log/audit/audit.log`
+  + `/var/ossec/logs/active-responses.log` - jamais `/var/log/messages`.
+
+**Cause reelle** : `WAZ_019_FLOOD.sh` injectait via 20000 appels
+`logger -t auth` (un fork de processus par ligne - 11 minutes reelles
+pour 20000 lignes, deja anormalement lent en soi). `journald` applique
+une limite de debit par defaut qui absorbe silencieusement une rafale
+de messages quasi-identiques en quelques secondes. Preuve que ce n'est
+pas un probleme de regle de detection (contrairement au canari) : le
+canari de `WAZ_041_ALERT_CANARY.sh` (1 seul message/jour, jamais
+touche par cette limite) fonctionne, documente comme teste avec succes
+le 2026-08-31 - la difference n'est PAS la regle, c'est le volume/debit
+qui ne franchit meme pas journald.
+
+**Corrige** : `WAZ_019_FLOOD.sh` ecrit desormais directement (bash pur,
+sans fork, sans passer par journald) dans un fichier dedie
+`/var/log/wazuh-flood-test.log`, ajoute comme `<localfile>` dans
+`ossec.conf` par ce job lui-meme, avec sa propre regle Wazuh dediee
+(id 100102, meme principe que la regle 100101 du canari) pour generer
+une vraie alerte plutot que d'etre seulement archive. Beneice
+secondaire : 20000 lignes ecrites en une fraction de seconde au lieu de
+11 minutes (memes gains en simplicite d'execution, aucun besoin de
+justifier la lenteur).
+
+**Bug latent trouve en corrigeant celui-ci, dans un fichier partage** :
+`WAZ_025.sh` faisait un `cat > local_rules.xml` INCONDITIONNEL (pas
+idempotent, pas additif) - si un job numeriquement plus petit (comme
+`WAZ_019_FLOOD`, desormais lui aussi contributeur de ce meme fichier)
+avait deja ajoute sa propre regle avant que `WAZ_025` ne tourne, ce
+dernier l'aurait ecrasee silencieusement. Corrige avec le meme principe
+additif deja etabli par `WAZ_041_ALERT_CANARY.sh` (grep avant d'inserer,
+jamais un `cat >` brut sur un fichier partage entre plusieurs jobs).
+
+**Incident non elucide en parallele, laisse ouvert honnetement** : entre
+la fin propre de l'orchestrateur (04:39:50, rapport ecrit normalement,
+PAS un crash) et le prochain acces reseau (04:47:59), la VM elle-meme
+s'est retrouvee eteinte (constate par l'operateur directement dans
+VMware Workstation). `journalctl` cote invite ne contenait aucun
+historique de demarrage precedent (journal non persistant - active
+maintenant pour la prochaine fois). Cote hote, `vmware.log` montre des
+ecritures disque anormalement lentes (1,4 a 2,8 secondes par commande
+WRITE, tres au-dessus de la normale) mais sur une fenetre horaire
+(02h56-03h00) qui precede largement la coupure (04h39-04h48) - preuve
+insuffisante pour conclure avec certitude a un lien de cause a effet.
+Piste retenue mais NON confirmee : ressources de la machine hote
+(RAM/disque du PC portable) insuffisantes pour la charge cumulee de
+plusieurs VM + la pile complete ELK/Wazuh (5,6 Gio alloues, seulement
+2,0 Gio disponibles au repos). A surveiller lors du prochain test de
+charge, avec le journal persistant desormais actif pour capturer une
+preuve directe si ca se reproduit.
+
 ## Prochaine etape
 
 Execution reelle contre les 2 VM (`./orchestrator.sh` sur chaque machine,

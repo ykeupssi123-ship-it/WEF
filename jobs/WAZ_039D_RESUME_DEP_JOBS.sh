@@ -20,14 +20,18 @@ echo "[WAZ_039D_RESUME_DEP_JOBS] Retrait de ${DEP_JOBS} de SKIP_JOBS..."
 remove_jobs_from_skip_list "$DEP_JOBS" || exit 1
 
 echo "[WAZ_039D_RESUME_DEP_JOBS] Reactivation du timer systemd wef-health-guardian..."
-if systemctl list-unit-files wef-health-guardian.timer >/dev/null 2>&1; then
+# CORRIGE LE 2026-09-03 (meme diagnostic reel que WAZ_035A_PAUSE_DEP_JOBS.sh,
+# meme premier test en direct de la refonte) : "systemctl list-unit-files
+# <nom>" n'est pas un indicateur fiable d'existence (code 0 meme absent).
+# Verifie directement le fichier d'unite sur disque.
+if [ -f /etc/systemd/system/wef-health-guardian.timer ]; then
   systemctl start wef-health-guardian.timer 2>/dev/null || true
   if ! systemctl is-active --quiet wef-health-guardian.timer; then
     echo "[WAZ_039D_RESUME_DEP_JOBS] ERREUR : wef-health-guardian.timer toujours inactif apres 'systemctl start'." >&2
     exit 1
   fi
 else
-  echo "[WAZ_039D_RESUME_DEP_JOBS] wef-health-guardian.timer absent - rien a reactiver."
+  echo "[WAZ_039D_RESUME_DEP_JOBS] wef-health-guardian.timer absent (INFRA_004 n'a pas encore tourne sur cette VM) - rien a reactiver."
 fi
 
 echo "INDEXER" > "$ROUTE_STATE_FILE"

@@ -38,14 +38,20 @@ echo "[WAZ_035A_PAUSE_DEP_JOBS] Ajout de ${DEP_JOBS} a SKIP_JOBS..."
 add_jobs_to_skip_list "$DEP_JOBS" || exit 1
 
 echo "[WAZ_035A_PAUSE_DEP_JOBS] Suspension du timer systemd wef-health-guardian (independant de SKIP_JOBS)..."
-if systemctl list-unit-files wef-health-guardian.timer >/dev/null 2>&1; then
+# CORRIGE LE 2026-09-03 (premier test en direct de la refonte) :
+# "systemctl list-unit-files <nom>" retourne code 0 MEME quand l'unite
+# n'existe pas (table vide, "0 unit files listed") - jamais un
+# indicateur fiable d'existence. Verifie a la place directement le
+# fichier d'unite sur disque (le meme chemin ecrit par
+# INFRA_004_HEALTH_GUARDIAN.sh : TIMER_FILE).
+if [ -f /etc/systemd/system/wef-health-guardian.timer ]; then
   systemctl stop wef-health-guardian.timer 2>/dev/null || true
   if systemctl is-active --quiet wef-health-guardian.timer; then
     echo "[WAZ_035A_PAUSE_DEP_JOBS] ERREUR : wef-health-guardian.timer toujours actif apres 'systemctl stop'." >&2
     exit 1
   fi
 else
-  echo "[WAZ_035A_PAUSE_DEP_JOBS] wef-health-guardian.timer absent (INFRA_004 n'a peut-etre pas encore tourne) - rien a suspendre."
+  echo "[WAZ_035A_PAUSE_DEP_JOBS] wef-health-guardian.timer absent (INFRA_004 n'a pas encore tourne sur cette VM) - rien a suspendre."
 fi
 
 echo "[WAZ_035A_PAUSE_DEP_JOBS] OK."

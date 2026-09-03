@@ -1618,6 +1618,91 @@ introuvables dans jobs/ - le commentaire etait une reference obsolete a
 une iteration anterieure du projet). Rien a corriger cote AGENT_HOST
 pour cette classe de bug precise.
 
+## 2026-09-03 - Boucle reelle WAZ_014A (HTTP 503 sur `_cluster/health`) sur le deploiement MIPREL (`/opt/wef`, Oracle Linux 8)
+
+Deux incidents distincts, tous deux confirmes par preuve directe (jamais
+supposes), decouverts en diagnostiquant un `WAZ_014A_INDXR_ADMINPW.sh`
+qui echouait en boucle avec HTTP 503 sur `_cluster/health`.
+
+**Incident A - `orchestrator.sh` recree lui-meme `/dev/null` avec du
+contenu reel dedans.** Le rapport de fin d'execution testait l'existence
+de fichiers avec `ls "$STATE_DIR"/*.ok >/dev/null 2>&1`. Si `/dev/null`
+n'est plus, a cet instant precis, un peripherique caractere (bug deja
+connu, voir incident 17 plus haut et `INFRA_003_DEVNULL_GUARDIAN.sh`),
+la redirection `>` le RECREE comme fichier ordinaire et le vrai contenu
+de `ls` (la liste des chemins `state/*.ok`) s'ecrit DEDANS au lieu
+d'etre jete. Preuve directe : capture reelle de `/dev/null` corrompu
+(5209 octets, `stat`/`xxd` a l'appui) contenant exactement cette liste,
+caractere pour caractere. Preuve complementaire : `journalctl -u
+wazuh-indexer` montrait `/dev/null: Permission non accordee` dans
+`opensearch-env` ligne 92 des le demarrage du service, avant meme que
+WAZ_014A ne tourne - confirmant que `/dev/null` etait deja ce fichier
+`root:root` non-inscriptible a ce moment-la. **Corrige** :
+`orchestrator.sh` remplace desormais ce test par un `shopt -s nullglob`
+purement bash, qui ne touche jamais `/dev/null` (commit `98a7006`).
+
+**Incident B - `internal_users.yml` vide de facon PERMANENTE dans
+l'index de securite lui-meme, pas seulement dans le fichier local.**
+Le log reel de `wazuh-passwords-tool.sh` (`securityadmin.sh -backup`)
+montrait le cluster GREEN et bien connecte, mais `FAIL: Configuration
+for 'internalusers' failed because of empty source` (et 5 autres types :
+`config`, `roles`, `actiongroups`, `tenants`, `audit`) - preuve que ces
+types etaient reellement vides DANS L'INDEX `.opendistro_security`, pas
+juste dans le fichier. Lecture du code source de
+`wazuh-passwords-tool.sh` (`/usr/share/wazuh-indexer/plugins/opensearch-
+security/tools/`, paquet RPM, hors depot Git) : `passwords_createBackUp()`
+ne verifie jamais l'echec individuel par type de ressource (seul le code
+de sortie global de `securityadmin.sh -backup` est teste), et
+`passwords_updateInternalUsers()` fait ensuite un `cp` inconditionnel du
+backup (meme vide) par-dessus le vrai fichier - puis
+`passwords_runSecurityAdmin()` repousse ce contenu vide DANS L'INDEX via
+`securityadmin.sh -f ... -t internalusers`. Une fois qu'un premier
+passage a eu lieu pendant que l'index n'etait pas encore pret (le HTTP
+503 d'origine), le vide se grave ainsi de facon permanente - chaque
+tentative suivante retrouve le meme vide, meme cluster GREEN, boucle
+auto-entretenue. Preuve que le vide est ancien (pas cause par la
+derniere tentative) : les DEUX sauvegardes horodatees dans
+`/etc/wazuh-indexer/internalusers-backup/` (01h19 ET 02h42) etaient
+deja a 0 octet.
+
+**Recuperation reelle effectuee sur la VM** (`wazuh-indexer-4.14.7-1`) :
+le `.rpm` d'origine etait encore en cache DNF
+(`/var/cache/dnf/wazuh-*/packages/wazuh-indexer-4.14.7-1.x86_64.rpm`).
+Extraction via `rpm2cpio | cpio` des 10 fichiers YAML par defaut
+(`internal_users.yml` notamment : hash bcrypt public du mot de passe de
+demonstration `admin`/`admin`, `_meta.type: internalusers` - format
+authentique confirme par lecture), remplacement des 10 fichiers sur
+disque (`chown wazuh-indexer:wazuh-indexer`, `chmod 640`), puis
+`securityadmin.sh -cd /etc/wazuh-indexer/opensearch-security/` avec les
+memes host/port/certificats (`localhost:9200`, `root-ca.pem`,
+`admin.pem`/`admin-key.pem`) deja prouves fonctionnels par le log de
+l'outil - `SUCC` confirme sur les 10 types, `Done with success`.
+`./orchestrator.sh` relance ensuite : `WAZ_014A_INDXR_ADMINPW -> OK`
+confirme reellement (pas suppose) via le marqueur d'etat de
+l'orchestrateur.
+
+**Corrige dans le code pour que ca ne se reproduise plus tout seul** :
+`WAZ_014A_INDXR_ADMINPW.sh` detecte desormais lui-meme un
+`internal_users.yml` vide AVANT d'appeler `wazuh-passwords-tool.sh`, et
+applique automatiquement la meme procedure de recuperation (extraction
+depuis le `.rpm` en cache DNF/YUM, `securityadmin.sh -cd`) avant de
+poursuivre - un futur deploiement qui tombe dans ce piege se repare seul,
+sans intervention manuelle ni acces a cette conversation.
+
+**Honnetete sur la certitude de ce correctif** : le mecanisme de
+compounding (backup vide reinjecte dans l'index) est confirme par
+lecture directe du code de `wazuh-passwords-tool.sh` et par les logs
+reels. La cause TOUT A FAIT initiale (pourquoi l'index etait vide pour
+ces 6 types des le tout premier passage, avant meme le premier des deux
+backups a 0 octet observes) n'est pas totalement elucidee - hypothese la
+plus probable : un premier appel a `wazuh-passwords-tool.sh` a eu lieu
+pendant une fenetre ou l'index de securite venait tout juste d'etre cree
+par le demarrage initial de wazuh-indexer et n'avait pas encore ete
+peuple par le bootstrap de securite embarque dans le paquet. Le
+correctif d'auto-guerison rend cette question moins critique : quelle
+que soit la cause initiale exacte, le symptome (fichier vide) est
+desormais detecte et repare automatiquement avant de faire des degats.
+
 ## Prochaine etape
 
 Execution reelle contre les 2 VM (`./orchestrator.sh` sur chaque machine,

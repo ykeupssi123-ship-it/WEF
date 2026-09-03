@@ -64,6 +64,74 @@ if [ ! -r "$ADMIN_CERT" ] || [ ! -r "$ADMIN_KEY" ]; then
   exit 1
 fi
 
+# AJOUTE LE 2026-09-03, suite a un incident reel (deploiement MIPREL, voir
+# docs/JOURNAL_TECHNIQUE.md) : wazuh-passwords-tool.sh fait un "securityadmin
+# -backup" AVANT de pousser le nouveau mot de passe, puis ecrase
+# inconditionnellement internal_users.yml avec ce backup - meme si le backup
+# a echoue ("empty source"). Si un premier passage a deja eu lieu pendant que
+# l'index de securite n'etait pas encore pret, ce vide se grave alors de
+# facon PERMANENTE dans l'index : chaque tentative suivante retrouve le meme
+# vide, meme cluster GREEN, boucle infinie de 503 sur _cluster/health. Aucune
+# quantite de reessais ne repare ca seule - il faut repousser une config par
+# defaut saine AVANT de rappeler l'outil. Detecte et repare ICI pour qu'un
+# futur deploiement (VM differente, etudiant, MIPREL) ne reste jamais bloque
+# sans intervention manuelle.
+INTERNAL_USERS_YML="/etc/wazuh-indexer/opensearch-security/internal_users.yml"
+if [ ! -s "$INTERNAL_USERS_YML" ]; then
+  echo "[WAZ_014A] ALERTE : ${INTERNAL_USERS_YML} est vide - incident connu (voir docs/JOURNAL_TECHNIQUE.md, 2026-09-03). Restauration depuis le paquet RPM d'origine avant de continuer..."
+
+  RPM_NVRA="$(rpm -q --queryformat '%{name}-%{version}-%{release}.%{arch}.rpm\n' wazuh-indexer 2>/dev/null)"
+  if [ -z "$RPM_NVRA" ]; then
+    echo "[WAZ_014A] ERREUR : impossible de determiner le paquet wazuh-indexer installe (rpm -q a echoue)." >&2
+    exit 1
+  fi
+  RPM_PATH="$(find /var/cache/dnf /var/cache/yum -iname "$RPM_NVRA" 2>/dev/null | head -1)"
+  if [ -z "$RPM_PATH" ]; then
+    echo "[WAZ_014A] ERREUR : ${INTERNAL_USERS_YML} est vide et le paquet d'origine (${RPM_NVRA}) est introuvable en cache DNF/YUM - restauration manuelle necessaire (voir docs/JOURNAL_TECHNIQUE.md)." >&2
+    exit 1
+  fi
+
+  RESTORE_DIR="$(mktemp -d)"
+  ( cd "$RESTORE_DIR" && rpm2cpio "$RPM_PATH" | cpio -idm "./etc/wazuh-indexer/opensearch-security/*.yml" ) >/dev/null 2>&1
+  RESTORED=0
+  for f in "$RESTORE_DIR"/etc/wazuh-indexer/opensearch-security/*.yml; do
+    [ -s "$f" ] || continue
+    dest="/etc/wazuh-indexer/opensearch-security/$(basename "$f")"
+    [ -s "$dest" ] && continue
+    cp -f "$f" "$dest"
+    chown wazuh-indexer:wazuh-indexer "$dest"
+    chmod 640 "$dest"
+    echo "[WAZ_014A] Restaure depuis le paquet RPM : ${dest}"
+    RESTORED=$((RESTORED+1))
+  done
+  rm -rf "$RESTORE_DIR"
+  if [ "$RESTORED" -eq 0 ] || [ ! -s "$INTERNAL_USERS_YML" ]; then
+    echo "[WAZ_014A] ERREUR : la restauration depuis ${RPM_PATH} n'a pas rempli ${INTERNAL_USERS_YML}." >&2
+    exit 1
+  fi
+
+  echo "[WAZ_014A] Rechargement de la configuration de securite par defaut dans l'index (securityadmin.sh -cd)..."
+  CD_CACERT="$(grep 'plugins.security.ssl.transport.pemtrustedcas_filepath:' /etc/wazuh-indexer/opensearch.yml | awk '{print $2}')"
+  CD_LOG="${WORK_TMP_DIR}/waz014a_securityadmin_cd.log"
+  # NOTE : port 9200 ici (pas ${WAZ_INDEXER_PORT}=9201) - c'est le port de
+  # transport que securityadmin.sh utilise reellement pour parler a
+  # opensearch-security, distinct du port REST verifie par check_auth().
+  # Prouve fonctionnel en reel le 2026-09-03 (log wazuh-passwords-tool.sh :
+  # "Will connect to localhost:9200 ... done", cluster GREEN).
+  JAVA_HOME=/usr/share/wazuh-indexer/jdk/ OPENSEARCH_CONF_DIR=/etc/wazuh-indexer \
+    /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
+    -cd /etc/wazuh-indexer/opensearch-security/ -icl -nhnv \
+    -cacert "$CD_CACERT" -cert "$ADMIN_CERT" -key "$ADMIN_KEY" \
+    -h localhost -p 9200 > "$CD_LOG" 2>&1
+  if ! grep -q "Done with success" "$CD_LOG"; then
+    echo "[WAZ_014A] ERREUR : le rechargement de la configuration par defaut a echoue - voir ${CD_LOG}." >&2
+    cat "$CD_LOG" >&2
+    exit 1
+  fi
+  rm -f "$CD_LOG"
+  echo "[WAZ_014A] Configuration de securite par defaut rechargee (admin/mot de passe de demonstration actif temporairement - remplace ci-dessous)."
+fi
+
 echo "[WAZ_014A] Poussee du mot de passe (WAZ_INDEXER_ADMIN_USER=${WAZ_INDEXER_ADMIN_USER}) via wazuh-passwords-tool.sh..."
 bash "$TOOL" -u "${WAZ_INDEXER_ADMIN_USER}" -p "${WAZ_INDEXER_ADMIN_PASSWORD}" \
   -c "$ADMIN_CERT" -k "$ADMIN_KEY" -v > "$LOGFILE" 2>&1

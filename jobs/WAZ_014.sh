@@ -42,5 +42,36 @@ if ! systemctl restart wazuh-indexer; then
   journalctl -u wazuh-indexer -n 30 --no-pager 2>/dev/null || true
   exit 1
 fi
-echo "[WAZ_014] OK."
+
+# CORRIGE LE 2026-09-04 (incident reel, deploiement sur VM neuve,
+# meme diagnostic que WAZ_037_CONVERGENT_TEST/docs/JOURNAL_TECHNIQUE.md :
+# "wait_for_service_active confirme seulement que l'UNITE SYSTEMD est
+# active, jamais que le PIPELINE/l'API a lui-meme fini son propre
+# demarrage interne"). Constate en reel : WAZ_014A_INDXR_ADMINPW,
+# lance 11 secondes seulement apres ce "OK", recevait HTTP 503 (port
+# deja ouvert mais formation du cluster/plugin de securite pas encore
+# terminee) - wazuh-passwords-tool.sh echouait pour la meme raison.
+# Corrige par un sondage repete de l'API elle-meme (jusqu'a 120s),
+# jamais un delai fixe parie a l'avance - le port peut repondre HTTP
+# 401 (authentification requise, pas encore de mot de passe pousse a
+# ce stade) ou 200 : les deux prouvent que l'indexeur repond REELEMENT,
+# contrairement a 503/connexion refusee qui prouvent l'inverse.
+WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9200}"
+echo "[WAZ_014] Attente de la disponibilite reelle de l'API (jusqu'a 120s)..."
+READY=0
+for i in $(seq 1 24); do
+  HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://127.0.0.1:${WAZ_INDEXER_PORT}/" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ]; then
+    READY=1
+    break
+  fi
+  sleep 5
+done
+if [ "$READY" -ne 1 ]; then
+  echo "[WAZ_014] ERREUR : wazuh-indexer actif au sens systemd mais l'API ne repond toujours pas apres 120s (dernier code HTTP : ${HTTP_CODE:-000}). Diagnostic :" >&2
+  journalctl -u wazuh-indexer -n 30 --no-pager 2>/dev/null || true
+  exit 1
+fi
+
+echo "[WAZ_014] OK (API reellement disponible, pas seulement l'unite systemd)."
 exit 0

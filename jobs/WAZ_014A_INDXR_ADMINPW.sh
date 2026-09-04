@@ -86,8 +86,20 @@ if [ ! -s "$INTERNAL_USERS_YML" ]; then
     exit 1
   fi
   RPM_PATH="$(find /var/cache/dnf /var/cache/yum -iname "$RPM_NVRA" 2>/dev/null | head -1)"
+  # CORRIGE LE 2026-09-04 (incident reel, meme deploiement, VM neuve) :
+  # le cache DNF/YUM peut avoir ete legitimement purge entre-temps
+  # (INFRA_005_DISK_HYGIENE fait exactement ca, "purge cache dnf" - pas
+  # un accident, un entretien voulu). Ne jamais abandonner sur ce seul
+  # constat : retelecharge le MEME NVRA exact depuis le depot officiel
+  # (deja configure, WAZ_009) avant de renoncer.
   if [ -z "$RPM_PATH" ]; then
-    echo "[WAZ_014A] ERREUR : ${INTERNAL_USERS_YML} est vide et le paquet d'origine (${RPM_NVRA}) est introuvable en cache DNF/YUM - restauration manuelle necessaire (voir docs/JOURNAL_TECHNIQUE.md)." >&2
+    echo "[WAZ_014A] Paquet absent du cache local (probablement purge par l'entretien disque) - retelechargement depuis le depot officiel..."
+    DL_DIR="$(mktemp -d)"
+    dnf download --downloaddir="$DL_DIR" wazuh-indexer >/dev/null 2>&1 || true
+    RPM_PATH="$(find "$DL_DIR" -iname "$RPM_NVRA" 2>/dev/null | head -1)"
+  fi
+  if [ -z "$RPM_PATH" ]; then
+    echo "[WAZ_014A] ERREUR : ${INTERNAL_USERS_YML} est vide, le paquet d'origine (${RPM_NVRA}) est introuvable en cache DNF/YUM ET le retelechargement depuis le depot a echoue - restauration manuelle necessaire (voir docs/JOURNAL_TECHNIQUE.md)." >&2
     exit 1
   fi
 

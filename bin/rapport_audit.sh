@@ -10,7 +10,7 @@
 #   ./rapport_audit.sh              -> tableau de tous les jobs ayant un historique
 #   ./rapport_audit.sh --echecs     -> uniquement les jobs ayant eu au moins un echec
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LEDGER="$HERE/state/JOBS_HISTORY.csv"
 MODE="${1:-}"
 

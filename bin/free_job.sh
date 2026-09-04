@@ -5,7 +5,7 @@
 # Usage :
 #   ./bin/free_job.sh <JOB_ID>
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
 source "$VARS_FILE"
 source "$HERE/lib/commun.sh"

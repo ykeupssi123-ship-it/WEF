@@ -17,7 +17,7 @@
 #   ./bin/view_history.sh ES_017 stats 300           -> pareil, + signale les intervalles qui s'ecartent de
 #                                                       plus de 20% du cycle attendu (300s = toutes les 5 min)
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LEDGER="$HERE/state/JOBS_HISTORY.csv"
 JOB_ID="${1:-}"
 

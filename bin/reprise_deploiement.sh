@@ -8,7 +8,7 @@
 #
 # Ne modifie rien - lecture seule, verdict + commande exacte a lancer.
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$HERE"
 
 echo "===================================================================="

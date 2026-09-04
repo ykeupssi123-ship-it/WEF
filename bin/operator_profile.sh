@@ -20,7 +20,7 @@
 # telle quelle et documentez-la comme specifique a cette installation
 # (voir GUIDE_EXPLOITATION.txt, section "Vocabulaire operateur").
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
 source "$VARS_FILE"
 

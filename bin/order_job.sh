@@ -27,7 +27,7 @@
 # Usage :
 #   ./bin/order_job.sh <JOB_ID> "<raison>"
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
 source "$VARS_FILE"
 source "$HERE/lib/commun.sh"
@@ -154,8 +154,8 @@ if [ $JOB_EXIT -eq 0 ]; then
 else
   echo "$(date -Iseconds),$JOB_ID,$C_JOB_NAME,FORCE_ECHEC,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
   echo "$JOB_ID -> FORCE_ECHEC. Voir $JOB_LOG."
-  if [ -x "$HERE/notifier.sh" ]; then
-    "$HERE/notifier.sh" "$JOB_ID" "$C_JOB_NAME (FORCAGE MANUEL)" "FORCE_ECHEC" "$JOB_LOG" || true
+  if [ -x "$HERE/bin/notifier.sh" ]; then
+    "$HERE/bin/notifier.sh" "$JOB_ID" "$C_JOB_NAME (FORCAGE MANUEL)" "FORCE_ECHEC" "$JOB_LOG" || true
   fi
   exit 1
 fi

@@ -25,7 +25,7 @@
 #     -> appele automatiquement par orchestrator.sh/bin/order_job.sh sur
 #        un echec. Peut aussi etre appele a la main.
 set -uo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
 source "$VARS_FILE"
 

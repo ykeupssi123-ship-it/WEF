@@ -17,7 +17,7 @@
 #
 # UTILISATION MANUELLE (bascule en cours d'exploitation, pas au premier
 # deploiement) :
-#   ./forcer_job.sh WAZ_035_KIBANA_TRIGGER "raison" && ./orchestrator.sh
+#   ./bin/order_job.sh WAZ_035_KIBANA_TRIGGER "raison" && ./orchestrator.sh
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

@@ -72,7 +72,7 @@ PYEOF
 # purge_index_pattern <url> <user> <pw> <ca_file> <index_pattern>
 # Supprime TOUS les documents du pattern donne (delete_by_query,
 # match_all) et confirme un compte a 0 apres coup. N'existe QUE pour un
-# usage volontaire (forcer_job.sh) - jamais dans une chaine automatique.
+# usage volontaire (bin/order_job.sh) - jamais dans une chaine automatique.
 purge_index_pattern() {
   local url="$1" user="$2" pw="$3" ca_file="$4" index_pattern="$5"
   URL="$url" USER="$user" PW="$pw" CA_FILE="$ca_file" INDEX_PATTERN="$index_pattern" \

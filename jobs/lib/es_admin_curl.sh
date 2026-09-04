@@ -30,9 +30,9 @@ es_admin_curl() {
   http_code=$(curl -s -o /dev/null -w "%{http_code}" --cacert "${PKI_DIR}/factory_ca.crt" -u "elastic:$(cat "$pwfile")" "https://127.0.0.1:${ES_PORT}/_cluster/health" 2>/dev/null)
 
   if [ "$http_code" = "401" ]; then
-    echo "[es_admin_curl] ALERTE : mot de passe 'elastic' desynchronise (HTTP 401) - reinitialisation automatique via reinitialiser_mdp_elastic.sh..." >&2
-    if ! "${INSTALL_DIR}/reinitialiser_mdp_elastic.sh" --silencieux; then
-      echo "[es_admin_curl] ERREUR : echec de la reinitialisation automatique. Intervention manuelle requise (./reinitialiser_mdp_elastic.sh)." >&2
+    echo "[es_admin_curl] ALERTE : mot de passe 'elastic' desynchronise (HTTP 401) - reinitialisation automatique via bin/reinitialiser_mdp_elastic.sh..." >&2
+    if ! "${INSTALL_DIR}/bin/reinitialiser_mdp_elastic.sh" --silencieux; then
+      echo "[es_admin_curl] ERREUR : echec de la reinitialisation automatique. Intervention manuelle requise (./bin/reinitialiser_mdp_elastic.sh)." >&2
       return 1
     fi
     http_code=$(curl -s -o /dev/null -w "%{http_code}" --cacert "${PKI_DIR}/factory_ca.crt" -u "elastic:$(cat "$pwfile")" "https://127.0.0.1:${ES_PORT}/_cluster/health" 2>/dev/null)

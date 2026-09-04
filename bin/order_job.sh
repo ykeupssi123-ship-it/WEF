@@ -1,5 +1,5 @@
 #!/bin/bash
-# forcer_job.sh - Force Start manuel d'un job, ajoute le 2026-08-12.
+# bin/order_job.sh - Force Start manuel d'un job, ajoute le 2026-08-12.
 # Equivalent fonctionnel de l'action "Force" d'un ordonnanceur type
 # Control-M/Autosys/JES : demarre un job precis MEME SI ses dependances
 # (IN_COND) ne sont pas satisfaites - operation volontairement rare et
@@ -9,7 +9,7 @@
 #   - exige de retaper le JOB_ID exact (pas juste "oui/y") ;
 #   - refuse de forcer un job explicitement GELE (HELD) - un gel est une
 #     decision d'exploitation deliberee, elle ne doit jamais pouvoir
-#     etre court-circuitee par megarde : il faut d'abord liberer_job.sh ;
+#     etre court-circuitee par megarde : il faut d'abord bin/free_job.sh ;
 #   - exige une RAISON (audit bancaire : aucune derogation manuelle sans
 #     justification nominative) - capturee avec l'identite de
 #     l'operateur (whoami@hostname) EN TETE du log dedie de cette
@@ -25,7 +25,7 @@
 #     reussi.
 #
 # Usage :
-#   ./forcer_job.sh <JOB_ID> "<raison>"
+#   ./bin/order_job.sh <JOB_ID> "<raison>"
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
@@ -35,9 +35,9 @@ source "$HERE/lib/commun.sh"
 JOB_ID="${1:-}"
 RAISON="${2:-}"
 if [ -z "$JOB_ID" ] || [ -z "$RAISON" ]; then
-  echo "Usage : ./forcer_job.sh <JOB_ID> \"<raison>\""
+  echo "Usage : ./bin/order_job.sh <JOB_ID> \"<raison>\""
   echo "La raison est obligatoire (audit - on ne force jamais un job sans dire pourquoi)."
-  echo "Voir ./statut_live.sh pour la liste des jobs EN ATTENTE forcable."
+  echo "Voir ./bin/monitoring.sh pour la liste des jobs EN ATTENTE forcable."
   exit 1
 fi
 RAISON_SAFE="${RAISON//,/;}"
@@ -66,7 +66,7 @@ if job_held "$JOB_ID"; then
   echo ""
   echo "Un gel est une decision d'exploitation deliberee - elle ne peut pas"
   echo "etre court-circuitee par un forcage. Liberez-le d'abord si voulu :"
-  echo "./liberer_job.sh $JOB_ID"
+  echo "./bin/free_job.sh $JOB_ID"
   exit 1
 fi
 
@@ -149,7 +149,7 @@ if [ $JOB_EXIT -eq 0 ]; then
   mark_done "$C_OUT_COND"
   echo "$(date -Iseconds),$JOB_ID,$C_JOB_NAME,FORCE_OK,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
   echo "$JOB_ID -> FORCE_OK ($C_OUT_COND). Marque distinctement dans l'historique"
-  echo "(jamais confondu avec une execution normale) : ./historique_job.sh $JOB_ID"
+  echo "(jamais confondu avec une execution normale) : ./bin/view_history.sh $JOB_ID"
   exit 0
 else
   echo "$(date -Iseconds),$JOB_ID,$C_JOB_NAME,FORCE_ECHEC,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"

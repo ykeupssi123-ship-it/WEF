@@ -9,7 +9,7 @@
 # le principe general. Difference de nature : INFRA_003 REPARE des
 # corruptions connues et specifiques ; celui-ci ne repare rien, il
 # CONSTATE et JOURNALISE (logger, donc visible par `journalctl -t
-# wef-health-guardian` ou tout futur systeme d'alerte/notifier.sh
+# wef-health-guardian` ou tout futur systeme d'alerte/bin/notifier.sh
 # branche dessus) - jamais d'action corrective automatique sur des
 # services metier (redemarrer un service en boucle sur un faux positif
 # serait pire que l'absence de surveillance).

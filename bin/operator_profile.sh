@@ -62,11 +62,11 @@ kburl(){
 }
 
 wstat(){
-  "${WEF_HOME}/statut_live.sh"
+  "${WEF_HOME}/bin/monitoring.sh"
 }
 
 wlog(){
-  "${WEF_HOME}/historique_job.sh" "$@"
+  "${WEF_HOME}/bin/view_history.sh" "$@"
 }
 
 # Ajoute le 2026-08-14, suite a un incident reel pre-demo (mot de passe
@@ -81,10 +81,10 @@ wpwreset(){
 # Ajoute le 2026-08-14, suite a une demande reelle de l'operateur (VM1) :
 # marquer un job comme deja satisfait SANS l'executer, sans bloquer tout
 # ce qui en depend (contrairement a un gel HELD). Voir
-# marquer_deja_fait.sh pour le detail (raison obligatoire, confirmation,
+# bin/set_to_ok.sh pour le detail (raison obligatoire, confirmation,
 # trace distincte MARQUE_FAIT jamais confondue avec une execution reelle).
 wskip(){
-  "${WEF_HOME}/marquer_deja_fait.sh" "$@"
+  "${WEF_HOME}/bin/set_to_ok.sh" "$@"
 }
 
 # =====================================================================

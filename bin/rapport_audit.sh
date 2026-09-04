@@ -1,6 +1,6 @@
 #!/bin/bash
 # rapport_audit.sh - vue d'ensemble de TOUTES les executions de TOUS les
-# jobs (pas un job a la fois comme historique_job.sh) : qui a marche,
+# jobs (pas un job a la fois comme bin/view_history.sh) : qui a marche,
 # qui n'a pas marche, combien de fois chacun a tourne. Ajoute le
 # 2026-08-12, meme discipline qu'un vrai outil d'ordonnancement
 # (Airflow/Control-M/Autosys) : ce n'est pas l'outil qui donne la
@@ -25,7 +25,7 @@ echo " RAPPORT D'AUDIT - EXECUTIONS DE TOUS LES JOBS"
 echo "===================================================================="
 TOTAL_RUNS=$(tail -n +2 "$LEDGER" | wc -l)
 TOTAL_JOBS=$(tail -n +2 "$LEDGER" | awk -F',' '{print $2}' | sort -u | wc -l)
-# FORCE_OK/FORCE_ECHEC (forcer_job.sh) comptent comme succes/echec dans
+# FORCE_OK/FORCE_ECHEC (bin/order_job.sh) comptent comme succes/echec dans
 # les totaux, mais restent visibles tels quels (colonne DERNIER) -
 # jamais confondus avec une execution automatique normale.
 TOTAL_OK=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="OK" || $4=="FORCE_OK"' | wc -l)
@@ -33,7 +33,7 @@ TOTAL_KO=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC"' |
 TOTAL_FORCE=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="FORCE_OK" || $4=="FORCE_ECHEC"' | wc -l)
 echo "Jobs distincts avec historique : $TOTAL_JOBS"
 echo "Executions totales enregistrees : $TOTAL_RUNS (OK: $TOTAL_OK / ECHEC: $TOTAL_KO)"
-[ "$TOTAL_FORCE" -gt 0 ] && echo "dont forcees manuellement (./forcer_job.sh) : $TOTAL_FORCE"
+[ "$TOTAL_FORCE" -gt 0 ] && echo "dont forcees manuellement (./bin/order_job.sh) : $TOTAL_FORCE"
 echo ""
 
 printf "%-30s %6s %6s %6s %-8s %s\n" "JOB_ID" "EXECS" "OK" "ECHEC" "DERNIER" "DERNIERE_EXECUTION"
@@ -54,5 +54,5 @@ tail -n +2 "$LEDGER" | awk -F',' '{print $2}' | sort -u | while IFS= read -r JID
 done
 
 echo "===================================================================="
-echo "Detail d'un job precis : ./historique_job.sh <JOB_ID>"
-echo "Statistiques/frequence : ./historique_job.sh <JOB_ID> stats"
+echo "Detail d'un job precis : ./bin/view_history.sh <JOB_ID>"
+echo "Statistiques/frequence : ./bin/view_history.sh <JOB_ID> stats"

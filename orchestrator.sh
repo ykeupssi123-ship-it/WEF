@@ -50,7 +50,7 @@ REPORT_FILE="$STATE_DIR/RAPPORT_EXECUTION.txt"
 # sautes car deja .ok) laisse une trace : une ligne dans le registre
 # HISTORY_LEDGER (jamais reecrite, uniquement ajoutee) + un fichier de
 # log dedie a CETTE execution precise dans HISTORY_DIR/<JOB_ID>/. Voir
-# historique_job.sh a la racine pour consulter.
+# bin/view_history.sh pour consulter.
 HISTORY_DIR="$STATE_DIR/history"
 HISTORY_LEDGER="$STATE_DIR/JOBS_HISTORY.csv"
 mkdir -p "$HISTORY_DIR"
@@ -75,7 +75,7 @@ fi
 # echec, ou interruption via le trap ci-dessous). Un marqueur dont le
 # PID ne repond plus = execution precedente interrompue brutalement
 # (crash, kill -9, coupure electrique) - jamais interprete comme "en
-# cours" sans verification du PID. Voir statut_live.sh a la racine.
+# cours" sans verification du PID. Voir bin/monitoring.sh a la racine.
 RUNNING_DIR="$STATE_DIR/RUNNING"
 mkdir -p "$RUNNING_DIR"
 ORCH_MARK="$RUNNING_DIR/_ORCHESTRATEUR.running"
@@ -185,12 +185,12 @@ for pass in $(seq 1 $MAX_PASSES); do
 
     # GEL MANUEL (HELD), ajoute le 2026-08-12 : un job pret (dependances
     # satisfaites) peut avoir ete explicitement gele par un operateur
-    # (./geler_job.sh) - distinct d'un blocage sur dependance. On ne le
+    # (./bin/hold_job.sh) - distinct d'un blocage sur dependance. On ne le
     # marque pas en echec, on ne le marque pas .ok : on le saute
     # simplement, encore et encore, tant qu'il reste gele. Voir
-    # statut_live.sh pour le voir liste separement des jobs EN ATTENTE.
+    # bin/monitoring.sh pour le voir liste separement des jobs EN ATTENTE.
     if job_held "$JOB_ID"; then
-      log "$JOB_ID -> GELE (HELD), saute. Liberer avec ./liberer_job.sh $JOB_ID"
+      log "$JOB_ID -> GELE (HELD), saute. Liberer avec ./bin/free_job.sh $JOB_ID"
       continue
     fi
 
@@ -238,7 +238,7 @@ for pass in $(seq 1 $MAX_PASSES); do
     JOB_LOG="$HISTORY_DIR/$JOB_ID/${JOB_TS}.log"
 
     # Lance en arriere-plan uniquement pour recuperer le PID reel du
-    # job (necessaire pour que statut_live.sh puisse verifier si un
+    # job (necessaire pour que bin/monitoring.sh puisse verifier si un
     # marqueur EN_COURS est encore vivant) - orchestrator.sh reste
     # sequentiel : le "wait" juste apres bloque jusqu'a la fin du job,
     # exactement comme un appel synchrone.
@@ -260,7 +260,7 @@ for pass in $(seq 1 $MAX_PASSES); do
     JOB_EXIT=$?
     rm -f "$CURRENT_JOB_MARK"
     CURRENT_JOB_MARK=""
-    # DUREE_SEC (ajoute le 2026-08-12) : necessaire a statut_live.sh
+    # DUREE_SEC (ajoute le 2026-08-12) : necessaire a bin/monitoring.sh
     # pour detecter un job EN COURS anormalement long par rapport a sa
     # moyenne historique (SLA/retard) - directement motive par
     # l'incident reel ES_027 (timeout de 5 min decouvert seulement une
@@ -270,18 +270,18 @@ for pass in $(seq 1 $MAX_PASSES); do
     if [ $JOB_EXIT -eq 0 ]; then
       mark_done "$OUT_COND"
       echo "$(date -Iseconds),$JOB_ID,$JOB_NAME,OK,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
-      log "$JOB_ID -> OK ($OUT_COND) [historique: ./historique_job.sh $JOB_ID]"
+      log "$JOB_ID -> OK ($OUT_COND) [historique: ./bin/view_history.sh $JOB_ID]"
       progressed=1
     else
       echo "$(date -Iseconds),$JOB_ID,$JOB_NAME,ECHEC,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
       log "$JOB_ID -> ECHEC. Voir $JOB_LOG (ou $RUN_LOG). Arret orchestrateur."
       FAILED_JOB_ID="$JOB_ID"
       FAILED_JOB_NAME="$JOB_NAME"
-      # Alerte email (notifier.sh, ajoute le 2026-08-12) - ne bloque et
+      # Alerte email (bin/notifier.sh, ajoute le 2026-08-12) - ne bloque et
       # ne casse JAMAIS l'orchestrateur, meme si l'envoi echoue ou si
       # NOTIF_ENABLED n'est pas configure.
-      if [ -x "$SCRIPT_DIR/notifier.sh" ]; then
-        "$SCRIPT_DIR/notifier.sh" "$JOB_ID" "$JOB_NAME" "ECHEC" "$JOB_LOG" >> "$RUN_LOG" 2>&1 || true
+      if [ -x "$SCRIPT_DIR/bin/notifier.sh" ]; then
+        "$SCRIPT_DIR/bin/notifier.sh" "$JOB_ID" "$JOB_NAME" "ECHEC" "$JOB_LOG" >> "$RUN_LOG" 2>&1 || true
       fi
       exit 1
     fi

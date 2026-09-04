@@ -35,16 +35,22 @@ if ! command -v python3 &>/dev/null; then
   exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# CORRIGE LE 2026-09-04 (reorganisation racine/bin/setup) : ce script
+# vit desormais dans setup/, jamais a la racine - SCRIPT_DIR doit
+# remonter d'un niveau pour continuer a designer la racine reelle
+# (vars.conf y reste), BIN_DIR pointe separement vers bin/ (nouvel
+# emplacement de tableau_de_bord.py).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN_DIR="$SCRIPT_DIR/bin"
 export VARS_FILE="$SCRIPT_DIR/vars.conf"
 source "$VARS_FILE"
 DASHBOARD_PORT="${DASHBOARD_PORT:-8088}"
 UNIT_PATH="/etc/systemd/system/wef-tableau-de-bord.service"
 
-echo "[installer_service_tableau_de_bord] Installation du service pour : ${SCRIPT_DIR}/tableau_de_bord.py (port ${DASHBOARD_PORT})"
+echo "[installer_service_tableau_de_bord] Installation du service pour : ${BIN_DIR}/tableau_de_bord.py (port ${DASHBOARD_PORT})"
 
-if [ ! -f "${SCRIPT_DIR}/tableau_de_bord.py" ]; then
-  echo "ERREUR : ${SCRIPT_DIR}/tableau_de_bord.py introuvable." >&2
+if [ ! -f "${BIN_DIR}/tableau_de_bord.py" ]; then
+  echo "ERREUR : ${BIN_DIR}/tableau_de_bord.py introuvable." >&2
   exit 1
 fi
 
@@ -73,7 +79,7 @@ After=multi-user.target
 [Service]
 Type=simple
 WorkingDirectory=${SCRIPT_DIR}
-ExecStart=/usr/bin/python3 ${SCRIPT_DIR}/tableau_de_bord.py
+ExecStart=/usr/bin/python3 ${BIN_DIR}/tableau_de_bord.py
 Restart=on-failure
 RestartSec=5
 User=root

@@ -61,5 +61,5 @@ else
 fi
 echo "===================================================================="
 echo " OK. Machine prete pour MNT_019/020 (extraction archive + relance"
-echo " orchestrator.sh), ou utilisez directement reprise_deploiement.sh."
+echo " orchestrator.sh), ou utilisez directement bin/reprise_deploiement.sh."
 echo "===================================================================="

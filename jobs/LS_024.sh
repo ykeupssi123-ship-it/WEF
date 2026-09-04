@@ -42,7 +42,7 @@ source "$PROJECT_ROOT/lib/commun.sh"
 mkdir -p /etc/logstash/conf.d
 # Copie locale des certs (voir lib/commun.sh) - idempotent, sans effet si
 # LS_020 l'a deja fait, mais garantit ce fichier correct meme si ce job
-# est rejoue seul (ex: forcer_job.sh) avant LS_020.
+# est rejoue seul (ex: bin/order_job.sh) avant LS_020.
 local_pki_copy "/etc/logstash/certs" "${LS_USER}:${LS_USER}"
 
 OUT_FILE="/etc/logstash/conf.d/30-outputs.conf"
@@ -52,7 +52,7 @@ OUT_FILE="/etc/logstash/conf.d/30-outputs.conf"
 # tard dans la chaine) verrouille /etc/logstash/conf.d/*.conf en
 # immuable (chattr +i) une fois le premier passage termine - rejouer CE
 # job ensuite (reglage change dans vars.conf, ou comme ici a la main via
-# forcer_job.sh) echouait silencieusement ("Operation non permise" sur
+# bin/order_job.sh) echouait silencieusement ("Operation non permise" sur
 # la redirection, jamais verifiee) : le fichier affichait "regenere"
 # dans le log alors qu'il n'avait pas bouge du tout. Corrige : on leve
 # l'immutabilite si elle est deja posee - LS_036_FINAL la reposera de

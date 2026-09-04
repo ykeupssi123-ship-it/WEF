@@ -35,7 +35,7 @@
 # WAZ_035->040 (auto-test des deux sens a chaque deploiement a froid,
 # etat final toujours Souverain par defaut). Pour re-basculer
 # manuellement en exploitation, rejouer ce script seul via
-# forcer_job.sh WAZ_039_MODE_SOUVERAIN.
+# bin/order_job.sh WAZ_039_MODE_SOUVERAIN.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

@@ -73,7 +73,7 @@
 # automatique lors d'un premier deploiement a froid sert d'auto-test des
 # DEUX sens de la bascule avant de revenir a l'etat par defaut
 # (Souverain/Wazuh Dashboard). Pour re-basculer manuellement plus tard en
-# exploitation, rejouer ce script seul via forcer_job.sh WAZ_035_MODE_CONVERGENT.
+# exploitation, rejouer ce script seul via bin/order_job.sh WAZ_035_MODE_CONVERGENT.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

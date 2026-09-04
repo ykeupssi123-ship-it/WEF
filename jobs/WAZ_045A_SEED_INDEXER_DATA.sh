@@ -9,7 +9,7 @@
 # docs/JOURNAL_TECHNIQUE.md). JAMAIS dans la chaine automatique
 # (IN_COND=WAZ_PURGE_MANUAL_GATE, jamais satisfaite ailleurs) - usage
 # EXCLUSIVEMENT volontaire :
-#   ./forcer_job.sh WAZ_045A_SEED_INDEXER_DATA "test de charge migration"
+#   ./bin/order_job.sh WAZ_045A_SEED_INDEXER_DATA "test de charge migration"
 # Chaque document porte "wef_test_seed": true - jamais confondu avec une
 # vraie alerte (voir jobs/lib/test_data_tools.sh).
 set -uo pipefail

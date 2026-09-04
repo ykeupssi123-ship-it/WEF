@@ -1,5 +1,5 @@
 #!/bin/bash
-# historique_job.sh - consulte l'historique COMPLET d'un job (toutes ses
+# bin/view_history.sh - consulte l'historique COMPLET d'un job (toutes ses
 # executions, pas seulement la derniere), et le log exact de chacune.
 # Ajoute le 2026-08-12 suite a une demande legitime : un .ok ne garde
 # que la derniere reussite, ecrase a chaque re-execution - insuffisant
@@ -7,14 +7,14 @@
 # voir chacune des sorties".
 #
 # Usage :
-#   ./historique_job.sh                          -> liste les jobs ayant un historique
-#   ./historique_job.sh ES_017                    -> liste toutes les executions de ES_017
-#   ./historique_job.sh ES_017 3                   -> affiche le log de la 3e execution (ordre chronologique)
-#   ./historique_job.sh ES_017 20260812_104500     -> affiche le log dont le timestamp contient ce texte
-#   ./historique_job.sh ES_017 stats               -> statistiques (nb executions, taux de reussite,
+#   ./bin/view_history.sh                          -> liste les jobs ayant un historique
+#   ./bin/view_history.sh ES_017                    -> liste toutes les executions de ES_017
+#   ./bin/view_history.sh ES_017 3                   -> affiche le log de la 3e execution (ordre chronologique)
+#   ./bin/view_history.sh ES_017 20260812_104500     -> affiche le log dont le timestamp contient ce texte
+#   ./bin/view_history.sh ES_017 stats               -> statistiques (nb executions, taux de reussite,
 #                                                       intervalles entre executions - utile pour verifier
 #                                                       qu'un job cense tourner regulierement le fait bien)
-#   ./historique_job.sh ES_017 stats 300           -> pareil, + signale les intervalles qui s'ecartent de
+#   ./bin/view_history.sh ES_017 stats 300           -> pareil, + signale les intervalles qui s'ecartent de
 #                                                       plus de 20% du cycle attendu (300s = toutes les 5 min)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,7 +55,7 @@ fi
 if [ "$SEL" = "stats" ]; then
   EXPECTED_SEC="${3:-}"
   TOTAL=$(echo "$MATCHES" | wc -l)
-  # FORCE_OK/FORCE_ECHEC (forcer_job.sh, ajoute le 2026-08-12) comptent
+  # FORCE_OK/FORCE_ECHEC (bin/order_job.sh, ajoute le 2026-08-12) comptent
   # respectivement comme succes/echec pour le taux de reussite - mais
   # restent affiches tels quels (jamais renommes en simple OK/ECHEC)
   # dans le detail liste plus bas, pour qu'un forcage manuel ne soit
@@ -74,7 +74,7 @@ if [ "$SEL" = "stats" ]; then
   echo "Taux de reussite    : ${RATE}%"
   echo "Premiere execution  : $FIRST"
   echo "Derniere execution  : $LAST"
-  [ "$FORCE_COUNT" -gt 0 ] && echo "dont FORCEES manuellement (./forcer_job.sh) : $FORCE_COUNT"
+  [ "$FORCE_COUNT" -gt 0 ] && echo "dont FORCEES manuellement (./bin/order_job.sh) : $FORCE_COUNT"
 
   if [ "$TOTAL" -lt 2 ]; then
     echo ""

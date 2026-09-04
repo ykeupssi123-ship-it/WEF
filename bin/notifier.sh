@@ -22,7 +22,7 @@
 #     -> envoie un email de test, pour valider la configuration une
 #        fois, independamment de tout echec reel.
 #   ./notifier.sh <JOB_ID> <JOB_NAME> <RESULTAT> <LOG_FILE>
-#     -> appele automatiquement par orchestrator.sh/forcer_job.sh sur
+#     -> appele automatiquement par orchestrator.sh/bin/order_job.sh sur
 #        un echec. Peut aussi etre appele a la main.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -135,8 +135,8 @@ LOG       : ${LOG_FILE}
 Date      : $(date -Iseconds)
 
 Consultez :
-  ./historique_job.sh ${JOB_ID}
-  ./statut_live.sh
+  ./bin/view_history.sh ${JOB_ID}
+  ./bin/monitoring.sh
   cat ${LOG_FILE}"
 
 echo "[notifier] Envoi de l'alerte pour $JOB_ID..."

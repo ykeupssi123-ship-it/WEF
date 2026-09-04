@@ -1,6 +1,6 @@
 #!/bin/bash
-# lib/commun.sh - fonctions partagees entre orchestrator.sh, statut_live.sh,
-# forcer_job.sh, geler_job.sh, liberer_job.sh. Ajoute le 2026-08-12.
+# lib/commun.sh - fonctions partagees entre orchestrator.sh, bin/monitoring.sh,
+# bin/order_job.sh, bin/hold_job.sh, bin/free_job.sh. Ajoute le 2026-08-12.
 #
 # Avant, job_done()/component_enabled()/pid_alive() etaient dupliquees
 # dans 3 scripts differents - un bugfix dans l'une exigeait de penser a
@@ -42,7 +42,7 @@ pid_alive(){ kill -0 "$1" 2>/dev/null; }
 # remplies et etre pret a s'executer, mais un operateur a explicitement
 # demande qu'il ne parte pas (fenetre de gel, changement en cours
 # ailleurs, decision manuelle) - equivalent du statut HELD chez
-# Control-M/Autosys. Voir geler_job.sh / liberer_job.sh.
+# Control-M/Autosys. Voir bin/hold_job.sh / bin/free_job.sh.
 job_held(){ [ -f "${STATE_DIR}/HELD/$1.held" ]; }
 
 # COPIE LOCALE DES CERTIFICATS PKI, ajoutee le 2026-08-14 suite a un
@@ -60,7 +60,7 @@ job_held(){ [ -f "${STATE_DIR}/HELD/$1.held" ]; }
 # Usage : local_pki_copy <dossier_cible> <utilisateur[:groupe]>
 # A utiliser depuis un job avec : PROJECT_ROOT="$(dirname "$VARS_FILE")"
 # puis source "$PROJECT_ROOT/lib/commun.sh" (VARS_FILE est deja exporte
-# par orchestrator.sh/forcer_job.sh vers tous les jobs qu'ils lancent).
+# par orchestrator.sh/bin/order_job.sh vers tous les jobs qu'ils lancent).
 local_pki_copy(){
   local target_dir="$1"
   local owner="$2"
@@ -86,7 +86,7 @@ local_pki_copy(){
 # suite a un cas reel : creneau demo/test chez un client trop court pour
 # attendre un job lent mais sans impact fonctionnel sur la suite (ex: la
 # mise a jour OS, contrairement au demarrage d'Elasticsearch dont tout
-# depend reellement). Distinct de marquer_deja_fait.sh : ici, on n'attend
+# depend reellement). Distinct de bin/set_to_ok.sh : ici, on n'attend
 # jamais que le job ait ete "fait ailleurs", on decide A L'AVANCE (dans
 # vars.conf, avant meme de lancer l'orchestrateur) qu'il n'a pas besoin
 # de tourner cette fois-ci. Voir vars.conf pour le format de SKIP_JOBS.
@@ -185,7 +185,7 @@ wait_for_service_active(){
 # vars.conf - livre tel quel dans l'archive de deploiement, donc un vrai
 # secret (mot de passe root des serveurs de l'usine, entre autres) s'est
 # retrouve dans un artefact destine a etre redepose ailleurs. Meme defaut
-# deja evite pour SMTP_PASS_FILE (voir notifier.sh) - ce point unique
+# deja evite pour SMTP_PASS_FILE (voir bin/notifier.sh) - ce point unique
 # generalise ce reflexe a tous les autres secrets du projet.
 #
 # A l'origine de la decouverte : diagnostic reel de l'echec WAZ_020_VERIFY

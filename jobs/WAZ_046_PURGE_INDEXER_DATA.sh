@@ -8,7 +8,7 @@
 # AJOUTE LE 2026-09-03 (demande explicite utilisateur, voir
 # docs/JOURNAL_TECHNIQUE.md). IN_COND=WAZ_PURGE_MANUAL_GATE (jamais
 # satisfaite ailleurs) - usage EXCLUSIVEMENT volontaire :
-#   ./forcer_job.sh WAZ_046_PURGE_INDEXER_DATA "nettoyage post-essai"
+#   ./bin/order_job.sh WAZ_046_PURGE_INDEXER_DATA "nettoyage post-essai"
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

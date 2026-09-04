@@ -24,7 +24,7 @@ projet, donc pas de distinction "attend son heure" vs "attend une
 dependance") :
   GRIS   = EN ATTENTE   (dependance(s) non encore satisfaite(s))
   JAUNE  = EN COURS      (marqueur state/RUNNING/<JOB_ID>.running present)
-  ORANGE = GELE (HELD)   (gel manuel operateur, ./geler_job.sh)
+  ORANGE = GELE (HELD)   (gel manuel operateur, ./bin/hold_job.sh)
   VERT   = TERMINE OK    (marqueur state/<OUT_COND>.ok present)
   ROUGE  = ECHEC         (derniere execution ECHEC/FORCE_ECHEC, pas encore OK)
 
@@ -41,7 +41,7 @@ import sys
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # remonte de bin/ vers la racine
 JOBS_CSV = os.path.join(PROJECT_ROOT, "jobs_table.csv")
 VARS_FILE = os.path.join(PROJECT_ROOT, "vars.conf")
 

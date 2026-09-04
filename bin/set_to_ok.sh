@@ -1,22 +1,22 @@
 #!/bin/bash
-# marquer_deja_fait.sh - Marque un job comme deja satisfait SANS
+# bin/set_to_ok.sh - Marque un job comme deja satisfait SANS
 # l'executer, ajoute le 2026-08-14 suite a une demande reelle de
-# l'operateur (VM1) : geler_job.sh (HELD) bloque tout ce qui depend du
+# l'operateur (VM1) : bin/hold_job.sh (HELD) bloque tout ce qui depend du
 # job gele - inadapte quand le besoin reel est "ce job a deja ete fait
 # (ou n'a pas besoin de l'etre), laisse le reste de la chaine continuer
 # derriere lui" (ex: sauter ES_001, la mise a jour OS, sans bloquer
 # ES_002 et tout ce qui suit).
 #
 # Distinct des 3 outils existants :
-#   - geler_job.sh (HELD)  : "ne joue PAS ce job, meme quand il serait
+#   - bin/hold_job.sh (HELD)  : "ne joue PAS ce job, meme quand il serait
 #                             pret" - bloque tout ce qui en depend.
-#   - forcer_job.sh        : "joue REELLEMENT ce job maintenant, meme
+#   - bin/order_job.sh        : "joue REELLEMENT ce job maintenant, meme
 #                             si ses dependances ne sont pas remplies".
-#   - marquer_deja_fait.sh : "considere ce job comme deja reussi, SANS
+#   - bin/set_to_ok.sh : "considere ce job comme deja reussi, SANS
 #                             executer son script" - le reste de la
 #                             chaine peut continuer.
 #
-# Meme rigueur d'audit que forcer_job.sh :
+# Meme rigueur d'audit que bin/order_job.sh :
 #   - RAISON obligatoire, capturee avec l'identite de l'operateur
 #     (whoami@hostname) dans un log dedie a cette "execution" ;
 #   - exige de retaper le JOB_ID exact pour confirmer ;
@@ -30,7 +30,7 @@
 #     continue normalement derriere.
 #
 # Usage :
-#   ./marquer_deja_fait.sh <JOB_ID> "<raison>"
+#   ./bin/set_to_ok.sh <JOB_ID> "<raison>"
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
@@ -40,7 +40,7 @@ source "$HERE/lib/commun.sh"
 JOB_ID="${1:-}"
 RAISON="${2:-}"
 if [ -z "$JOB_ID" ] || [ -z "$RAISON" ]; then
-  echo "Usage : ./marquer_deja_fait.sh <JOB_ID> \"<raison>\""
+  echo "Usage : ./bin/set_to_ok.sh <JOB_ID> \"<raison>\""
   echo "La raison est obligatoire (audit - on ne marque jamais un job sans dire pourquoi)."
   echo "ATTENTION : ceci ne joue PAS le script du job - ca dit juste a l'orchestrateur"
   echo "de le considerer comme deja reussi. A utiliser seulement si vous savez que la"
@@ -72,7 +72,7 @@ if job_held "$JOB_ID"; then
   echo ""
   echo "Un gel est une decision d'exploitation deliberee - elle ne peut pas"
   echo "etre court-circuitee, meme par un marquage manuel. Liberez-le d'abord :"
-  echo "./liberer_job.sh $JOB_ID"
+  echo "./bin/free_job.sh $JOB_ID"
   exit 1
 fi
 
@@ -118,6 +118,6 @@ mark_done "$C_OUT_COND"
 echo "$(date -Iseconds),$JOB_ID,$C_JOB_NAME,MARQUE_FAIT,$JOB_LOG" >> "$HISTORY_LEDGER"
 echo ""
 echo "$JOB_ID -> MARQUE_FAIT ($C_OUT_COND). Marque distinctement dans l'historique"
-echo "(jamais confondu avec une execution reelle) : ./historique_job.sh $JOB_ID"
+echo "(jamais confondu avec une execution reelle) : ./bin/view_history.sh $JOB_ID"
 echo "Relancez ./orchestrator.sh - la chaine continuera derriere ce job."
 exit 0

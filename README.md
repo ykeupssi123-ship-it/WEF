@@ -25,17 +25,33 @@ feuille *Correspondance Control-M* du classeur d'exploitation.
 
 ## Démarrage rapide
 
-1. Lisez [`GUIDE_EXPLOITATION.md`](GUIDE_EXPLOITATION.md) — machine par
-   machine, étape par étape.
+1. Lisez [`docs/GUIDE_EXPLOITATION.md`](docs/GUIDE_EXPLOITATION.md) —
+   machine par machine, étape par étape.
 2. Ouvrez [`docs/TABLEAU_DE_BORD_EXPLOITATION.xlsx`](docs/TABLEAU_DE_BORD_EXPLOITATION.xlsx)
    — votre feuille de route pour piloter l'exploitation au quotidien
    (commandes prêtes à copier-coller, correspondance Control-M, scénarios
    de démonstration).
 3. Sur VM1 :
    ```bash
-   chmod +x *.sh jobs/*.sh
+   chmod +x *.sh bin/*.sh setup/*.sh jobs/*.sh
    ./orchestrator.sh
    ```
+
+## Opérations d'exploitation (façon Control-M)
+
+Racine minimale — `orchestrator.sh` reste le seul point d'entrée à la
+racine. Toutes les actions d'exploitation vivent dans `bin/`, sous le
+vrai nom de l'action Control-M correspondante (jamais une paraphrase
+française) :
+
+| Action Control-M | Commande |
+|---|---|
+| Hold | `./bin/hold_job.sh <JOB_ID> "<raison>"` |
+| Free / Release | `./bin/free_job.sh <JOB_ID>` |
+| Order / Force | `./bin/order_job.sh <JOB_ID> "<raison>"` |
+| Set to OK | `./bin/set_to_ok.sh <JOB_ID> "<raison>"` |
+| View History | `./bin/view_history.sh <JOB_ID>` |
+| Monitoring | `./bin/monitoring.sh` |
 
 ## Topologie recommandée
 
@@ -79,16 +95,23 @@ devez en changer).
 ## Structure du dépôt
 
 ```
-orchestrator.sh              orchestrateur principal (Linux)
+orchestrator.sh              orchestrateur principal (Linux) - SEUL script a la racine
 jobs_table.csv                table des jobs (dépendances, description)
+vars.conf                       toute la configuration (aucune valeur en dur ailleurs)
+bin/                            actions d'exploitation Control-M (hold_job.sh, free_job.sh,
+                                 order_job.sh, set_to_ok.sh, view_history.sh, monitoring.sh,
+                                 notifier.sh, operator_profile.sh, rapport_audit.sh,
+                                 reinitialiser_mdp_elastic.sh, reprise_deploiement.sh,
+                                 tableau_de_bord.py)
+setup/                          installation ponctuelle (installer_service_*.sh) - jamais
+                                 utilise au quotidien, seulement a la mise en place
 jobs/                          les scripts, un par job (jobs/lib/ = fonctions partagées)
 jobs_windows/                  kit PowerShell (agents Windows)
 lib/                            fonctions communes à l'orchestrateur
 templates/                      gabarits d'index (mappings Elasticsearch/OpenSearch)
 maintenance/                    scripts d'entretien (purge, diagnostic)
-vars.conf                       toute la configuration (aucune valeur en dur ailleurs)
 secrets/                        secrets générés à l'exécution (vide au dépôt)
-GUIDE_EXPLOITATION.md          mode d'emploi complet
+docs/GUIDE_EXPLOITATION.md     mode d'emploi complet
 docs/TABLEAU_DE_BORD_EXPLOITATION.xlsx   classeur d'exploitation (commandes, Control-M)
 docs/JOURNAL_TECHNIQUE.md      journal technique complet (optionnel, approfondi)
 ```

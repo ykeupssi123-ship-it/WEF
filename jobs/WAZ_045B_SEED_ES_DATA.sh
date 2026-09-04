@@ -6,7 +6,7 @@
 # AJOUTE LE 2026-09-03 (demande explicite utilisateur, voir
 # docs/JOURNAL_TECHNIQUE.md). JAMAIS dans la chaine automatique
 # (IN_COND=WAZ_PURGE_MANUAL_GATE, jamais satisfaite ailleurs) :
-#   ./forcer_job.sh WAZ_045B_SEED_ES_DATA "test de charge migration"
+#   ./bin/order_job.sh WAZ_045B_SEED_ES_DATA "test de charge migration"
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

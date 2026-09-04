@@ -2,10 +2,21 @@
 > complet du projet : chaque bug réel rencontré, sa cause exacte, son
 > diagnostic et son correctif, dans l'ordre chronologique. Il n'est **pas**
 > nécessaire pour installer ou exploiter le produit — voir
-> [`README.md`](../README.md) et [`GUIDE_EXPLOITATION.md`](../GUIDE_EXPLOITATION.md)
+> [`README.md`](../README.md) et [`GUIDE_EXPLOITATION.md`](GUIDE_EXPLOITATION.md)
 > à la racine pour ça. Gardé ici pour la profondeur d'ingénierie qu'il
 > démontre (utile pour une soutenance, un audit, ou pour quiconque doit un
 > jour modifier ce code en connaissance de cause).
+>
+> **Noms d'outils historiques (avant le 4 septembre 2026)** : les entrées
+> ci-dessous mentionnent `forcer_job.sh`, `geler_job.sh`, `liberer_job.sh`,
+> `marquer_deja_fait.sh`, `historique_job.sh`, `statut_live.sh` à la racine
+> - c'était exact et vrai au moment de chaque incident decrit, jamais
+> corrigé après coup pour rester un compte-rendu fidèle. Depuis cette date,
+> ces outils vivent dans `bin/` sous leur vrai nom Control-M
+> (`bin/order_job.sh`, `bin/hold_job.sh`, `bin/free_job.sh`,
+> `bin/set_to_ok.sh`, `bin/view_history.sh`, `bin/monitoring.sh`) - voir
+> `README.md` pour la table de correspondance complète et le diagnostic de
+> cette réorganisation.
 
 # WAZ_ELK_FACTORY - Scripts d'automatisation (241 jobs Linux + kit Windows)
 

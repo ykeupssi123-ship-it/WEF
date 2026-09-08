@@ -51,15 +51,29 @@ fi
 # lance 11 secondes seulement apres ce "OK", recevait HTTP 503 (port
 # deja ouvert mais formation du cluster/plugin de securite pas encore
 # terminee) - wazuh-passwords-tool.sh echouait pour la meme raison.
-# Corrige par un sondage repete de l'API elle-meme (jusqu'a 120s),
-# jamais un delai fixe parie a l'avance - le port peut repondre HTTP
-# 401 (authentification requise, pas encore de mot de passe pousse a
-# ce stade) ou 200 : les deux prouvent que l'indexeur repond REELEMENT,
+# Corrige par un sondage repete de l'API elle-meme, jamais un delai
+# fixe parie a l'avance - le port peut repondre HTTP 401
+# (authentification requise, pas encore de mot de passe pousse a ce
+# stade) ou 200 : les deux prouvent que l'indexeur repond REELEMENT,
 # contrairement a 503/connexion refusee qui prouvent l'inverse.
+#
+# BUDGET REMONTE DE 120s A 300s LE 2026-09-08 (incident reel,
+# deploiement MIPREL2, RESOURCE_PROFILE=DEMO_LEGER) : le service a fini
+# par demarrer correctement (confirme plus tard par l'operateur,
+# "systemctl status" propre, aucune erreur) - mais est reste en 503
+# pendant la totalite des 120s alloues, sous une pression memoire reelle
+# (ES+Logstash+Kibana deja lances sur la meme VM 4-6 Gio, "free -h"
+# releve au moment de l'incident : ~1,4 Gio "available" seulement). Pas
+# un bug du produit ni de ce job - juste un budget insuffisant pour ce
+# profil de ressources. Remonte a 300s par prudence (marge reelle,
+# jamais mesure le temps exact necessaire ce jour-la) plutot qu'un choix
+# arbitraire.
 WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9200}"
-echo "[WAZ_014] Attente de la disponibilite reelle de l'API (jusqu'a 120s)..."
+WAZ_INDEXER_READY_TIMEOUT_SEC="${WAZ_INDEXER_READY_TIMEOUT_SEC:-300}"
+WAZ_READY_ATTEMPTS=$(( (WAZ_INDEXER_READY_TIMEOUT_SEC + 4) / 5 ))
+echo "[WAZ_014] Attente de la disponibilite reelle de l'API (jusqu'a ${WAZ_INDEXER_READY_TIMEOUT_SEC}s)..."
 READY=0
-for i in $(seq 1 24); do
+for i in $(seq 1 "$WAZ_READY_ATTEMPTS"); do
   HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://127.0.0.1:${WAZ_INDEXER_PORT}/" 2>/dev/null || echo "000")
   if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ]; then
     READY=1
@@ -68,7 +82,10 @@ for i in $(seq 1 24); do
   sleep 5
 done
 if [ "$READY" -ne 1 ]; then
-  echo "[WAZ_014] ERREUR : wazuh-indexer actif au sens systemd mais l'API ne repond toujours pas apres 120s (dernier code HTTP : ${HTTP_CODE:-000}). Diagnostic :" >&2
+  echo "[WAZ_014] ERREUR : wazuh-indexer actif au sens systemd mais l'API ne repond toujours pas apres ${WAZ_INDEXER_READY_TIMEOUT_SEC}s (dernier code HTTP : ${HTTP_CODE:-000}). Diagnostic :" >&2
+  echo "[WAZ_014] --- Memoire au moment de l'echec (une pression memoire ralentit le bootstrap du plugin de securite OpenSearch) ---" >&2
+  free -h 2>/dev/null >&2 || true
+  echo "[WAZ_014] --- journalctl -u wazuh-indexer -n 30 ---" >&2
   journalctl -u wazuh-indexer -n 30 --no-pager 2>/dev/null || true
   exit 1
 fi

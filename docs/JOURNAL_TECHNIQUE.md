@@ -2005,3 +2005,13 @@ faute d'acces reseau vers 192.168.50.128/.129 - mais la resolution de
 dependances elle-meme (l'ordonnancement des 241 jobs) est maintenant
 verifiee reellement (voir "Bugs trouves..." plus haut), pas juste
 supposee correcte.
+
+## 2026-09-08 - WAZ_014 echoue sur deploiement MIPREL2 (VM 192.168.50.128) : 120s insuffisant sous pression memoire reelle
+
+**Incident reel** : `./orchestrator.sh` (clone frais depuis GitHub, commit `6c52f96`) echoue a `WAZ_014` apres avoir installe avec succes ES/Logstash/Kibana puis Wazuh Indexer sur la meme VM (`ROLE=ELK_HOST`, `RESOURCE_PROFILE=DEMO_LEGER`). Log reel (`state/history/WAZ_014/20260908_054323_943825653.log`) : `systemctl restart wazuh-indexer` a mis 58s pour que systemd considere l'unite "Started" (05:43:23 -> 05:44:21), puis l'API a repondu HTTP 503 pendant l'integralite des 120s de sondage alloues par le correctif du 2026-09-04 - jamais 200/401.
+
+**Diagnostic reel** (`free -h` et `systemctl status wazuh-indexer` demandes a l'operateur) : `systemctl status` montre le service **actif et sain** quelques heures plus tard (`active (running)... 9h ago`, aucune erreur, Memory 1.1G) - donc pas un crash ni une corruption, juste un demarrage plus lent que le budget de 120s. `free -h` au moment de la demande de diagnostic : 5,6 Gio total, seulement 1,4 Gio "available" (ES 768m heap + Logstash 768m heap + Kibana + l'indexeur 768m heap deja tous residents sur une seule VM en profil DEMO_LEGER). HTTP 503 (pas 000/connexion refusee) = le plugin de securite OpenSearch est en cours d'initialisation, pas en echec - ce bootstrap est connu pour ralentir fortement sous pression memoire/swap.
+
+**Corrige** : `WAZ_014.sh` - budget de sondage remonte de 120s (fixe en dur) a `WAZ_INDEXER_READY_TIMEOUT_SEC` (nouvelle variable `vars.conf`, defaut 300s), diagnostic d'echec enrichi d'un `free -h` reel (avant meme `journalctl`) pour que le prochain incident de ce type se diagnostique en un seul log, sans aller-retour. Deblocage immediat de l'operateur : l'API repondant deja normalement, un simple `./orchestrator.sh` relance passe WAZ_014 sans attente (job deja idempotent, aucun autre changement necessaire).
+
+**Non fait, deliberement** : ni augmentation de RAM allouee a la VM, ni reduction des heaps JVM deja au plancher du profil DEMO_LEGER (768m chacun) - la vraie cause est la co-residence de 3 JVM + Kibana sur une VM a 4-6 Gio, caracteristique connue et documentee de ce profil (`RESOURCE_PROFILE="DEMO_LEGER"`), pas une anomalie a corriger en dur dans le code.

@@ -71,11 +71,7 @@ fi
 # a echoue ("empty source"). Si un premier passage a deja eu lieu pendant que
 # l'index de securite n'etait pas encore pret, ce vide se grave alors de
 # facon PERMANENTE dans l'index : chaque tentative suivante retrouve le meme
-# vide, meme cluster GREEN, boucle infinie de 503 sur _cluster/health. Aucune
-# quantite de reessais ne repare ca seule - il faut repousser une config par
-# defaut saine AVANT de rappeler l'outil. Detecte et repare ICI pour qu'un
-# futur deploiement (VM differente, etudiant, MIPREL) ne reste jamais bloque
-# sans intervention manuelle.
+# vide, meme cluster GREEN, boucle infinie de 503 sur _cluster/health.
 INTERNAL_USERS_YML="/etc/wazuh-indexer/opensearch-security/internal_users.yml"
 if [ ! -s "$INTERNAL_USERS_YML" ]; then
   echo "[WAZ_014A] ALERTE : ${INTERNAL_USERS_YML} est vide - incident connu (voir docs/JOURNAL_TECHNIQUE.md, 2026-09-03). Restauration depuis le paquet RPM d'origine avant de continuer..."
@@ -121,28 +117,48 @@ if [ ! -s "$INTERNAL_USERS_YML" ]; then
     echo "[WAZ_014A] ERREUR : la restauration depuis ${RPM_PATH} n'a pas rempli ${INTERNAL_USERS_YML}." >&2
     exit 1
   fi
-
-  echo "[WAZ_014A] Rechargement de la configuration de securite par defaut dans l'index (securityadmin.sh -cd)..."
-  CD_CACERT="$(grep 'plugins.security.ssl.transport.pemtrustedcas_filepath:' /etc/wazuh-indexer/opensearch.yml | awk '{print $2}')"
-  CD_LOG="${WORK_TMP_DIR}/waz014a_securityadmin_cd.log"
-  # NOTE : port 9200 ici (pas ${WAZ_INDEXER_PORT}=9201) - c'est le port de
-  # transport que securityadmin.sh utilise reellement pour parler a
-  # opensearch-security, distinct du port REST verifie par check_auth().
-  # Prouve fonctionnel en reel le 2026-09-03 (log wazuh-passwords-tool.sh :
-  # "Will connect to localhost:9200 ... done", cluster GREEN).
-  JAVA_HOME=/usr/share/wazuh-indexer/jdk/ OPENSEARCH_CONF_DIR=/etc/wazuh-indexer \
-    /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
-    -cd /etc/wazuh-indexer/opensearch-security/ -icl -nhnv \
-    -cacert "$CD_CACERT" -cert "$ADMIN_CERT" -key "$ADMIN_KEY" \
-    -h localhost -p 9200 > "$CD_LOG" 2>&1
-  if ! grep -q "Done with success" "$CD_LOG"; then
-    echo "[WAZ_014A] ERREUR : le rechargement de la configuration par defaut a echoue - voir ${CD_LOG}." >&2
-    cat "$CD_LOG" >&2
-    exit 1
-  fi
-  rm -f "$CD_LOG"
-  echo "[WAZ_014A] Configuration de securite par defaut rechargee (admin/mot de passe de demonstration actif temporairement - remplace ci-dessous)."
 fi
+
+# CORRIGE LE 2026-09-08 (incident reel, deploiement MIPREL2, voir
+# docs/JOURNAL_TECHNIQUE.md) : le rechargement ci-dessous (securityadmin.sh
+# -cd) n'etait declenche QUE si le fichier LOCAL internal_users.yml etait
+# vide - mais l'incident reel rencontre ce jour-la etait different : le
+# fichier local etait intact (config demo standard), c'est l'INDEX COTE
+# SERVEUR (.opendistro_security) qui venait d'etre cree, totalement VIDE
+# (rien n'a jamais ete pousse dedans) - preuve reelle dans le log de
+# wazuh-passwords-tool.sh : "index does not exists, attempt to create it
+# ... done" suivi de "FAIL: ... empty source" sur config/roles/
+# rolesmapping/internalusers/actiongroups/audit, puis "ERROR: The given
+# user does not exist" (admin n'existe pas encore dans un index vide).
+# wazuh-passwords-tool.sh est concu pour FAIRE TOURNER le mot de passe
+# d'un utilisateur DEJA existant, jamais pour amorcer un index vierge.
+#
+# Rendu INCONDITIONNEL (toujours execute avant wazuh-passwords-tool.sh,
+# plus seulement quand le fichier local est vide) : pousser la config
+# locale par defaut dans l'index couvre les DEUX scenarios reels
+# rencontres (fichier local vide, et index serveur vierge) avec un seul
+# mecanisme, idempotent par nature (si l'index a deja la bonne config,
+# la repousser ne change rien).
+echo "[WAZ_014A] Rechargement de la configuration de securite par defaut dans l'index (securityadmin.sh -cd)..."
+CD_CACERT="$(grep 'plugins.security.ssl.transport.pemtrustedcas_filepath:' /etc/wazuh-indexer/opensearch.yml | awk '{print $2}')"
+CD_LOG="${WORK_TMP_DIR}/waz014a_securityadmin_cd.log"
+# NOTE : port 9200 ici (pas ${WAZ_INDEXER_PORT}=9201) - c'est le port de
+# transport que securityadmin.sh utilise reellement pour parler a
+# opensearch-security, distinct du port REST verifie par check_auth().
+# Prouve fonctionnel en reel le 2026-09-03 (log wazuh-passwords-tool.sh :
+# "Will connect to localhost:9200 ... done", cluster GREEN).
+JAVA_HOME=/usr/share/wazuh-indexer/jdk/ OPENSEARCH_CONF_DIR=/etc/wazuh-indexer \
+  /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
+  -cd /etc/wazuh-indexer/opensearch-security/ -icl -nhnv \
+  -cacert "$CD_CACERT" -cert "$ADMIN_CERT" -key "$ADMIN_KEY" \
+  -h localhost -p 9200 > "$CD_LOG" 2>&1
+if ! grep -q "Done with success" "$CD_LOG"; then
+  echo "[WAZ_014A] ERREUR : le rechargement de la configuration par defaut a echoue - voir ${CD_LOG}." >&2
+  cat "$CD_LOG" >&2
+  exit 1
+fi
+rm -f "$CD_LOG"
+echo "[WAZ_014A] Configuration de securite par defaut rechargee (admin/mot de passe de demonstration actif - remplace ci-dessous par le vrai mot de passe de vars.conf)."
 
 echo "[WAZ_014A] Poussee du mot de passe (WAZ_INDEXER_ADMIN_USER=${WAZ_INDEXER_ADMIN_USER}) via wazuh-passwords-tool.sh..."
 bash "$TOOL" -u "${WAZ_INDEXER_ADMIN_USER}" -p "${WAZ_INDEXER_ADMIN_PASSWORD}" \

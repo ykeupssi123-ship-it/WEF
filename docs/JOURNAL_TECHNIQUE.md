@@ -2047,3 +2047,21 @@ Ce message se repete **indefiniment**, toutes les ~13s, verifie sur plus de 20 m
 **Corrige** : `WAZ_014.sh` accepte desormais HTTP `503` comme preuve de vie valide (en plus de `200`/`401`) - 503 prouve que le demon a demarre et que son plugin de securite est charge et repond reellement (contrairement a une connexion refusee/timeout, qui prouverait l'inverse) ; il attend seulement son initialisation, qui reste explicitement le role de `WAZ_014A` (lequel verifie lui-meme, par un appel authentifie reel a `_cluster/health`, que l'initialisation a reellement reussi avant de se declarer OK - rien n'est delegue a l'aveugle). Diagnostic d'echec enrichi du vrai log applicatif (`tail /var/log/wazuh-indexer/*.log`), pas seulement `journalctl`.
 
 **Non verifie a ce stade** (a confirmer par l'operateur au prochain lancement) : que `WAZ_014A_INDXR_ADMINPW.sh` initialise correctement l'index de securite depuis cet etat "jamais initialise" via `wazuh-passwords-tool.sh` - le script est concu pour ce cas precis (c'est son usage principal documente), et les 3 incidents anterieurs (2026-08-20, 2026-09-03, 2026-09-04) confirment tous un aboutissement reel ("cluster GREEN") par ce meme mecanisme, mais jamais depuis un index totalement absent dans le cadre de cette session precise.
+
+## 2026-09-08 (suite) - WAZ_014A echoue sur un index de securite fraichement cree (vierge) : le rechargement de config par defaut etait mal conditionne
+
+**Suite directe de l'entree precedente** : une fois `WAZ_014` corrige (accepte 503), `WAZ_014A_INDXR_ADMINPW` echoue a son tour, reel (log de `wazuh-passwords-tool.sh`, `/opt/wef/state/tmp/waz014a_pwtool.log`) :
+
+```
+.opendistro_security index does not exists, attempt to create it ... done (0-all replicas)
+Will retrieve '/internalusers' into /etc/wazuh-indexer/backup/internal_users.yml
+   FAIL: Configuration for 'internalusers' failed because of empty source
+...
+ERROR: The given user does not exist
+```
+
+**Cause reelle** : `wazuh-passwords-tool.sh` fait un `securityadmin -backup` PUIS restaure avant de changer le mot de passe - concu pour FAIRE TOURNER le mot de passe d'un utilisateur DEJA existant, jamais pour amorcer un index totalement vierge (il vient d'etre cree par l'outil lui-meme a l'instant, sans aucune config dedans - donc rien a sauvegarder, "empty source" partout, et "admin" n'existe pas encore). Le correctif deja en place (`securityadmin.sh -cd`, qui pousse la config locale par defaut dans l'index) existait deja dans `WAZ_014A.sh` depuis le 2026-09-03 - mais sa condition de declenchement verifiait uniquement si le FICHIER LOCAL `internal_users.yml` etait vide. Ici, le fichier local etait intact (config demo standard, jamais modifiee) - c'est l'INDEX COTE SERVEUR qui etait vierge, un scenario different que la condition existante ne couvrait pas.
+
+**Corrige** : le rechargement `securityadmin.sh -cd` est desormais INCONDITIONNEL - toujours execute avant `wazuh-passwords-tool.sh`, plus seulement quand le fichier local est vide. Couvre les deux scenarios reels rencontres (fichier local vide -> restauration RPM puis -cd ; index serveur vierge avec fichier local intact -> -cd directement) avec un seul mecanisme, idempotent par construction (repousser une config deja correcte ne change rien).
+
+**A confirmer par l'operateur** : que `git pull && ./orchestrator.sh` fait desormais passer `WAZ_014A` proprement (le `-cd` initialise l'index, puis `wazuh-passwords-tool.sh` trouve un utilisateur "admin" reel a faire tourner).

@@ -52,22 +52,34 @@ fi
 # deja ouvert mais formation du cluster/plugin de securite pas encore
 # terminee) - wazuh-passwords-tool.sh echouait pour la meme raison.
 # Corrige par un sondage repete de l'API elle-meme, jamais un delai
-# fixe parie a l'avance - le port peut repondre HTTP 401
-# (authentification requise, pas encore de mot de passe pousse a ce
-# stade) ou 200 : les deux prouvent que l'indexeur repond REELEMENT,
-# contrairement a 503/connexion refusee qui prouvent l'inverse.
+# fixe parie a l'avance.
 #
-# BUDGET REMONTE DE 120s A 300s LE 2026-09-08 (incident reel,
-# deploiement MIPREL2, RESOURCE_PROFILE=DEMO_LEGER) : le service a fini
-# par demarrer correctement (confirme plus tard par l'operateur,
-# "systemctl status" propre, aucune erreur) - mais est reste en 503
-# pendant la totalite des 120s alloues, sous une pression memoire reelle
-# (ES+Logstash+Kibana deja lances sur la meme VM 4-6 Gio, "free -h"
-# releve au moment de l'incident : ~1,4 Gio "available" seulement). Pas
-# un bug du produit ni de ce job - juste un budget insuffisant pour ce
-# profil de ressources. Remonte a 300s par prudence (marge reelle,
-# jamais mesure le temps exact necessaire ce jour-la) plutot qu'un choix
-# arbitraire.
+# CORRECTION DE FOND LE 2026-09-08 (incident reel, deploiement MIPREL2) :
+# le diagnostic du 2026-09-04 et l'augmentation de budget du meme jour
+# (120s->300s, RESOURCE_PROFILE=DEMO_LEGER, "pression memoire") etaient
+# INCOMPLETS - un vCPU insuffisant a bien ete trouve et corrige
+# separement (voir ES_B001B_CPU_CHECK), mais la VRAIE cause de fond,
+# confirmee par le log applicatif reel (/var/log/wazuh-indexer/
+# wazuh-cluster.log, jamais journalctl qui ne montre pas ce niveau de
+# detail) est structurelle, pas une histoire de vitesse :
+#   Failure no such index [.opendistro_security] retrieving configuration...
+# Ce message se repete INDEFINIMENT (verifie sur plus de 20 minutes,
+# CPU/RAM normaux) - l'index systeme de securite n'existe simplement pas
+# encore, et RIEN ne le cree automatiquement. Il n'est cree que par
+# securityadmin.sh (via wazuh-passwords-tool.sh), qui vit dans WAZ_014A -
+# lequel ne peut jamais s'executer tant que CE job (WAZ_014) n'a pas
+# reussi. Un vrai probleme d'oeuf et de poule : attendre plus longtemps
+# ici n'aurait JAMAIS resolu la situation, quel que soit le budget.
+#
+# HTTP 503 sur ce point precis N'EST PAS UN ECHEC - c'est la preuve que
+# le demon a bien demarre et que son plugin de securite est charge et
+# repond reellement (contrairement a une connexion refusee/timeout, qui
+# prouverait l'inverse) : il attend juste son initialisation, qui est le
+# role explicite de WAZ_014A, pas de ce job. Accepter 503 ici PLUTOT que
+# de le traiter comme "pas encore pret" debloque la chaine vers le vrai
+# job responsable de l'initialisation, sans rien deleguer a l'aveugle :
+# WAZ_014A verifie lui-meme, par un appel reel authentifie, que
+# l'initialisation a reellement reussi avant de se declarer OK.
 WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9200}"
 WAZ_INDEXER_READY_TIMEOUT_SEC="${WAZ_INDEXER_READY_TIMEOUT_SEC:-300}"
 WAZ_READY_ATTEMPTS=$(( (WAZ_INDEXER_READY_TIMEOUT_SEC + 4) / 5 ))
@@ -75,20 +87,26 @@ echo "[WAZ_014] Attente de la disponibilite reelle de l'API (jusqu'a ${WAZ_INDEX
 READY=0
 for i in $(seq 1 "$WAZ_READY_ATTEMPTS"); do
   HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://127.0.0.1:${WAZ_INDEXER_PORT}/" 2>/dev/null || echo "000")
-  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ]; then
+  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "503" ]; then
     READY=1
     break
   fi
   sleep 5
 done
 if [ "$READY" -ne 1 ]; then
-  echo "[WAZ_014] ERREUR : wazuh-indexer actif au sens systemd mais l'API ne repond toujours pas apres ${WAZ_INDEXER_READY_TIMEOUT_SEC}s (dernier code HTTP : ${HTTP_CODE:-000}). Diagnostic :" >&2
-  echo "[WAZ_014] --- Memoire au moment de l'echec (une pression memoire ralentit le bootstrap du plugin de securite OpenSearch) ---" >&2
+  echo "[WAZ_014] ERREUR : wazuh-indexer actif au sens systemd mais aucune reponse HTTP apres ${WAZ_INDEXER_READY_TIMEOUT_SEC}s (dernier code : ${HTTP_CODE:-000}, connexion refusee ou timeout - jamais 503, qui est desormais accepte comme preuve de vie). Diagnostic :" >&2
+  echo "[WAZ_014] --- Memoire au moment de l'echec ---" >&2
   free -h 2>/dev/null >&2 || true
   echo "[WAZ_014] --- journalctl -u wazuh-indexer -n 30 ---" >&2
   journalctl -u wazuh-indexer -n 30 --no-pager 2>/dev/null || true
+  echo "[WAZ_014] --- Dernieres lignes du vrai log applicatif (plus informatif que journalctl) ---" >&2
+  tail -n 30 /var/log/wazuh-indexer/*.log 2>/dev/null >&2 || true
   exit 1
 fi
 
-echo "[WAZ_014] OK (API reellement disponible, pas seulement l'unite systemd)."
+if [ "$HTTP_CODE" = "503" ]; then
+  echo "[WAZ_014] OK (demon actif, HTTP 503 = plugin de securite charge mais pas encore initialise - normal, WAZ_014A s'en charge et le verifie reellement)."
+else
+  echo "[WAZ_014] OK (API deja pleinement disponible, HTTP ${HTTP_CODE})."
+fi
 exit 0

@@ -2015,3 +2015,19 @@ supposee correcte.
 **Corrige** : `WAZ_014.sh` - budget de sondage remonte de 120s (fixe en dur) a `WAZ_INDEXER_READY_TIMEOUT_SEC` (nouvelle variable `vars.conf`, defaut 300s), diagnostic d'echec enrichi d'un `free -h` reel (avant meme `journalctl`) pour que le prochain incident de ce type se diagnostique en un seul log, sans aller-retour. Deblocage immediat de l'operateur : l'API repondant deja normalement, un simple `./orchestrator.sh` relance passe WAZ_014 sans attente (job deja idempotent, aucun autre changement necessaire).
 
 **Non fait, deliberement** : ni augmentation de RAM allouee a la VM, ni reduction des heaps JVM deja au plancher du profil DEMO_LEGER (768m chacun) - la vraie cause est la co-residence de 3 JVM + Kibana sur une VM a 4-6 Gio, caracteristique connue et documentee de ce profil (`RESOURCE_PROFILE="DEMO_LEGER"`), pas une anomalie a corriger en dur dans le code.
+
+## 2026-09-08 (suite) - Cause racine reelle de WAZ_014 : 1 seul vCPU, pas seulement la RAM - nouveau controle ES_B001B_CPU_CHECK
+
+**Deuxieme occurrence du meme incident** apres le correctif de budget (300s) : `WAZ_014` echoue encore, HTTP 503 permanent (`OpenSearch Security not initialized`) meme apres ~4 minutes. Diagnostic pousse plus loin sur demande, reel :
+- `nproc` -> **1** (un seul vCPU).
+- `uptime` -> `load average: 2.01, 1.95, 1.17` sur cette unique VCPU - contention CPU severe et soutenue, pas un pic isole.
+- `ps aux --sort=-%cpu` -> Elasticsearch (java), Logstash (java), Kibana (node) et Wazuh Indexer (java) tous actifs SIMULTANEMENT sur le meme coeur unique.
+- `free -h` -> RAM disponible correcte (1,5 Gio) - **la RAM n'est pas le facteur limitant ici**, contrairement a l'hypothese initiale du correctif precedent.
+
+**Cause reelle** : 4 JVM/runtimes lourds se disputent 1 seul coeur CPU. Le bootstrap du plugin de securite OpenSearch (generation de cles, creation d'index systeme `.opendistro_security`) est CPU-bound - sous contention severe et soutenue, il peut prendre plusieurs minutes au lieu de quelques secondes. Ce n'est PAS un bug du produit ni une histoire de delai a rallonger indefiniment : c'est un sous-dimensionnement reel de la VM, invisible jusqu'a ce point precis de la chaine (aucun controle vCPU n'existait pour le role ELK_HOST avant ce jour - seul `MIN_VCPU_REQUIRED_AGENT` existait, pour AGENT_HOST).
+
+**Corrige** : nouveau job `ES_B001B_CPU_CHECK` (`jobs/ES_B001B_CPU_CHECK.sh`), insere juste apres `ES_B001_RAM_CHECK` dans `jobs_table.csv` (`ES_002` repointe sur son `OUT_COND`, `ES_CPU_CONFIRMED`, au lieu de `ES_RAM_CONFIRMED` directement) - meme patron exact que le controle RAM. Nouveau seuil `MIN_VCPU_REQUIRED=2` (`vars.conf`). Desormais, une VM ELK_HOST a 1 seul vCPU echoue proprement des le debut de la chaine, avec un message qui explique pourquoi (4 JVM/runtimes en parallele) et quoi faire (ajouter un vCPU), au lieu d'un timeout mysterieux 30+ minutes plus tard sur `WAZ_014`.
+
+**Non fait** : pas de modification du budget `WAZ_INDEXER_READY_TIMEOUT_SEC` (reste a 300s, ajoute plus haut le meme jour) - il reste une securite raisonnable pour une lenteur ponctuelle, mais n'est plus la premiere ligne de defense contre un sous-dimensionnement CPU reel, desormais interceptee en amont.
+
+**Recommandation laissee a l'operateur** (VM locale VMware Workstation, pas d'action prise sans son accord) : eteindre la VM, augmenter le nombre de processeurs virtuels a 2 minimum dans les parametres VMware, redemarrer, puis relancer `./orchestrator.sh` (idempotent - reprend a `ES_B001B_CPU_CHECK`, tout le reste deja `OK` est saute).

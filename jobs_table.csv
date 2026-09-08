@@ -12,7 +12,8 @@ PKI_010,WEF_PKI_BLD_CLEANCSR,ELK_HOST,ALWAYS,PKI_010.sh,Nettoyage : Évacuation 
 PKI_011,WEF_PKI_BLD_PERMRSTRCT,ELK_HOST,ALWAYS,PKI_011.sh,Verrouillage Hermétique : Isolation et attribution des droits au groupe partagé,PKI_CLEAN_OK,PKI_CRYPTO_ARMED
 ES_001,WEF_ES_BLD_OSUPDATE,ELK_HOST,ALWAYS,ES_001.sh,Terrassement : Mise à jour OS Oracle Linux 8.10,PKI_CRYPTO_ARMED,ES_OS_UPDATED
 ES_B001_RAM_CHECK,WEF_ES_BLD_MINRAMVERIFY,ELK_HOST,ALWAYS,ES_B001_RAM_CHECK.sh,Contrôle Capacitaire : Vérification du seuil minimal de mémoire physique,ES_OS_UPDATED,ES_RAM_CONFIRMED
-ES_002,WEF_ES_BLD_OSLIMIT,ELK_HOST,ALWAYS,ES_002.sh,Durcissement : Fixation définitive ulimit -n 65536 et memlock unlimited,ES_RAM_CONFIRMED,ES_LIMITS_OK
+ES_B001B_CPU_CHECK,WEF_ES_BLD_MINVCPUVERIFY,ELK_HOST,ALWAYS,ES_B001B_CPU_CHECK.sh,Contrôle Capacitaire : Vérification du seuil minimal de cœurs processeur,ES_RAM_CONFIRMED,ES_CPU_CONFIRMED
+ES_002,WEF_ES_BLD_OSLIMIT,ELK_HOST,ALWAYS,ES_002.sh,Durcissement : Fixation définitive ulimit -n 65536 et memlock unlimited,ES_CPU_CONFIRMED,ES_LIMITS_OK
 ES_003,WEF_ES_BLD_OSSWPPNS,ELK_HOST,ALWAYS,ES_003.sh,Durcissement : Fixation stable de vm.swappiness=1,ES_LIMITS_OK,ES_SWAP_OK
 ES_004,WEF_ES_BLD_OSTHP,ELK_HOST,ALWAYS,ES_004.sh,Durcissement : Désactivation permanente des THP via rc.local,ES_SWAP_OK,ES_KERNEL_READY
 ES_005,WEF_ES_BLD_OSMAXMAP,ELK_HOST,ALWAYS,ES_005.sh,Durcissement : Augmentation vm.max_map_count à 262144,ES_KERNEL_READY,ES_MAP_COUNT_OK

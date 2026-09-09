@@ -64,21 +64,17 @@ Ouvre une nouvelle session (ou `source /etc/profile.d/wef-app-env.sh`),
 et **tout script du dépôt, où qu'il vive, devient appelable en un
 seul hop** — peu importe le répertoire courant :
 
-| Variable | Pointe vers | Exemple |
-|---|---|---|
-| `$APP_HOME` | racine du dépôt | `$APP_HOME/orchestrator.sh` |
-| `$APP_BIN` | `bin/` (12 outils d'action) | `$APP_BIN/order.sh <JOB_ID> "<raison>"` |
-| `$APP_CONF` | racine (`vars.conf`, `jobs_table.csv`, `secrets/`) | `cat $APP_CONF/vars.conf` |
-| `$APP_INF` | `setup/` (installateurs ponctuels) | `sudo $APP_INF/svc_orch.sh` |
-| `$APP_JOBS` | `jobs/` (275 scripts, un par job) | `cat $APP_JOBS/WAZ_048_SEED_INDEXER_LIVE.sh` |
-| `$APP_MNT` | `maintenance/` (diagnostic/purge) | `$APP_MNT/MNT_diagnostic.sh` |
+| Variable | Pointe vers | Pourquoi | Exemple |
+|---|---|---|---|
+| `$APP_HOME` | racine du dépôt | ancre de tout le reste (`orchestrator.sh`, `vars.conf`, `jobs_table.csv`, `secrets/`, `jobs/` via sous-chemin) | `$APP_HOME/orchestrator.sh` |
+| `$APP_BIN` | `bin/` (12 outils) | seuls scripts tapés au quotidien par un opérateur — raccourci dédié, le reste passe par `$APP_HOME/...` | `$APP_BIN/order.sh <JOB_ID> "<raison>"` |
+| `$APP_INF` | `setup/` (install + maintenance) | scripts d'admin système, jamais du pilotage de job (installation ponctuelle de service **et** diagnostic/purge, regroupés) | `sudo $APP_INF/svc_orch.sh` / `$APP_INF/MNT_diagnostic.sh` |
 
-`$APP_JOBS/*.sh` sont conçus pour être lancés par l'orchestrateur ou
-`bin/order.sh` (qui leur fournit le contexte `VARS_FILE` nécessaire),
-jamais exécutés seuls directement — `$APP_JOBS` sert surtout à les
-localiser/lire d'un seul hop. `$APP_MNT/*.sh` sont autonomes,
-directement exécutables. `jobs/lib/` et `lib/` (fonctions partagées,
-jamais exécutées seules) n'ont volontairement aucune variable dédiée.
+3 variables seulement (réduit depuis 6, volontairement — voir
+`vars.conf`) : `jobs/` reste joignable via `$APP_HOME/jobs/`, jamais de
+variable dédiée (ses scripts ne sont jamais lancés seuls, ils attendent
+`VARS_FILE` déjà exporté par l'orchestrateur ou `bin/order.sh`). Même
+raisonnement pour `jobs/lib/` et `lib/` (fonctions partagées).
 
 Relancez `setup/installer_env_cli.sh` après tout déplacement/re-clonage
 du dépôt sur une nouvelle machine.
@@ -133,14 +129,15 @@ bin/                            actions d'exploitation Control-M (hold.sh, free.
                                  notify.sh, profile.sh, audit.sh,
                                  reset_es_password.sh, resume.sh, summary.sh,
                                  dashboard.py)
-setup/                          installation ponctuelle (svc_orch.sh, svc_dash.sh,
-                                 installer_env_cli.sh) - jamais utilise au quotidien,
-                                 seulement a la mise en place
+setup/                          admin systeme, jamais du pilotage de job quotidien :
+                                 installation ponctuelle (svc_orch.sh, svc_dash.sh,
+                                 installer_env_cli.sh) + maintenance occasionnelle
+                                 (MNT_diagnostic.sh, MNT_purge_complete_reinstall.sh,
+                                 MNT_purge_rapide_disque.sh, MNT_purge_historique.sh)
 jobs/                          les scripts, un par job (jobs/lib/ = fonctions partagées)
 jobs_windows/                  kit PowerShell (agents Windows)
 lib/                            fonctions communes à l'orchestrateur
 templates/                      gabarits d'index (mappings Elasticsearch/OpenSearch)
-maintenance/                    scripts d'entretien (purge, diagnostic)
 secrets/                        secrets générés à l'exécution (vide au dépôt)
 docs/GUIDE_EXPLOITATION.md     mode d'emploi complet
 docs/TABLEAU_DE_BORD_EXPLOITATION.xlsx   classeur d'exploitation (commandes, Control-M)

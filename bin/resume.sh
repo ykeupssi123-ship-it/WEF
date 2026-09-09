@@ -34,7 +34,7 @@ if [ -n "${MIN_RAM_GB_REQUIRED:-}" ] && [ "$RAM_GB" -lt "$MIN_RAM_GB_REQUIRED" ]
   echo "ATTENTION : RAM detectee (${RAM_GB} Go) < seuil configure - ES_B001_RAM_CHECK va bloquer le deploiement."
 fi
 if [ -n "${MIN_DISK_FREE_PCT:-}" ] && [ "$DISK_PCT_FREE" -lt "$MIN_DISK_FREE_PCT" ]; then
-  echo "ATTENTION : disque libre (${DISK_PCT_FREE}%) < seuil configure - lancez d'abord maintenance/MNT_diagnostic.sh"
+  echo "ATTENTION : disque libre (${DISK_PCT_FREE}%) < seuil configure - lancez d'abord setup/MNT_diagnostic.sh"
 fi
 
 echo ""
@@ -78,7 +78,7 @@ if [ -n "$FOUND_PKG" ] && [ "$NB_OK" -eq 0 ]; then
   echo "l'orchestrateur croirait repartir de zero sur des paquets deja la,"
   echo "risque de configuration incoherente."
   echo ""
-  echo ">>> A FAIRE : ./maintenance/MNT_purge_complete_reinstall.sh"
+  echo ">>> A FAIRE : setup/MNT_purge_complete_reinstall.sh"
   echo "    puis relancez ce script."
 elif [ "$NB_OK" -eq 0 ]; then
   echo "Machine vierge (aucun paquet, aucun etat) : premier lancement ici."

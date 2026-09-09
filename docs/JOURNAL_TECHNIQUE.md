@@ -2340,3 +2340,18 @@ Cause reelle, jamais un bug de comptage : `WAZ_035A_PAUSE_DEP_JOBS` (job precede
 **Verifie** : contenu recoupe avec le code reel avant publication - `bin/notify.sh --test` (option confirmee presente), `jobs_windows/orchestrator_windows.ps1` (auto-localisation via `$MyInvocation.MyCommand.Path`, fonctionne quel que soit le repertoire d'appel), `AGENT_COMPONENTS` par defaut (`FILEBEAT,METRICBEAT,WAZUH_AGENT,HOSTNAME_RENAME`, corrige une premiere version incomplete de ce tableau avant publication), `DASHBOARD_PORT` (8088).
 
 **Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - a confirmer au prochain passage que chaque commande du guide fonctionne telle quelle une fois `setup/installer_env_cli.sh` actif.
+
+## 2026-09-09 (suite) - $APP_* ramene de 6 a 3 variables : maintenance/ fusionne dans setup/
+
+**Demande explicite** : "5 repertoires c'est beaucoup pour l'exploitation, arranger vous que l'on ait 3 justes et tres optimise" (6 en realite : APP_HOME/APP_BIN/APP_CONF/APP_INF/APP_JOBS/APP_MNT). Analyse avant simplification : `APP_CONF` etait deja un pur doublon d'`APP_HOME` (meme valeur exacte, aucune fonction distincte) - suppression immediate, gain net. `APP_JOBS` (jobs/) n'apportait de valeur reelle que pour LIRE un script, jamais pour le lancer seul (chaque job attend `$VARS_FILE` deja exporte) - repli naturel sur `$APP_HOME/jobs/`. `APP_INF` (setup/, installation ponctuelle) et `APP_MNT` (maintenance/, diagnostic/purge occasionnels) couvraient deux repertoires PHYSIQUEMENT distincts pour une seule et meme famille reelle : "scripts d'admin systeme, jamais du pilotage de job quotidien" - jamais de raison reelle de les separer.
+
+**Corrige structurellement (pas juste cache derriere moins de variables)** : `maintenance/` fusionne physiquement dans `setup/` (`git mv` sur les 4 scripts `MNT_*.sh`) - le dossier `maintenance/` disparait reellement, pas seulement sa variable. Resultat : exactement 3 variables, un role architectural distinct chacune, zero chevauchement :
+- `APP_HOME` = racine (ancre de tout ce qui n'a pas sa propre variable, `jobs/` inclus)
+- `APP_BIN` = `bin/` (seuls scripts qu'un operateur tape au quotidien)
+- `APP_INF` = `setup/` (admin systeme : installation ponctuelle + maintenance occasionnelle, desormais regroupes au meme endroit)
+
+**Propage partout** : `vars.conf` (definition + commentaire d'explication du choix, historique des 6 variables precedentes conserve pour memoire) ; `setup/installer_env_cli.sh` (exporte desormais 3 variables) ; `README.md` (tableau reduit a 3 lignes + colonne "Pourquoi") ; `docs/GUIDE_EXPLOITATION.md` (toutes les occurrences `$APP_CONF`/`$APP_JOBS`/`$APP_MNT` remplacees) ; toutes les references en dur a `maintenance/` corrigees en `setup/` (`orchestrator.sh`, `bin/resume.sh`, l'en-tete du script lui-meme).
+
+**Verifie** : `bash -n` propre sur les 8 fichiers `.sh` touches (`vars.conf`, `setup/installer_env_cli.sh`, `orchestrator.sh`, `bin/resume.sh`, les 4 `MNT_*.sh` deplaces) ; grep de controle final sans filtre d'extension : 0 reference residuelle a `maintenance/` ou aux 3 variables retirees (hors notes historiques volontaires dans ce journal et dans le commentaire d'explication de `vars.conf`) ; `git ls-files -s -- '*.sh'` confirme 0 fichier sans bit executable apres le deplacement.
+
+**Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - a confirmer au prochain `sudo setup/installer_env_cli.sh` + nouvelle session : `echo $APP_INF` doit pointer vers `setup/` et y trouver les 4 scripts `MNT_*.sh` en plus des 3 scripts d'installation.

@@ -8,7 +8,7 @@
 #
 # Appelee AUTOMATIQUEMENT au demarrage de chaque orchestrator.sh
 # (silencieuse, rapide) - reste aussi lancable seule a tout moment :
-#   ./maintenance/MNT_purge_historique.sh
+#   setup/MNT_purge_historique.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"

@@ -4,12 +4,11 @@
 # session CLI Linux, "$APP_BIN/order.sh <job> <raison>" et obtenir le
 # resultat voulu, peu importe ou le depot a ete clone).
 #
-# PROBLEME REEL : vars.conf definit deja APP_HOME/APP_BIN/APP_CONF/
-# APP_INF/APP_JOBS/APP_MNT (voir son en-tete), mais vars.conf n'est
-# source QUE par les scripts du projet eux-memes (orchestrator.sh,
-# jobs/*.sh, bin/*.sh) - jamais par un shell de connexion SSH ordinaire.
-# Sans ce script, ces variables restent invisibles a l'invite de
-# commande elle-meme.
+# PROBLEME REEL : vars.conf definit deja APP_HOME/APP_BIN/APP_INF (voir
+# son en-tete), mais vars.conf n'est source QUE par les scripts du
+# projet eux-memes (orchestrator.sh, jobs/*.sh, bin/*.sh) - jamais par
+# un shell de connexion SSH ordinaire. Sans ce script, ces variables
+# restent invisibles a l'invite de commande elle-meme.
 #
 # CORRECTIF : ce script ecrit un fichier dans /etc/profile.d/, charge
 # automatiquement par bash a CHAQUE connexion (interactive login shell)
@@ -49,10 +48,7 @@ cat > "$PROFILE_FILE" << ENVEOF
 # (relancez ce script si le depot WAZ_ELK_FACTORY est deplace/re-clone).
 export APP_HOME="${SCRIPT_DIR}"
 export APP_BIN="${SCRIPT_DIR}/bin"
-export APP_CONF="${SCRIPT_DIR}"
 export APP_INF="${SCRIPT_DIR}/setup"
-export APP_JOBS="${SCRIPT_DIR}/jobs"
-export APP_MNT="${SCRIPT_DIR}/maintenance"
 ENVEOF
 chmod 644 "$PROFILE_FILE"
 
@@ -62,5 +58,5 @@ echo "  source ${PROFILE_FILE}"
 echo "Verification :"
 echo "  echo \$APP_BIN   # doit afficher : ${SCRIPT_DIR}/bin"
 echo "  \$APP_BIN/order.sh <JOB_ID> \"<raison>\""
-echo "  \$APP_MNT/MNT_diagnostic.sh   # ex. : n'importe quel script maintenance/, meme principe"
+echo "  \$APP_INF/MNT_diagnostic.sh   # ex. : n'importe quel script d'admin (setup/), meme principe"
 exit 0

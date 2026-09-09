@@ -61,8 +61,8 @@ mkdir -p "$HISTORY_DIR"
 # JCL/mainframe. Retention pilotee par HISTORY_RETENTION_DAYS (vars.conf,
 # 7 jours par defaut en contexte demo). Silencieuse et rapide : ne doit
 # jamais bloquer le demarrage meme si le script est absent ou echoue.
-if [ -x "$SCRIPT_DIR/maintenance/MNT_purge_historique.sh" ]; then
-  "$SCRIPT_DIR/maintenance/MNT_purge_historique.sh" >> "$RUN_LOG" 2>&1 || true
+if [ -x "$SCRIPT_DIR/setup/MNT_purge_historique.sh" ]; then
+  "$SCRIPT_DIR/setup/MNT_purge_historique.sh" >> "$RUN_LOG" 2>&1 || true
 fi
 
 # ETAT VIVANT (EN_COURS), ajoute le 2026-08-12 : jusqu'ici, l'etat d'un

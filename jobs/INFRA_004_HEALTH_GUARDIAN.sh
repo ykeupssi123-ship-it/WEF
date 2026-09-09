@@ -68,7 +68,15 @@ fi
 
 DISK_PCT=\$(df --output=pcent / 2>/dev/null | tail -n1 | tr -dc '0-9')
 if [ -n "\$DISK_PCT" ] && [ "\$DISK_PCT" -ge 85 ]; then
-  logger -t wef-health-guardian "ALERTE : disque / a \${DISK_PCT}% d'utilisation."
+  # AJOUTE LE 2026-09-09 (incident reel : disque a 97%, plusieurs
+  # allers-retours necessaires ce jour-la pour identifier le vrai
+  # poste - /var/ossec/queue/vd/feed, 12 Go) avant de pouvoir agir.
+  # Le plus gros consommateur reel est desormais inclus directement
+  # dans l'alerte - jamais une action corrective automatique (voir
+  # en-tete de ce fichier), juste l'information immediatement
+  # exploitable au lieu de devoir la redemander.
+  TOP_CONSO=\$(du -x --max-depth=3 / 2>/dev/null | sort -rn | head -1 | awk '{printf "%.1fG %s", \$1/1048576, \$2}')
+  logger -t wef-health-guardian "ALERTE : disque / a \${DISK_PCT}% d'utilisation (plus gros poste : \${TOP_CONSO:-inconnu})."
 fi
 SCRIPTEOF
 chmod 755 "$CHECK_SCRIPT"

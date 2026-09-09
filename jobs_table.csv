@@ -1,4 +1,5 @@
 JOB_ID,JOB_NAME,JOB_ROLE,COMPONENT,SCRIPT_FILE,DESC,IN_COND,OUT_COND
+INFRA_002_RECLAIM_HOME,WEF_INFRA_BLD_RECLAIMHOME,ELK_HOST,ALWAYS,INFRA_002_RECLAIM_HOME.sh,Résilience : fusionne /home (quasi vide sur ce rôle) dans / avant toute installation - maximise l'espace disque réel disponible,NONE,HOME_RECLAIMED
 INFRA_001,WEF_INFRA_BLD_RENAMEELK,ELK_HOST,ALWAYS,INFRA_001.sh,[PROJET-SPECIFIQUE - SUPPRIMABLE] Renommage de la VM ELK_HOST avec un nom explicite,NONE,ELK_HOSTNAME_SET
 INFRA_003_DEVNULL_GUARDIAN,WEF_INFRA_BLD_DEVNULLGRD,ALL,ALWAYS,INFRA_003_DEVNULL_GUARDIAN.sh,Résilience : gardes permanentes contre la corruption récurrente de /dev/null (timer 3s) et le remplissage disque du cache CVE Vulnerability Detector (timer 60s),NONE,DEVNULL_GUARDIAN_OK
 INFRA_004_HEALTH_GUARDIAN,WEF_INFRA_RUN_HEALTHGRD,ALL,ALWAYS,INFRA_004_HEALTH_GUARDIAN.sh,Exploitation continue : contrôle de santé fonctionnelle toutes les 5 min (services/DNS/certificat PKI/disque),NONE,HEALTH_GUARDIAN_OK

@@ -2132,3 +2132,15 @@ ERREUR bulk (copie) : {'type': 'unavailable_shards_exception', 'reason': '[wazuh
 **Corrige** (`jobs/lib/cut_migrate.sh`) : le lot `_bulk` en echec est desormais rejoue automatiquement (6 tentatives, 5s d'ecart) - UNIQUEMENT si TOUTES les erreurs du lot sont bien du type transitoire `unavailable_shards_exception` (toute autre erreur reelle, mapping incompatible ou document malforme, remonte immediatement, jamais masquee). Rejouer le meme lot est sans risque : un `_bulk` de type "index" avec les memes `_id` source ecrase, ne duplique jamais.
 
 **Deblocage** : `bin/order_job.sh WAZ_035B_CUT_INDEXER_TO_ES` - source intacte, rejouable sans effet de bord.
+
+## 2026-09-09 (suite) - Anticiper plutot que reagir : le disque plein etait deja programme des l'installation
+
+**Demande explicite de l'utilisateur** : trop d'allers-retours manuels aujourd'hui pour le disque - anticiper ce probleme DANS les scripts orchestres, pour que le prochain deploiement depuis zero n'exige plus cette intervention.
+
+**Cause racine, trouvee en repartant du tout debut** (`pvs`/`vgs`/`lvs`, deja consultes plus tot le meme jour) : le groupe de volumes LVM etait deja rempli a 100% (`VFree=0`) DES L'INSTALLATION - 35,6 Go pour `/`, 17,4 Go pour `/home`, 6 Go de swap, sur un disque de 60 Go. Aucun kickstart ou script de partitionnement ne fait partie de ce depot (partitionnement automatique Anaconda, hors du controle de cette usine) - le disque etait donc programme pour se remplir des le depart, independamment de l'incident VD (Vulnerability Detector) de la journee.
+
+**Corrige** : nouveau job `INFRA_002_RECLAIM_HOME`, en tete de `jobs_table.csv` (avant meme `INFRA_001`) - fusionne `/home` dans `/` UNE FOIS, avant toute installation lourde. Jamais un nettoyage aveugle : verifie reellement que `/home` est quasi vide (< 50 Mo - le squelette par defaut, aucun utilisateur interactif reel sur ce role ou l'unique acces est root via SSH) avant de le toucher - si une vraie donnee y est trouvee, le job se contente de le signaler et n'agit pas. Sur cette VM, aurait porte `/` de 35,6 Go a plus de 53 Go des le premier boot - largement suffisant pour absorber la croissance du cache Vulnerability Detector rencontree ce jour (12 Go) sans jamais approcher le seuil watermark d'Elasticsearch.
+
+**Corrige egalement** (`INFRA_004_HEALTH_GUARDIAN`) : l'alerte disque (>=85%) inclut desormais directement le plus gros poste de consommation (`du` cible, uniquement declenche quand l'alerte est deja active - jamais en fonctionnement normal) - le prochain incident de ce type s'identifie en un seul log, sans avoir a redemander `du -xh --max-depth=1` manuellement comme aujourd'hui.
+
+**Limite honnete** : ce job corrige le disque APRES l'installation OS (schema de partitionnement existant, jamais modifie a la racine) - un futur choix de partitionnement plus genereux pour `/` des l'installation Oracle Linux (kickstart, ou partitionnement manuel a l'installation) resterait la solution la plus propre si un template VM est un jour prepare pour ce projet.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  WAZ_ELK_FACTORY (237 jobs) - ORCHESTRATEUR (ordonnanceur)
+#  WAZ_ELK_FACTORY (271 jobs) - ORCHESTRATEUR (ordonnanceur)
 #  Meme moteur que wazuh_factory_2/orchestrator.sh : lit jobs_table.csv,
 #  resout les dependances (IN_COND/OUT_COND) et execute les jobs un a
 #  un, dans l'ordre permis par les dependances.

@@ -2501,3 +2501,22 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **Verifie** : les 4 fichiers `.ps1` (nouveaux + modifie) parses sans erreur via `[System.Management.Automation.Language.Parser]::ParseFile` (equivalent `bash -n` pour PowerShell, verifie ici car aucun `pwsh`/`powershell.exe` d'execution reelle Windows-agent n'est disponible depuis cet environnement pour un test bout-en-bout).
 
 **Limite honnete, assumee explicitement dans le code** (`bin/monitor.ps1`) : contrairement au cote Linux, ce kit Windows ne pose aujourd'hui que des marqueurs `*.ok` (job termine) - aucun marqueur "en cours" (`*.running`), aucun etat "gele" (HELD/Free), aucun historique dure par job (`JOBS_HISTORY.csv`). Ces fonctionnalites n'ont jamais existe dans `orchestrator_windows.ps1` avant aujourd'hui et n'ont pas ete demandees explicitement pour Windows - non ajoutees ici pour rester proportionne a la demande reelle ("variables" + "tableau final"), plutot que d'inventer une parite complete non sollicitee. Egalement jamais teste en conditions reelles sur une vraie machine Windows a ce jour (aucun deploiement Windows reel encore effectue) - a verifier des le premier lancement reel, comme deja note pour `INFRA_006_AGENT_RESOURCE_CHECK` cote Linux.
+
+## 2026-09-09 (suite) - Premier lancement reel de `jobs_windows/env.ps1` : echec reel (droits registre) masque par un rapport de succes trompeur
+
+**Contexte** : premier test reel du kit Windows (entree precedente), sur une VM agent Windows fraichement clonee (`git clone` + `cd WEF\jobs_windows` + `.\env.ps1`), PowerShell **non-Administrateur**.
+
+**Echec reel observe** : `[Environment]::SetEnvironmentVariable("APP_HOME", ..., "Machine")` a leve `SecurityException` ("Acces au registre demande non autorise") - la portee `Machine` ecrit dans `HKLM`, reserve a une session elevee. Meme echec pour `APP_BIN`. **Mais le script a quand meme affiche "Variables ecrites (portee Machine)."** - aucune des deux exceptions n'a ete interceptee, PowerShell a simplement poursuivi a l'instruction suivante (comportement par defaut d'une exception levee par un appel de methode .NET hors `try/catch` : erreur terminale pour CETTE instruction seulement, pas pour le script). Un rapport de succes non verifie, exactement la classe d'erreur que ce projet a deja corrigee plusieurs fois cote Linux (PKI_003-009, dnf install ES_017/KB_005/LS_011/MB_016) : verifier l'etat REEL, jamais seulement l'absence de crash visible.
+
+**Cause racine, pas seulement contournee** : rien dans la conception de `env.ps1` ne justifiait la portee `Machine` - ces 2 variables ne sont lues par aucun service, uniquement par l'operateur humain dans ses propres commandes. Exiger une elevation Administrateur pour un simple confort operateur etait une contrainte non necessaire, source de cet echec reel des le premier essai.
+
+**Corrige (`jobs_windows/env.ps1`)** :
+1. Portee changee de `Machine` (HKLM, admin requis) a `User` (HKCU, jamais de droits speciaux) - persiste tout autant pour les commandes de cet operateur, plus besoin d'elevation.
+2. Chaque ecriture est desormais suivie d'une relecture reelle (`GetEnvironmentVariable`) avant d'annoncer un succes - un `SecurityException` (ou toute autre cause d'echec silencieux) fait desormais echouer le script visiblement (`exit 1`, message rouge), jamais un succes suppose.
+3. `docs/GUIDE_EXPLOITATION.md` : etape `env.ps1` ne demande plus PowerShell administrateur (uniquement le lancement de `orchestrator_windows.ps1` lui-meme le reste, pour l'installation reelle des services Wazuh/Filebeat/Metricbeat).
+
+**Verifie** : parse PowerShell propre (`ParseFile`, aucune erreur).
+
+**A faire sur la VM Windows** : `git pull` (ou re-cloner), puis relancer `.\env.ps1` en PowerShell normal (non-admin) depuis `WEF\jobs_windows`.
+
+**Limite honnete** : non re-teste en reel sur la VM au moment de ce correctif (correctif ecrit a partir du message d'erreur reel colle par l'operateur, jamais devine) - a confirmer au prochain lancement reel.

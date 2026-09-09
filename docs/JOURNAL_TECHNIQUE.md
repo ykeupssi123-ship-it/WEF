@@ -2308,3 +2308,17 @@ Cause reelle, jamais un bug de comptage : `WAZ_035A_PAUSE_DEP_JOBS` (job precede
 **Verifie** : `bash -n` propre sur tous les fichiers `.sh` modifies/crees (`orchestrator.sh`, `bin/summary.sh`, `setup/svc_orch.sh`, `setup/svc_dash.sh`, `setup/installer_env_cli.sh`, `ES_037.sh`, `ES_040.sh`, `LS_024.sh`, `WAZ_048/049`, `test_data_tools.sh`) ; `py_compile` propre sur le nouveau bloc Python `seed_test_alerts_live` ; `jobs_table.csv` verifie a 8 colonnes sur toutes les lignes ; grep de controle final sans filtre d'extension sur les anciens noms de service : 0 occurrence residuelle (hors note historique volontaire) ; `git ls-files -s -- '*.sh'` confirme 0 fichier sans bit executable (les 2 nouveaux jobs necessitaient un `git update-index --chmod=+x` explicite, meme limitation deja rencontree ce jour sur un depot Windows/Git Bash).
 
 **Limite honnete** : aucun de ces changements n'a ete teste en reel sur la VM (pas d'acces direct) - notamment `seed_test_alerts_live()` (insertion document par document avec `_refresh` a chaque fois - cout reseau/CPU par document jamais mesure en conditions reelles sur cette VM deja chargee) et le rollover ILM a seuil abaisse (jamais observe en direct que la demo se deroule comme prevu).
+
+## 2026-09-09 (suite) - Couverture $APP_* completee : APP_JOBS et APP_MNT, plus aucun dossier de scripts sans variable
+
+**Demande explicite** : "je dois etre capable d'appeler n'importe quel script a partir d'une variable de ce genre ($APP_BIN/orchestrator.sh ce n'est qu'une illustration)". `orchestrator.sh` est deja correctement joignable via `$APP_HOME/orchestrator.sh` (sa vraie place architecturale - jamais `bin/`, reserve aux outils d'action operateur) - mais audit systematique de CHAQUE dossier de scripts du depot (`ls -d */`, comptage reel) a trouve deux trous reels : `jobs/` (275 scripts, aucune variable) et `maintenance/` (4 scripts, aucune variable).
+
+**Corrige (`vars.conf`)** : deux nouvelles variables completant le schema existant - `APP_JOBS="${INSTALL_DIR}/jobs"`, `APP_MNT="${INSTALL_DIR}/maintenance"`. Exclusion deliberee, documentee : `jobs/lib/` et `lib/` (fonctions partagees, jamais executees seules - toujours "source"ees par un autre script) n'ont volontairement AUCUNE variable dediee, pour ne jamais laisser croire qu'on peut les lancer directement (ce qui echouerait toujours, ce sont des collections de fonctions bash, pas des points d'entree).
+
+**Nuance honnete documentee (README, cette meme entree)** : `$APP_JOBS/*.sh` ne sont PAS concus pour un lancement direct sans contexte - chaque job commence par `source "$VARS_FILE"`, une variable normalement exportee par `orchestrator.sh`/`bin/order.sh` AVANT de les invoquer. `$APP_JOBS` sert surtout a les localiser/lire en un seul saut (`cat $APP_JOBS/<JOB>.sh`), le lancement reel passe par `bin/order.sh`. `$APP_MNT/*.sh`, a l'inverse, sont autonomes (verifie : aucun ne source `$VARS_FILE`) - directement executables via `$APP_MNT/<script>.sh`.
+
+**Propage** : `setup/installer_env_cli.sh` exporte desormais les 6 variables (`APP_HOME`/`APP_BIN`/`APP_CONF`/`APP_INF`/`APP_JOBS`/`APP_MNT`) dans `/etc/profile.d/wef-app-env.sh`. `README.md` : tableau complet des 6 variables avec un exemple d'usage reel pour chacune, remplace l'ancienne liste prose partielle.
+
+**Verifie** : `bash -n` propre sur `vars.conf` et `setup/installer_env_cli.sh`.
+
+**Limite honnete** : non teste en reel sur la VM (pas d'acces direct) - a verifier au prochain `sudo setup/installer_env_cli.sh` + nouvelle session : `echo $APP_JOBS`, `echo $APP_MNT`.

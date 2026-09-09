@@ -54,26 +54,34 @@ française) :
 | Monitoring | `./bin/monitor.sh` |
 | Tableau de bord final (URLs/logins/scenarios) | `./bin/summary.sh` |
 
-### Depuis n'importe quel répertoire (`$APP_BIN`)
+### Depuis n'importe quel répertoire (`$APP_*`)
 
 Une seule fois par machine (root) :
 ```bash
 sudo setup/installer_env_cli.sh
 ```
 Ouvre une nouvelle session (ou `source /etc/profile.d/wef-app-env.sh`),
-et les variables `APP_HOME`/`APP_BIN`/`APP_CONF`/`APP_INF` sont
-disponibles dans toute session CLI, peu importe le répertoire courant :
+et **tout script du dépôt, où qu'il vive, devient appelable en un
+seul hop** — peu importe le répertoire courant :
 
-```bash
-$APP_BIN/order.sh <JOB_ID> "<raison>"
-$APP_BIN/hold.sh <JOB_ID> "<raison>"
-$APP_BIN/monitor.sh
-```
+| Variable | Pointe vers | Exemple |
+|---|---|---|
+| `$APP_HOME` | racine du dépôt | `$APP_HOME/orchestrator.sh` |
+| `$APP_BIN` | `bin/` (12 outils d'action) | `$APP_BIN/order.sh <JOB_ID> "<raison>"` |
+| `$APP_CONF` | racine (`vars.conf`, `jobs_table.csv`, `secrets/`) | `cat $APP_CONF/vars.conf` |
+| `$APP_INF` | `setup/` (installateurs ponctuels) | `sudo $APP_INF/svc_orch.sh` |
+| `$APP_JOBS` | `jobs/` (275 scripts, un par job) | `cat $APP_JOBS/WAZ_048_SEED_INDEXER_LIVE.sh` |
+| `$APP_MNT` | `maintenance/` (diagnostic/purge) | `$APP_MNT/MNT_diagnostic.sh` |
 
-`APP_BIN` = `bin/` (les 12 outils d'action), `APP_CONF` = racine du
-projet (`vars.conf`, `jobs_table.csv`, `secrets/`), `APP_INF` = `setup/`
-(installateurs ponctuels). Relancez `setup/installer_env_cli.sh` après
-tout déplacement/re-clonage du dépôt sur une nouvelle machine.
+`$APP_JOBS/*.sh` sont conçus pour être lancés par l'orchestrateur ou
+`bin/order.sh` (qui leur fournit le contexte `VARS_FILE` nécessaire),
+jamais exécutés seuls directement — `$APP_JOBS` sert surtout à les
+localiser/lire d'un seul hop. `$APP_MNT/*.sh` sont autonomes,
+directement exécutables. `jobs/lib/` et `lib/` (fonctions partagées,
+jamais exécutées seules) n'ont volontairement aucune variable dédiée.
+
+Relancez `setup/installer_env_cli.sh` après tout déplacement/re-clonage
+du dépôt sur une nouvelle machine.
 
 ## Topologie recommandée
 

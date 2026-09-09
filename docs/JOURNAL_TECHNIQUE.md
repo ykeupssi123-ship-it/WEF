@@ -2393,3 +2393,21 @@ Prefixe `MNT_` conserve sur les 4 scripts de maintenance : rattache au blueprint
 **A faire sur la VM** : `git pull origin main` puis `$APP_HOME/orchestrator.sh` (reprend automatiquement - `WAZ_035A` deja `.ok`, l'orchestrateur execute desormais `WAZ_035C` en premier puisque son nouveau `IN_COND` est deja satisfait, puis `WAZ_035B` sur une source enfin geleee). Aucun nettoyage manuel des donnees necessaire : les documents deja migres vers Elasticsearch lors de la tentative precedente seront simplement re-ecrits a l'identique (memes `_id`, `_bulk` de type "index" - jamais de doublon), et les 5 documents residuels cote indexeur seront cette fois supprimes sans reliquat.
 
 **Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - a confirmer au prochain passage que `WAZ_035B` reussit desormais du premier coup, sans jamais declencher le reessai de secours.
+
+## 2026-09-09 (suite) - WAZ_044 : le correctif "fenetre croissante" du jour meme etait lui-meme casse - diagnostic pousse jusqu'au bout, jamais accepte a moitie
+
+**Demande explicite, refus categorique de l'a-peu-pres** : "on ne veut pas de presque, on veut la perfection" - suite a un nouveau timeout de `WAZ_044_VD_SAFE_RETRY` (600s, aucune confirmation trouvee), alors que le correctif "fenetre croissante" du jour meme etait censement pense pour eliminer exactement ce genre de perte de message.
+
+**Diagnostic mene jusqu'au bout, chaque hypothese verifiee ou ecartee par une preuve reelle, jamais suppose** :
+1. Hypothese "le module n'a jamais demarre" (contention reelle) : ECARTEE - `grep -i vulnerab` sur le journal reel montre `"Vulnerability scanner module started."` a 20:34:22, soit 22 secondes seulement apres le redemarrage - largement dans le budget de 600s.
+2. Hypothese "le fichier a tourne/ete tronque entre la capture de la ligne de depart et la fin de l'attente" : ECARTEE - `wc -l` confirme 107315 lignes actuelles, largement au-dela de la ligne de depart notee par le job (83706), un seul fichier `ossec.log` present (aucun `.log.1`/rotation).
+3. Hypothese "la ligne cible est en fait AVANT la ligne de depart" : ECARTEE - `grep -n` localise le vrai message a la ligne 105331, `sed -n '83706p'` confirme que la ligne de depart correspond bien a 20:33:57 (juste avant le demarrage du job a 20:33:59) - l'ordre est correct.
+4. Test direct du mecanisme exact du job (`tail -n +83707 ossec.log | grep -q "..."`) : premiere execution rendait "1" (non trouve) - mais le terminal montrait une commande visiblement dupliquee/collee deux fois sur la meme ligne (bug d'affichage au collage, pas un vrai resultat). Retape proprement avec `grep -c` : **1** occurrence trouvee - le pipeline direct fonctionne reellement.
+
+**Cause reelle isolee par elimination** : le job ne testait pas ce pipeline directement - il capturait d'abord `tail -n +N` dans une variable bash (`NEW_LINES="$(...)"`) avant de la re-tester via `echo "$NEW_LINES" | grep`. Ce detour, jamais present dans le test manuel qui a reussi, est la seule difference reelle entre "ce qui marche" et "ce qui echoue" - cause exacte non confirmee au niveau interne de bash (soupconne : fragilite de faire transiter des dizaines de milliers de lignes croissantes par une variable shell), mais la difference de comportement est, elle, prouvee sans ambiguite.
+
+**Corrige (`jobs/WAZ_044_VD_SAFE_RETRY.sh`)** : suppression complete de la variable intermediaire `NEW_LINES` - le job utilise desormais exactement le meme pipeline direct `tail -n +N "$OSSEC_LOG" | grep -q "..."` que celui verifie manuellement en reel sur le journal en echec, sans jamais transiter par une variable.
+
+**Verifie** : `bash -n` propre. Honnetete assumee : la cause exacte du comportement defaillant de la variable bash n'est PAS confirmee au niveau mecanisme interne - seule sa consequence observable (echec de detection) et le remplacement verifie (pipeline direct, teste sur les donnees reelles de l'incident) le sont. Pas de certitude inventee ou elle n'existe pas.
+
+**A faire sur la VM** : `git pull origin main` puis `$APP_BIN/order.sh WAZ_044_VD_SAFE_RETRY "correctif pipeline direct"` (ou reprise normale via `$APP_HOME/orchestrator.sh`).

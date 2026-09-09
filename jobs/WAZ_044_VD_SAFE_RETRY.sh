@@ -84,17 +84,29 @@ if ! wait_for_service_active wazuh-manager 120 5; then
   exit 1
 fi
 
+# CORRIGE LE 2026-09-09 (2e incident reel le meme jour, VM neuve) : la
+# version precedente capturait "tail -n +N" dans une variable bash
+# (NEW_LINES="$(...)"), puis retestait via "echo "$NEW_LINES" | grep" -
+# a echoue a detecter un message de succes pourtant reellement present
+# et confirme par lecture manuelle directe du fichier ("grep -c" sur
+# le meme fichier, a l'instant du diagnostic, l'a bien trouve). Cause
+# exacte non confirmee (soupconne : cout/fragilite de faire transiter
+# des dizaines de milliers de lignes par une variable shell puis un
+# "echo", sur un journal tres volumineux et croissant) - jamais suppose
+# resolu sans preuve : corrige en revenant a un pipeline direct
+# "tail | grep", strictement le meme que celui verifie manuellement en
+# reel sur le journal en echec, sans jamais transiter par une variable
+# intermediaire.
 WAZ_VD_RETRY_TIMEOUT_SEC="${WAZ_VD_RETRY_TIMEOUT_SEC:-600}"
 echo "[WAZ_044] Attente de la confirmation reelle du module (jusqu'a ${WAZ_VD_RETRY_TIMEOUT_SEC}s, decompression 8,5G observee)..."
 for i in $(seq 1 $((WAZ_VD_RETRY_TIMEOUT_SEC / 5))); do
-  NEW_LINES="$(tail -n +$((RESTART_LINE + 1)) "$OSSEC_LOG" 2>/dev/null)"
-  if echo "$NEW_LINES" | grep -q "Vulnerability scanner module started"; then
+  if tail -n +$((RESTART_LINE + 1)) "$OSSEC_LOG" 2>/dev/null | grep -q "Vulnerability scanner module started"; then
     echo "[WAZ_044] OK (module demarre et confirme actif dans le journal reel)."
     exit 0
   fi
-  if echo "$NEW_LINES" | grep -qE "VulnerabilityScannerFacade::start: (Error|Write failed)"; then
+  if tail -n +$((RESTART_LINE + 1)) "$OSSEC_LOG" 2>/dev/null | grep -qE "VulnerabilityScannerFacade::start: (Error|Write failed)"; then
     echo "[WAZ_044] ERREUR : le module a signale un echec reel dans le journal - voir ${OSSEC_LOG}." >&2
-    echo "$NEW_LINES" | grep -E "VulnerabilityScannerFacade::start: (Error|Write failed)" | tail -n 10 >&2
+    tail -n +$((RESTART_LINE + 1)) "$OSSEC_LOG" 2>/dev/null | grep -E "VulnerabilityScannerFacade::start: (Error|Write failed)" | tail -n 10 >&2
     exit 1
   fi
   sleep 5

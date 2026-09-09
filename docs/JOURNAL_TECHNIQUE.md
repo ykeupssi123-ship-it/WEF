@@ -2178,3 +2178,27 @@ ERREUR bulk (copie) : {'type': 'unavailable_shards_exception', 'reason': '[wazuh
 **Verifie** : les 12 `git mv` confirmes via `git status --short` (12 lignes `R`, historique preserve) ; `bash -n setup/installer_env_cli.sh` propre ; grep de controle final sur les 12 anciens noms (`.sh`/`.py`/`.md`, hors `.git`) : 0 occurrence restante. `README.md` et la structure du depot documentes avec la nouvelle commande.
 
 **Limite honnete** : non teste en reel sur la VM (pas d'acces direct) - a verifier au prochain deploiement : `sudo setup/installer_env_cli.sh` puis nouvelle session puis `$APP_BIN/order.sh <JOB_ID> "<raison>"`.
+
+**Verifie en reel le jour meme** : `$APP_BIN`/`$APP_HOME` confirmes fonctionnels sur une VM neuve, y compris apres une reconnexion PuTTY complete (nouvelle session, `cd $APP_BIN` et `cd $APP_HOME` operationnels immediatement) - preuve que `/etc/profile.d/wef-app-env.sh` est bien charge automatiquement a la connexion.
+
+## 2026-09-09 (suite) - ES_017/KB_005/LS_011 : les 3 seuls jobs d'installation de paquet jamais corriges pour verifier dnf install
+
+**Incident reel, exactement celui deja signale par une etudiante** (voir `MNT_purge_complete_reinstall.sh`, correctif du 2026-09-04) : sur une VM neuve, `ES_021` (`WEF_ES_BLD_KSTINIT`) echoue avec `sudo: /usr/share/elasticsearch/bin/elasticsearch-keystore : commande introuvable`. Log reel :
+```
+[ES_021] Creation du keystore Elasticsearch (utilisateur elasticsearch)...
+sudo: /usr/share/elasticsearch/bin/elasticsearch-keystore : commande introuvable
+[ES_021] ERREUR : 'elasticsearch-keystore create' a rendu le code 1. Sortie ci-dessus.
+```
+Mais `ES_017` (`WEF_ES_BLD_BININST`, installation du paquet), 4 jobs plus tot dans la meme chaine, s'etait affiche `-> OK (ES_BIN_OK)` sans reserve.
+
+**Cause reelle, trouvee en relisant `ES_017.sh`** : `dnf install -y "$PKG_SPEC"` etait appele SANS jamais verifier son code de retour - exactement la meme classe de bug deja rencontree et corrigee ailleurs dans ce depot a plusieurs reprises (`ES_010`/`DNS_001_INSTALL` le 2026-08-19, `FB_004`/`MB_004`/`WAG_003` le 2026-08-31, `WAZ_010`/`WAZ_011`/`WAZ_012` le meme mois). Grep de controle sur tous les jobs appelant `dnf install`/`yum install` : **`ES_017.sh`, `KB_005.sh` et `LS_011.sh` etaient les 3 seuls survivants** n'ayant jamais recu ce correctif deja generalise partout ailleurs - un oubli reel, jamais un choix delibere (les 3 jobs sont structurellement identiques, meme gabarit copie/colle a l'origine).
+
+**Corrige (les 3 fichiers, meme idiome que `FB_004.sh`)** : code de sortie de `dnf install` desormais verifie ; en cas d'echec, un second essai automatique avec `--setopt=ip_resolve=4` (cas connu : IPv6 casse sur certains reseaux/hotspots, documente depuis `WAZ_010.sh`) ; si les deux echouent, le job s'arrete immediatement avec le vrai message `dnf` visible dans son propre log - plus jamais 4 jobs plus loin, sur un symptome sans lien evident avec la vraie cause. Ajout egalement d'une verification finale `rpm -q` (le paquet est-il VRAIMENT present, independamment du code de sortie de dnf) avant de declarer le job `OK`.
+
+**Non applique** : le contournement specifique `.build-id`/`rpm --replacefiles` de `WAZ_010.sh` (conflit de lien de debogage JVM entre wazuh-indexer et logstash) n'a pas ete reporte ici - c'est un cas particulier a cette paire de paquets precise, jamais observe ni justifie pour elasticsearch/kibana/logstash installes seuls.
+
+**Demande explicite de l'utilisateur** : "on relance tout a zero" - repartir d'un etat completement vierge sur cette VM, pas juste reprendre apres le point d'echec. Sequence donnee separement dans la conversation (jamais executee ici, aucun acces VM direct) : `./maintenance/MNT_purge_complete_reinstall.sh` (deja code, deja corrige le 2026-09-04 pour purger ELK ET Wazuh) puis `rm -rf state logs` (efface tous les marqueurs `.ok` de l'orchestrateur, deja le chemin documente par `bin/resume.sh` pour repartir a zero) puis `./orchestrator.sh`.
+
+**Verifie** : `bash -n` propre sur les 3 fichiers modifies.
+
+**Limite honnete** : non teste en reel sur la VM (pas d'acces direct) - la cause racine exacte du premier echec `dnf install` (reseau/DNS/depot/GPG) n'a jamais ete confirmee par une commande reelle (`rpm -qa`, sortie brute de `dnf`) avant ce correctif ; la correction s'appuie sur le pattern d'echec deja prouve identique ailleurs dans ce meme depot (echec silencieux + symptome retarde), pas sur un diagnostic direct de cette VM precise.

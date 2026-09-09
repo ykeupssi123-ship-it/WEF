@@ -1,5 +1,5 @@
 #!/bin/bash
-# reprise_deploiement.sh - AIDE A LA DECISION avant de (re)lancer
+# resume.sh - AIDE A LA DECISION avant de (re)lancer
 # orchestrator.sh sur une machine. Repond a la question qui revient a
 # chaque nouvelle machine : "je fais quoi maintenant, je desinstalle ou
 # je relance juste ?" - en lisant l'etat REEL de la machine au lieu de

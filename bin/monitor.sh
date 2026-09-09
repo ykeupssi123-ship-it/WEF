@@ -1,5 +1,5 @@
 #!/bin/bash
-# bin/monitoring.sh - Etat VIVANT de l'orchestrateur, du job en cours (avec
+# bin/monitor.sh - Etat VIVANT de l'orchestrateur, du job en cours (avec
 # detection de retard SLA), des jobs EN ATTENTE et des jobs GELES,
 # ajoute le 2026-08-12. Equivalent fonctionnel du statut EXECUTING/
 # ACTIVE (job en cours), WAITING (bloque sur dependance) et HELD (gele
@@ -14,7 +14,7 @@
 # annoncee comme "en cours".
 #
 # Usage :
-#   ./bin/monitoring.sh
+#   ./bin/monitor.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
@@ -81,7 +81,7 @@ if [ -d "$RUNNING_DIR" ]; then
     else
       echo "$BASENAME ($JNAME) : MARQUEUR PERIME (PID $JPID introuvable, demarre le $JTS)"
       echo "  -> execution interrompue brutalement. Dernier resultat connu :"
-      echo "     ./bin/view_history.sh $BASENAME"
+      echo "     ./bin/history.sh $BASENAME"
     fi
   done
 fi
@@ -105,7 +105,7 @@ if [ $HELD_FOUND -eq 0 ]; then
   echo "(aucun job gele actuellement)"
 else
   echo ""
-  echo "Pour liberer un job gele : ./bin/free_job.sh <JOB_ID>"
+  echo "Pour liberer un job gele : ./bin/free.sh <JOB_ID>"
 fi
 
 echo ""
@@ -141,6 +141,6 @@ if [ $WAITING_FOUND -eq 0 ]; then
 else
   echo ""
   echo "Pour forcer manuellement un de ces jobs malgre la dependance"
-  echo "manquante (equivalent 'Force Start' Control-M) : ./bin/order_job.sh <JOB_ID>"
+  echo "manquante (equivalent 'Force Start' Control-M) : ./bin/order.sh <JOB_ID>"
 fi
 echo "=================================================="

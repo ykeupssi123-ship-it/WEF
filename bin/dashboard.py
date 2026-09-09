@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-tableau_de_bord.py - AJOUTE LE 2026-08-20
+dashboard.py - AJOUTE LE 2026-08-20
 
 Tableau de bord visuel de l'orchestrateur WAZ_ELK_FACTORY, dans l'esprit
 d'un ecran de "Monitoring Domain" BMC Control-M : une toile de
@@ -24,11 +24,11 @@ projet, donc pas de distinction "attend son heure" vs "attend une
 dependance") :
   GRIS   = EN ATTENTE   (dependance(s) non encore satisfaite(s))
   JAUNE  = EN COURS      (marqueur state/RUNNING/<JOB_ID>.running present)
-  ORANGE = GELE (HELD)   (gel manuel operateur, ./bin/hold_job.sh)
+  ORANGE = GELE (HELD)   (gel manuel operateur, ./bin/hold.sh)
   VERT   = TERMINE OK    (marqueur state/<OUT_COND>.ok present)
   ROUGE  = ECHEC         (derniere execution ECHEC/FORCE_ECHEC, pas encore OK)
 
-Usage direct (test/debug) :  python3 tableau_de_bord.py
+Usage direct (test/debug) :  python3 dashboard.py
 Usage normal : voir installer_service_tableau_de_bord.sh (installe comme
 service systemd, ouvre le port dans firewalld, demarre au boot).
 """

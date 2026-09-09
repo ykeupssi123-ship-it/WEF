@@ -12,7 +12,7 @@
 # deploiement anterieur sur la meme machine (le mot de passe REEL du
 # cluster reste alors celui de ce premier bootstrap, quoi que ce job
 # ecrive ici). Si ES_027/es_admin_curl detectent une desynchronisation,
-# reinitialiser_mdp_elastic.sh est le SEUL point sanctionne pour la
+# reset_es_password.sh est le SEUL point sanctionne pour la
 # corriger (jamais ce job, jamais une commande manuelle isolee).
 set -uo pipefail
 source "$VARS_FILE"
@@ -50,14 +50,14 @@ ADD_CODE=$?
 # keystore ... because this incurs changing the file owner"). C'est
 # EXACTEMENT le scenario deja documente en tete de ce fichier
 # ("LIMITE CONNUE") : bootstrap.password est de toute facon inoperant
-# sur un cluster deja initialise, et es_admin_curl/reinitialiser_mdp_elastic.sh
+# sur un cluster deja initialise, et es_admin_curl/reset_es_password.sh
 # est deja le point sanctionne qui rattrape une desynchronisation reelle
 # a l'usage - donc PAS bloquant pour la suite de la chaine. On distingue
 # desormais ce cas precis (avertissement, on continue) de tout autre
 # echec inattendu (erreur dure, jamais silencieuse).
 if [ "$ADD_CODE" -ne 0 ] && echo "$ADD_OUT" | grep -q "changing the file owner"; then
   echo "[ES_022] AVERTISSEMENT : elasticsearch-keystore refuse d'ecrire (code $ADD_CODE, keystore deja proprietaire de l'utilisateur elasticsearch - dossier de donnees survivant d'un deploiement anterieur, voir LIMITE CONNUE en tete de ce fichier)."
-  echo "[ES_022] Non bloquant : es_admin_curl/reinitialiser_mdp_elastic.sh rattraperont une eventuelle desynchronisation reelle au premier appel admin."
+  echo "[ES_022] Non bloquant : es_admin_curl/reset_es_password.sh rattraperont une eventuelle desynchronisation reelle au premier appel admin."
   echo "[ES_022] OK (avec avertissement)."
   exit 0
 fi

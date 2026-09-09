@@ -12,7 +12,7 @@
 # monolithique (conserve dans l'historique git).
 #
 # UTILISATION MANUELLE :
-#   ./bin/order_job.sh WAZ_039_WAZUH_TRIGGER "raison" && ./orchestrator.sh
+#   ./bin/order.sh WAZ_039_WAZUH_TRIGGER "raison" && ./orchestrator.sh
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

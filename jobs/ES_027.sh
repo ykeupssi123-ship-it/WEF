@@ -28,7 +28,7 @@ fi
 #
 # Verification reelle desormais, via es_admin_curl qui resynchronise
 # automatiquement le mot de passe si necessaire (voir
-# jobs/lib/es_admin_curl.sh et reinitialiser_mdp_elastic.sh, seul point
+# jobs/lib/es_admin_curl.sh et reset_es_password.sh, seul point
 # sanctionne pour toucher ce mot de passe) - la desynchronisation est
 # ainsi detectee ET reparee ICI, tout de suite, plutot que de ressurgir
 # plus loin dans la chaine.

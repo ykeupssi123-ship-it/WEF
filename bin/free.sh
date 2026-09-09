@@ -1,9 +1,9 @@
 #!/bin/bash
-# bin/free_job.sh - Leve le gel manuel (HELD) d'un job, ajoute le
-# 2026-08-12. Voir bin/hold_job.sh.
+# bin/free.sh - Leve le gel manuel (HELD) d'un job, ajoute le
+# 2026-08-12. Voir bin/hold.sh.
 #
 # Usage :
-#   ./bin/free_job.sh <JOB_ID>
+#   ./bin/free.sh <JOB_ID>
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
@@ -12,7 +12,7 @@ source "$HERE/lib/commun.sh"
 
 JOB_ID="${1:-}"
 if [ -z "$JOB_ID" ]; then
-  echo "Usage : ./bin/free_job.sh <JOB_ID>"
+  echo "Usage : ./bin/free.sh <JOB_ID>"
   exit 1
 fi
 

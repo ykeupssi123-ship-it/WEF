@@ -1,5 +1,5 @@
 #!/bin/bash
-# notifier.sh - Alerte par email sur echec de job, ajoute le 2026-08-12.
+# notify.sh - Alerte par email sur echec de job, ajoute le 2026-08-12.
 # Le plus gros manque reel face a un centre d'exploitation 24/7 vecu
 # sur ce projet : sans ca, un job qui echoue ne fait qu'ecrire un log -
 # personne n'est prevenu tant qu'un humain ne va pas le lire.
@@ -18,11 +18,11 @@
 # le vrai mot de passe lui-meme n'est inclus dans une archive livree.
 #
 # Usage :
-#   ./notifier.sh --test
+#   ./notify.sh --test
 #     -> envoie un email de test, pour valider la configuration une
 #        fois, independamment de tout echec reel.
-#   ./notifier.sh <JOB_ID> <JOB_NAME> <RESULTAT> <LOG_FILE>
-#     -> appele automatiquement par orchestrator.sh/bin/order_job.sh sur
+#   ./notify.sh <JOB_ID> <JOB_NAME> <RESULTAT> <LOG_FILE>
+#     -> appele automatiquement par orchestrator.sh/bin/order.sh sur
 #        un echec. Peut aussi etre appele a la main.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -105,7 +105,7 @@ send_mail(){
 if [ "${1:-}" = "--test" ]; then
   echo "[notifier] Envoi d'un email de test a ${NOTIF_TO} via ${SMTP_HOST}:${SMTP_PORT}..."
   if send_mail "[WAZ_ELK_FACTORY] Test de notification" \
-    "Ceci est un email de test envoye par notifier.sh --test le $(date -Iseconds).
+    "Ceci est un email de test envoye par notify.sh --test le $(date -Iseconds).
 Si vous recevez ceci, la configuration SMTP (vars.conf) est correcte."; then
     echo "[notifier] Email de test envoye avec succes."
     exit 0
@@ -120,8 +120,8 @@ JOB_NAME="${2:-}"
 RESULTAT="${3:-}"
 LOG_FILE="${4:-}"
 if [ -z "$JOB_ID" ]; then
-  echo "Usage : ./notifier.sh --test"
-  echo "        ./notifier.sh <JOB_ID> <JOB_NAME> <RESULTAT> <LOG_FILE>"
+  echo "Usage : ./notify.sh --test"
+  echo "        ./notify.sh <JOB_ID> <JOB_NAME> <RESULTAT> <LOG_FILE>"
   exit 1
 fi
 
@@ -135,8 +135,8 @@ LOG       : ${LOG_FILE}
 Date      : $(date -Iseconds)
 
 Consultez :
-  ./bin/view_history.sh ${JOB_ID}
-  ./bin/monitoring.sh
+  ./bin/history.sh ${JOB_ID}
+  ./bin/monitor.sh
   cat ${LOG_FILE}"
 
 echo "[notifier] Envoi de l'alerte pour $JOB_ID..."

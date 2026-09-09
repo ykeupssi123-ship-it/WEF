@@ -1,5 +1,5 @@
 #!/bin/bash
-# operator_profile.sh - Vocabulaire operateur court, ajoute le 2026-08-14.
+# profile.sh - Vocabulaire operateur court, ajoute le 2026-08-14.
 #
 # PRINCIPE (observe en centre de production bancaire reel, pilotage
 # multi-filiales) : un operateur ne tape jamais un chemin complet a la
@@ -9,9 +9,9 @@
 # humain retient un vocabulaire fixe, pas une variante par machine.
 #
 # A SOURCER (jamais a executer directement) dans le shell de l'operateur :
-#   . /chemin/vers/wazuh_factory_3/operator_profile.sh
+#   . /chemin/vers/wazuh_factory_3/profile.sh
 # Pour l'avoir a chaque connexion, une seule fois :
-#   echo '. /chemin/vers/wazuh_factory_3/operator_profile.sh' >> ~/.bashrc
+#   echo '. /chemin/vers/wazuh_factory_3/profile.sh' >> ~/.bashrc
 #
 # ADAPTATION A LA NOMENCLATURE D'UN CLIENT : voir le bloc "VOCABULAIRE
 # OPERATEUR" plus bas - c'est le SEUL endroit de tout le projet a modifier.
@@ -62,29 +62,29 @@ kburl(){
 }
 
 wstat(){
-  "${WEF_HOME}/bin/monitoring.sh"
+  "${WEF_HOME}/bin/monitor.sh"
 }
 
 wlog(){
-  "${WEF_HOME}/bin/view_history.sh" "$@"
+  "${WEF_HOME}/bin/history.sh" "$@"
 }
 
 # Ajoute le 2026-08-14, suite a un incident reel pre-demo (mot de passe
 # 'elastic' desynchronise entre le cluster et state/es_bootstrap_password.secret).
 # Seul point sanctionne pour reinitialiser ce mot de passe - voir
-# reinitialiser_mdp_elastic.sh pour le detail (verification automatique
+# reset_es_password.sh pour le detail (verification automatique
 # incluse, jamais suppose que ca a fonctionne).
 wpwreset(){
-  "${WEF_HOME}/reinitialiser_mdp_elastic.sh"
+  "${WEF_HOME}/reset_es_password.sh"
 }
 
 # Ajoute le 2026-08-14, suite a une demande reelle de l'operateur (VM1) :
 # marquer un job comme deja satisfait SANS l'executer, sans bloquer tout
 # ce qui en depend (contrairement a un gel HELD). Voir
-# bin/set_to_ok.sh pour le detail (raison obligatoire, confirmation,
+# bin/confirm.sh pour le detail (raison obligatoire, confirmation,
 # trace distincte MARQUE_FAIT jamais confondue avec une execution reelle).
 wskip(){
-  "${WEF_HOME}/bin/set_to_ok.sh" "$@"
+  "${WEF_HOME}/bin/confirm.sh" "$@"
 }
 
 # =====================================================================

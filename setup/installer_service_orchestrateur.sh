@@ -33,8 +33,8 @@
 # n'a plus AUCUN effet sur lui : il continue de tourner et de progresser
 # dans jobs_table.csv exactement comme avant, que quelqu'un soit
 # connecte pour le regarder ou non. On se reconnecte simplement ensuite
-# pour consulter son etat (systemctl status / journalctl / bin/monitoring.sh
-# / bin/view_history.sh - tous continuent de fonctionner normalement).
+# pour consulter son etat (systemctl status / journalctl / bin/monitor.sh
+# / bin/history.sh - tous continuent de fonctionner normalement).
 #
 # A LANCER UNE SEULE FOIS (racine, root) - idempotent, peut etre relance
 # sans risque si le chemin d'installation change (ex: migration future
@@ -144,6 +144,6 @@ echo "Pour suivre en direct (facultatif, n'affecte pas l'execution) :"
 echo "  journalctl -u wef-orchestrateur -f"
 echo "Pour verifier l'issue apres coup (meme apres une reconnexion) :"
 echo "  systemctl status wef-orchestrateur"
-echo "  ./bin/monitoring.sh"
-echo "  ./bin/view_history.sh <JOB_ID>"
+echo "  ./bin/monitor.sh"
+echo "  ./bin/history.sh <JOB_ID>"
 exit 0

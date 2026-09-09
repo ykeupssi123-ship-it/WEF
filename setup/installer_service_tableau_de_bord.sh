@@ -1,7 +1,7 @@
 #!/bin/bash
 # installer_service_tableau_de_bord.sh - AJOUTE LE 2026-08-20
 #
-# Installe tableau_de_bord.py (toile de dependances live, esprit BMC
+# Installe dashboard.py (toile de dependances live, esprit BMC
 # Control-M - voir l'en-tete de ce fichier pour le detail complet) comme
 # service systemd permanent, et ouvre son port dans firewalld.
 #
@@ -39,7 +39,7 @@ fi
 # vit desormais dans setup/, jamais a la racine - SCRIPT_DIR doit
 # remonter d'un niveau pour continuer a designer la racine reelle
 # (vars.conf y reste), BIN_DIR pointe separement vers bin/ (nouvel
-# emplacement de tableau_de_bord.py).
+# emplacement de dashboard.py).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
 export VARS_FILE="$SCRIPT_DIR/vars.conf"
@@ -47,10 +47,10 @@ source "$VARS_FILE"
 DASHBOARD_PORT="${DASHBOARD_PORT:-8088}"
 UNIT_PATH="/etc/systemd/system/wef-tableau-de-bord.service"
 
-echo "[installer_service_tableau_de_bord] Installation du service pour : ${BIN_DIR}/tableau_de_bord.py (port ${DASHBOARD_PORT})"
+echo "[installer_service_tableau_de_bord] Installation du service pour : ${BIN_DIR}/dashboard.py (port ${DASHBOARD_PORT})"
 
-if [ ! -f "${BIN_DIR}/tableau_de_bord.py" ]; then
-  echo "ERREUR : ${BIN_DIR}/tableau_de_bord.py introuvable." >&2
+if [ ! -f "${BIN_DIR}/dashboard.py" ]; then
+  echo "ERREUR : ${BIN_DIR}/dashboard.py introuvable." >&2
   exit 1
 fi
 
@@ -79,7 +79,7 @@ After=multi-user.target
 [Service]
 Type=simple
 WorkingDirectory=${SCRIPT_DIR}
-ExecStart=/usr/bin/python3 ${BIN_DIR}/tableau_de_bord.py
+ExecStart=/usr/bin/python3 ${BIN_DIR}/dashboard.py
 Restart=on-failure
 RestartSec=5
 User=root

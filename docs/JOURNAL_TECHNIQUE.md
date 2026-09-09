@@ -13,8 +13,8 @@
 > - c'était exact et vrai au moment de chaque incident decrit, jamais
 > corrigé après coup pour rester un compte-rendu fidèle. Depuis cette date,
 > ces outils vivent dans `bin/` sous leur vrai nom Control-M
-> (`bin/order_job.sh`, `bin/hold_job.sh`, `bin/free_job.sh`,
-> `bin/set_to_ok.sh`, `bin/view_history.sh`, `bin/monitoring.sh`) - voir
+> (`bin/order.sh`, `bin/hold.sh`, `bin/free.sh`,
+> `bin/confirm.sh`, `bin/history.sh`, `bin/monitor.sh`) - voir
 > `README.md` pour la table de correspondance complète et le diagnostic de
 > cette réorganisation.
 
@@ -201,9 +201,9 @@ par la commande `chmod +x *.sh jobs/*.sh` ci-dessous.
 la commande etait auparavant `chmod +x orchestrator.sh jobs/*.sh` -
 elle ne couvrait que `orchestrator.sh` a la racine, oubliant les
 autres scripts racine executes directement par l'operateur ou par
-orchestrator.sh lui-meme (`notifier.sh`, `statut_live.sh`,
-`historique_job.sh`, `reprise_deploiement.sh`...). Consequence reelle
-observee : `./notifier.sh --test` a echoue avec "Permission non
+orchestrator.sh lui-meme (`notify.sh`, `statut_live.sh`,
+`historique_job.sh`, `resume.sh`...). Consequence reelle
+observee : `./notify.sh --test` a echoue avec "Permission non
 accordee" juste apres un clone frais. Corrige en `chmod +x *.sh
 jobs/*.sh`, qui couvre tous les scripts racine en plus de `jobs/`.
 
@@ -452,7 +452,7 @@ executant `orchestrator.sh` pour de vrai sur une VM Oracle Linux :
    sans jamais exiger de commandes tapees a la main sur une machine
    client.
 
-## Reinitialisation du mot de passe `elastic` (`reinitialiser_mdp_elastic.sh`)
+## Reinitialisation du mot de passe `elastic` (`reset_es_password.sh`)
 
 Ajoute le 2026-08-14 suite a l'incident 9 ci-dessus. Avant ce script, la
 reparation d'un mot de passe `elastic` desynchronise exigeait une
@@ -461,14 +461,14 @@ puis recopier la valeur au bon endroit, avec les bons droits) - source
 d'erreur reelle et rien de reproductible a documenter pour un client.
 Desormais :
 
-- **Un seul point d'entree sanctionne** : `./reinitialiser_mdp_elastic.sh`
-  (ou `wpwreset` via `operator_profile.sh`). Aucune autre procedure ne
+- **Un seul point d'entree sanctionne** : `./reset_es_password.sh`
+  (ou `wpwreset` via `profile.sh`). Aucune autre procedure ne
   doit etre utilisee pour toucher ce mot de passe.
 - **Une seule reference** : `state/es_bootstrap_password.secret` reste LA
   valeur canonique - le script l'ecrase avec la nouvelle valeur et
   personne d'autre n'a besoin d'etre mis a jour a la main. Tout ce qui
   consomme ce mot de passe (`es_admin_curl`, `escreds` dans
-  `operator_profile.sh`) le relit directement depuis ce fichier a chaque
+  `profile.sh`) le relit directement depuis ce fichier a chaque
   usage, jamais une copie mise en cache ailleurs.
 - **Verification systematique** : le script ne se contente jamais de
   supposer que la reinitialisation a fonctionne - il fait immediatement
@@ -735,7 +735,7 @@ Desormais :
     involontaire. C'est exactement le scenario deja documente en tete
     d'`ES_022.sh` sous "LIMITE CONNUE" : `bootstrap.password` est de
     toute facon inoperant sur un cluster deja initialise, et
-    `es_admin_curl`/`reinitialiser_mdp_elastic.sh` (incident 9) est deja
+    `es_admin_curl`/`reset_es_password.sh` (incident 9) est deja
     le point sanctionne qui rattrape une desynchronisation reelle a
     l'usage - donc non bloquant pour la suite. Avant le correctif de
     l'incident 17, cet echec passait deja inapercu a chaque run sur ce VM
@@ -1055,7 +1055,7 @@ maintenance (onglet `MAINTENANCE_MNT`, MNT_001-020, `ON_DEMAND (Human)`
 = commandes a taper a la main) mais rien ne l'executait vraiment.
 Desormais, sur chaque machine, en plus de `./orchestrator.sh` :
 
-- **`./reprise_deploiement.sh`** (a lancer AVANT `orchestrator.sh`, en
+- **`./resume.sh`** (a lancer AVANT `orchestrator.sh`, en
   cas de doute) : lecture seule, dit exactement quoi faire selon l'etat
   reel de la machine - premier lancement, reprise apres un arret,
   besoin de forcer la reapplication d'un nouveau heap JVM (les jobs
@@ -1110,7 +1110,7 @@ attendue (tolerance +/-20%) et les ecarts sont signales explicitement -
 utile pour verifier qu'un job cense tourner regulierement le fait
 vraiment, pas juste esperer que c'est le cas.
 
-`./rapport_audit.sh` donne la vue d'ensemble (tous les jobs ayant un
+`./audit.sh` donne la vue d'ensemble (tous les jobs ayant un
 historique, executions/OK/ECHEC/dernier statut) - `--echecs` filtre sur
 les jobs ayant eu au moins un echec.
 
@@ -1198,7 +1198,7 @@ que l'orchestrateur normal (log dedie dans `state/history/<JOB_ID>/`,
 marqueur EN_COURS pendant l'execution), mais est enregistree de facon
 INDELEBILE et DISTINCTE dans le registre : `FORCE_OK`/`FORCE_ECHEC`,
 jamais confondue avec `OK`/`ECHEC` d'une execution automatique -
-`historique_job.sh <JOB_ID> stats` et `rapport_audit.sh` comptent ces
+`historique_job.sh <JOB_ID> stats` et `audit.sh` comptent ces
 forcages dans les totaux de reussite/echec mais signalent toujours
 combien d'executions etaient des forcages manuels.
 
@@ -1207,7 +1207,7 @@ Teste : job inconnu (erreur propre), job deja termine avec succes
 rien dans le registre), et forcage reussi (script reellement execute
 malgre la dependance manquante, `.ok` cree, marqueur EN_COURS nettoye,
 ligne `FORCE_OK` dans le registre, bien comptabilisee par
-`historique_job.sh` et `rapport_audit.sh`).
+`historique_job.sh` et `audit.sh`).
 
 ## Gel manuel (HELD) - distinct d'une simple dependance non satisfaite
 
@@ -1265,7 +1265,7 @@ qu'aucune commande reelle n'a tourne pour ce job a ce moment precis. Le
 log dedie de cette "execution" ne contient donc pas de sortie de
 commande, seulement l'attestation d'audit (operateur, raison, horodatage).
 
-Raccourci une fois `operator_profile.sh` source : `wskip <JOB_ID>
+Raccourci une fois `profile.sh` source : `wskip <JOB_ID>
 "<raison>"`.
 
 Teste : marquage normal (marqueur `.ok` cree, trace `MARQUE_FAIT`
@@ -1336,12 +1336,12 @@ en tete du log dedie de CETTE execution (equivalent SYSOUT) - jamais
 dans le registre CSV, qui reste un simple index et pas un endroit ou
 stocker du texte libre pouvant contenir des virgules.
 
-## Alerte par email sur echec de job (notifier.sh)
+## Alerte par email sur echec de job (notify.sh)
 
 Ajoute le 2026-08-12. Le plus gros manque reel face a un centre
 d'exploitation 24/7 : sans ca, un job qui echoue ne fait qu'ecrire un
 log - personne n'est prevenu tant qu'un humain ne va pas le lire.
-`orchestrator.sh` et `forcer_job.sh` appellent desormais `notifier.sh`
+`orchestrator.sh` et `forcer_job.sh` appellent desormais `notify.sh`
 automatiquement sur tout echec.
 
 Implementation via `curl` en SMTP direct (`curl --url smtps://...`),
@@ -1389,8 +1389,8 @@ une injection via variable d'environnement au demarrage du processus).
 Le projet est concu pour que ce changement reste local et isole.
 Preuve verifiable, pas une simple affirmation : `SMTP_PASS_FILE`
 n'apparait que dans 2 fichiers de code sur tout le projet -
-`vars.conf` (ou il est defini) et `notifier.sh` (ou il est lu, une
-seule fois, `notifier.sh:55` : `SMTP_PASS="$(cat "$SMTP_PASS_FILE")"`)
+`vars.conf` (ou il est defini) et `notify.sh` (ou il est lu, une
+seule fois, `notify.sh:55` : `SMTP_PASS="$(cat "$SMTP_PASS_FILE")"`)
 - confirme par `grep -rn SMTP_PASS_FILE jobs/ lib/ orchestrator.sh`
 (aucun resultat). Basculer vers un vault ou une variable
 d'environnement se limite donc a remplacer cette seule ligne par
@@ -1398,7 +1398,7 @@ l'appel au coffre-fort ou une lecture de variable : aucun job, aucun
 autre script du projet ne reference ni ne suppose l'existence d'un
 fichier de mot de passe, donc aucune regression possible ailleurs.
 
-Test independant de toute panne reelle : `./notifier.sh --test`.
+Test independant de toute panne reelle : `./notify.sh --test`.
 
 Teste : desactive par defaut (aucune tentative), variables manquantes
 (erreur claire), fichier de mot de passe absent (erreur claire),
@@ -1413,7 +1413,7 @@ effectivement recu dans la boite Outlook.
 
 Question legitime posee par l'utilisateur : ce template est-il
 suffisant pour un autre fournisseur ? Reponse honnete - il y avait une
-vraie limite, corrigee le 2026-08-12. `notifier.sh` forcait au depart
+vraie limite, corrigee le 2026-08-12. `notify.sh` forcait au depart
 le mode TLS implicite (`smtps://`, adapte au port 465) quel que soit
 le port configure ; un fournisseur en STARTTLS (port 587) aurait
 echoue. Desormais, le mode est deduit automatiquement du port
@@ -1444,7 +1444,7 @@ implemente selon le mecanisme standard documente de curl et sa logique
 de selection de port est testee unitairement, mais n'a pas ete
 verifiee par un envoi reel de bout en bout dans cette session (aucun
 fournisseur STARTTLS n'etait disponible pour un test reel) - a
-confirmer avec un envoi `./notifier.sh --test` reel le jour ou un tel
+confirmer avec un envoi `./notify.sh --test` reel le jour ou un tel
 fournisseur est configure.
 
 ## Reutilisation pour la phase EXPLOITATION (au-dela du deploiement)
@@ -1503,7 +1503,7 @@ unique de correction, comportement garanti identique partout. Depuis le
 2026-08-14, `lib/commun.sh` porte aussi `local_pki_copy()` (voir section
 "Bugs trouves en DEPLOIEMENT REEL" plus haut).
 
-## Vocabulaire operateur (`operator_profile.sh`)
+## Vocabulaire operateur (`profile.sh`)
 
 Ajoute le 2026-08-14, a la demande de l'utilisateur qui a decrit une
 pratique reelle de centre de production bancaire multi-filiales
@@ -1517,11 +1517,11 @@ machine.
 **A sourcer** (jamais a executer directement) dans le shell de
 l'operateur :
 ```
-. /chemin/vers/wazuh_factory_3/operator_profile.sh
+. /chemin/vers/wazuh_factory_3/profile.sh
 ```
 Pour l'avoir a chaque connexion, une seule fois :
 ```
-echo '. /chemin/vers/wazuh_factory_3/operator_profile.sh' >> ~/.bashrc
+echo '. /chemin/vers/wazuh_factory_3/profile.sh' >> ~/.bashrc
 ```
 
 Six commandes, volontairement peu nombreuses (le principe observe est
@@ -1534,13 +1534,13 @@ justement de ne pas surcharger la memoire) :
 | `kburl` | Affiche l'URL Kibana |
 | `wstat` | Raccourci vers `./statut_live.sh` |
 | `wlog <JOB_ID>` | Raccourci vers `./historique_job.sh <JOB_ID>` |
-| `wpwreset` | Raccourci vers `./reinitialiser_mdp_elastic.sh` - seul point sanctionne pour reinitialiser le mot de passe `elastic` (voir section dediee) |
+| `wpwreset` | Raccourci vers `./reset_es_password.sh` - seul point sanctionne pour reinitialiser le mot de passe `elastic` (voir section dediee) |
 | `wskip <JOB_ID> "<raison>"` | Raccourci vers `./marquer_deja_fait.sh` - marque un job deja satisfait sans l'executer, sans bloquer ce qui en depend (voir section dediee) |
 
 **Adaptation a la nomenclature d'un client.** Un client peut deja avoir
 sa propre convention de nommage pour ce type d'outillage. Tout le
 vocabulaire est regroupe dans un seul bloc, clairement delimite, en bas
-de `operator_profile.sh` ("VOCABULAIRE OPERATEUR") - c'est le **seul**
+de `profile.sh` ("VOCABULAIRE OPERATEUR") - c'est le **seul**
 endroit de tout le projet a modifier pour renommer une commande (ex.
 `escreds` -> `dbconn`), sans toucher a aucun autre fichier ni casser
 quoi que ce soit ailleurs. S'il n'a pas de convention existante,
@@ -2068,7 +2068,7 @@ ERROR: The given user does not exist
 
 ## 2026-09-09 - Reorganisation : les gardes de resilience protegent desormais des le debut de la chaine, pas a la fin
 
-**Demande explicite** : suite a l'incident reel du jour (disque hote plein -> VM coupee -> /dev/null corrompu -> SSH inaccessible pendant plusieurs minutes, decouvert en plein milieu du deploiement) - reorganiser `jobs_table.csv` pour que les mecanismes de resilience protegent DES LE DEBUT, pas seulement une fois forces a la main (`bin/order_job.sh`) apres coup.
+**Demande explicite** : suite a l'incident reel du jour (disque hote plein -> VM coupee -> /dev/null corrompu -> SSH inaccessible pendant plusieurs minutes, decouvert en plein milieu du deploiement) - reorganiser `jobs_table.csv` pour que les mecanismes de resilience protegent DES LE DEBUT, pas seulement une fois forces a la main (`bin/order.sh`) apres coup.
 
 **Constat reel** : `INFRA_003_DEVNULL_GUARDIAN` (timer /dev/null 3s), `INFRA_004_HEALTH_GUARDIAN` (controle sante 5 min - services/DNS/certificat/disque), `INFRA_005_DISK_HYGIENE` (nettoyage + entretien hebdomadaire) et `INFRA_001` (renommage VM) etaient tous places aux lignes 255-259 d'un fichier de 271 lignes - soit apres environ 94% de la chaine complete (PKI, ES, LS, KB, WAZ_001 a WAZ_042+). Consequence directe : ces protections n'etaient actives QUE dans les tout derniers jobs d'un deploiement complet - zero protection pendant la quasi-totalite de la chaine, exactement le moment ou les operations les plus lourdes/instables se produisent (installations de paquets, redemarrages de services, le crash-test reseau WAZ_018_NET).
 
@@ -2111,7 +2111,7 @@ systemctl status wazuh-indexer --no-pager
 
 **Deblocage immediat verifie en reel** : `systemctl reset-failed wazuh-indexer && systemctl restart wazuh-indexer` - actif et repondant HTTP 401 en 15 secondes une fois la contention de demarrage a froid retombee (tous les autres services deja stables a ce moment).
 
-**Limite honnete restante** : le nouveau drop-in protege les FUTURS demarrages (prochain boot, prochain deploiement neuf) mais ne s'applique pas retroactivement sur une VM ou `WAZ_014` est deja `.ok` - a appliquer manuellement une fois sur les VM deja deployees (voir commande de deblocage ci-dessus + creation manuelle du drop-in), ou en rejouant `WAZ_014` via `bin/order_job.sh`.
+**Limite honnete restante** : le nouveau drop-in protege les FUTURS demarrages (prochain boot, prochain deploiement neuf) mais ne s'applique pas retroactivement sur une VM ou `WAZ_014` est deja `.ok` - a appliquer manuellement une fois sur les VM deja deployees (voir commande de deblocage ci-dessus + creation manuelle du drop-in), ou en rejouant `WAZ_014` via `bin/order.sh`.
 
 ## 2026-09-09 (suite) - WAZ_022 : le defaut Wazuh reel automatise, jamais un mot de passe invente
 
@@ -2131,7 +2131,7 @@ ERREUR bulk (copie) : {'type': 'unavailable_shards_exception', 'reason': '[wazuh
 
 **Corrige** (`jobs/lib/cut_migrate.sh`) : le lot `_bulk` en echec est desormais rejoue automatiquement (6 tentatives, 5s d'ecart) - UNIQUEMENT si TOUTES les erreurs du lot sont bien du type transitoire `unavailable_shards_exception` (toute autre erreur reelle, mapping incompatible ou document malforme, remonte immediatement, jamais masquee). Rejouer le meme lot est sans risque : un `_bulk` de type "index" avec les memes `_id` source ecrase, ne duplique jamais.
 
-**Deblocage** : `bin/order_job.sh WAZ_035B_CUT_INDEXER_TO_ES` - source intacte, rejouable sans effet de bord.
+**Deblocage** : `bin/order.sh WAZ_035B_CUT_INDEXER_TO_ES` - source intacte, rejouable sans effet de bord.
 
 ## 2026-09-09 (suite) - Anticiper plutot que reagir : le disque plein etait deja programme des l'installation
 
@@ -2158,3 +2158,23 @@ ERREUR bulk (copie) : {'type': 'unavailable_shards_exception', 'reason': '[wazuh
 ## 2026-09-09 (suite) - Revirement explicite : SKIP_JOBS repasse a ES_001 seul
 
 **Demande explicite, meme jour, apres reflexion** : "ne holder rien juste ES_001 qui fait l'update laisser les autres intact." L'extension de `SKIP_JOBS` aux 7 crash-tests (entree precedente, motivee par l'urgence d'une soutenance) est annulee - ces jobs redeviennent des executions reelles sur le prochain deploiement (nouvelle machine). Seul `ES_001` (mise a jour OS, decision anterieure et distincte) reste saute.
+
+## 2026-09-09 (suite) - $APP_BIN/$APP_CONF/$APP_INF : indirection CLI pour le futur redeploiement sur une nouvelle machine
+
+**Demande explicite** : pouvoir taper, depuis n'importe quel repertoire d'une session CLI Linux, `$APP_BIN/order.sh <job> <raison>` (et l'equivalent pour hold/free/confirm/history/monitor...) et obtenir directement le resultat voulu - conception explicitement deleguee ("utilisez votre jugeote et psyche INTJ + INFJ + ISTJ") apres confirmation que l'objectif exige un vrai renommage des outils, pas un simple alias vers les anciens noms.
+
+**Renommage reel effectue (`git mv`, historique preserve)**, les 12 outils de `bin/` passent a des noms courts, un seul verbe, sans prefixe/suffixe redondant (`order_job.sh` etait deja redondant avec son propre repertoire `bin/`) :
+`order_job.sh`->`order.sh`, `hold_job.sh`->`hold.sh`, `free_job.sh`->`free.sh`, `set_to_ok.sh`->`confirm.sh`, `view_history.sh`->`history.sh`, `monitoring.sh`->`monitor.sh`, `notifier.sh`->`notify.sh`, `operator_profile.sh`->`profile.sh`, `rapport_audit.sh`->`audit.sh`, `reinitialiser_mdp_elastic.sh`->`reset_es_password.sh`, `reprise_deploiement.sh`->`resume.sh`, `tableau_de_bord.py`->`dashboard.py`. Toutes les references croisees mises a jour dans le depot (35 occurrences reelles trouvees par grep avant renommage, 0 restante apres - verifie).
+
+**Architecture choisie (3 variables, sur le modele FHS/enterprise `/opt/<produit>/bin`, `/etc/<produit>`)** :
+- `APP_HOME` = racine reelle du depot (ou vivent `orchestrator.sh`, `vars.conf`, `jobs_table.csv`).
+- `APP_BIN` = `bin/` (les 12 outils d'action, renommes ci-dessus).
+- `APP_CONF` = `APP_HOME` lui-meme (`vars.conf`, `jobs_table.csv`, `secrets/`) - **choix deliberement conservateur** : deplacer physiquement ces fichiers dans un sous-dossier `conf/` casserait le mecanisme d'auto-localisation de `vars.conf` (`INSTALL_DIR` se deduit de l'emplacement REEL du fichier via `BASH_SOURCE`) et exigerait de corriger a la main une dizaine de points d'entree qui pointent aujourd'hui directement vers `$HERE/vars.conf` (`bin/*.sh`, `orchestrator.sh`) - risque reel juste avant un redeploiement sur une nouvelle machine, pour un gain seulement cosmetique. Ecarte consciemment, pas un oubli.
+- `APP_INF` = `setup/` (installateurs ponctuels : services systemd) - dossier deja existant, aucun fichier renomme dedans.
+- `jobs/` reste inchange (pas dans le perimetre de la demande - ce sont des scripts internes a l'orchestrateur, jamais invoques directement par un operateur).
+
+**Mecanisme reel (`vars.conf` seul ne suffit pas)** : les 4 variables sont definies dans `vars.conf` (pour les scripts qui le sourcent deja), mais `vars.conf` n'est JAMAIS source par un shell de connexion SSH ordinaire - seulement par les scripts du projet eux-memes. Sans rien d'autre, `$APP_BIN` resterait invisible a l'invite de commande. Nouveau script `setup/installer_env_cli.sh` (meme precedent que `installer_service_orchestrateur.sh`, meme jour de deploiement) : ecrit `/etc/profile.d/wef-app-env.sh`, charge automatiquement par bash a CHAQUE connexion de CHAQUE utilisateur - idempotent, a relancer une seule commande apres tout deplacement/re-clonage du depot (ecrase simplement l'ancien chemin par le nouveau).
+
+**Verifie** : les 12 `git mv` confirmes via `git status --short` (12 lignes `R`, historique preserve) ; `bash -n setup/installer_env_cli.sh` propre ; grep de controle final sur les 12 anciens noms (`.sh`/`.py`/`.md`, hors `.git`) : 0 occurrence restante. `README.md` et la structure du depot documentes avec la nouvelle commande.
+
+**Limite honnete** : non teste en reel sur la VM (pas d'acces direct) - a verifier au prochain deploiement : `sudo setup/installer_env_cli.sh` puis nouvelle session puis `$APP_BIN/order.sh <JOB_ID> "<raison>"`.

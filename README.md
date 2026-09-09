@@ -46,12 +46,33 @@ française) :
 
 | Action Control-M | Commande |
 |---|---|
-| Hold | `./bin/hold_job.sh <JOB_ID> "<raison>"` |
-| Free / Release | `./bin/free_job.sh <JOB_ID>` |
-| Order / Force | `./bin/order_job.sh <JOB_ID> "<raison>"` |
-| Set to OK | `./bin/set_to_ok.sh <JOB_ID> "<raison>"` |
-| View History | `./bin/view_history.sh <JOB_ID>` |
-| Monitoring | `./bin/monitoring.sh` |
+| Hold | `./bin/hold.sh <JOB_ID> "<raison>"` |
+| Free / Release | `./bin/free.sh <JOB_ID>` |
+| Order / Force | `./bin/order.sh <JOB_ID> "<raison>"` |
+| Set to OK | `./bin/confirm.sh <JOB_ID> "<raison>"` |
+| View History | `./bin/history.sh <JOB_ID>` |
+| Monitoring | `./bin/monitor.sh` |
+
+### Depuis n'importe quel répertoire (`$APP_BIN`)
+
+Une seule fois par machine (root) :
+```bash
+sudo setup/installer_env_cli.sh
+```
+Ouvre une nouvelle session (ou `source /etc/profile.d/wef-app-env.sh`),
+et les variables `APP_HOME`/`APP_BIN`/`APP_CONF`/`APP_INF` sont
+disponibles dans toute session CLI, peu importe le répertoire courant :
+
+```bash
+$APP_BIN/order.sh <JOB_ID> "<raison>"
+$APP_BIN/hold.sh <JOB_ID> "<raison>"
+$APP_BIN/monitor.sh
+```
+
+`APP_BIN` = `bin/` (les 12 outils d'action), `APP_CONF` = racine du
+projet (`vars.conf`, `jobs_table.csv`, `secrets/`), `APP_INF` = `setup/`
+(installateurs ponctuels). Relancez `setup/installer_env_cli.sh` après
+tout déplacement/re-clonage du dépôt sur une nouvelle machine.
 
 ## Topologie recommandée
 
@@ -98,13 +119,14 @@ devez en changer).
 orchestrator.sh              orchestrateur principal (Linux) - SEUL script a la racine
 jobs_table.csv                table des jobs (dépendances, description)
 vars.conf                       toute la configuration (aucune valeur en dur ailleurs)
-bin/                            actions d'exploitation Control-M (hold_job.sh, free_job.sh,
-                                 order_job.sh, set_to_ok.sh, view_history.sh, monitoring.sh,
-                                 notifier.sh, operator_profile.sh, rapport_audit.sh,
-                                 reinitialiser_mdp_elastic.sh, reprise_deploiement.sh,
-                                 tableau_de_bord.py)
-setup/                          installation ponctuelle (installer_service_*.sh) - jamais
-                                 utilise au quotidien, seulement a la mise en place
+bin/                            actions d'exploitation Control-M (hold.sh, free.sh,
+                                 order.sh, confirm.sh, history.sh, monitor.sh,
+                                 notify.sh, profile.sh, audit.sh,
+                                 reset_es_password.sh, resume.sh,
+                                 dashboard.py)
+setup/                          installation ponctuelle (installer_service_*.sh,
+                                 installer_env_cli.sh) - jamais utilise au quotidien,
+                                 seulement a la mise en place
 jobs/                          les scripts, un par job (jobs/lib/ = fonctions partagées)
 jobs_windows/                  kit PowerShell (agents Windows)
 lib/                            fonctions communes à l'orchestrateur

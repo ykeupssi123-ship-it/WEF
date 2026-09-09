@@ -144,6 +144,19 @@ try {
     }
 } finally {
     Write-Report
+    # AJOUTE LE 2026-09-09 (demande explicite : "je veux qu'a la fin il
+    # y ait un tableau systemique ... pour les postes windows faites
+    # pareillement") - meme regle que cote Linux (orchestrator.sh) :
+    # le tableau de bord ne s'ecrit QUE si aucun job n'a echoue.
+    if (-not $Script:FailedJobId) {
+        $SummaryScript = Join-Path $ScriptDir "bin\summary.ps1"
+        if (Test-Path $SummaryScript) {
+            $SummaryFile = Join-Path $STATE_DIR "TABLEAU_DE_BORD_FINAL.txt"
+            & $SummaryScript *> $SummaryFile
+            Write-Log "Tableau de bord final ecrit dans $SummaryFile"
+            Get-Content $SummaryFile | ForEach-Object { Write-Host $_; Add-Content -Path $RunLog -Value $_ }
+        }
+    }
 }
 
 exit $Script:ExitCode

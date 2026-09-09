@@ -33,9 +33,29 @@ source "$PROJECT_ROOT/lib/commun.sh"
 WAZ_INDEXER_ADMIN_PASSWORD="$(read_or_generate_secret "$WAZ_INDEXER_ADMIN_PASSWORD_FILE" non)" || exit 1
 WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9201}"
 
-echo "[WAZ_020_VERIFY] Verification de l'indexation des alertes..."
-TENTATIVES=6
-INTERVALLE=5
+# BUDGET REMONTE LE 2026-09-09 (incident reel, deploiement MIPREL2,
+# meme VM que l'incident CPU/WAZ_014 documente le meme jour) : 6
+# tentatives x 5s = 30s total etait beaucoup trop court une fois la
+# realite de cette VM etablie (2 vCPU, 6 services JVM/Node simultanes -
+# ES/Logstash/Kibana/wazuh-indexer/wazuh-manager/wazuh-dashboard).
+# Preuve reelle du vrai goulot d'etranglement : "systemctl status
+# logstash" montrait "logstash.outputs.http ... Connect to
+# 127.0.0.1:9200 ... Connexion refusee" - le pipeline WAZ_014B est
+# correctement configure (port verifie, cible le bon port reel de
+# wazuh-indexer), mais l'indexeur devient transitoirement injoignable
+# sous cette charge. `retry_non_idempotent => true` (WAZ_014B) et la
+# Persistent Queue Logstash finissent par livrer les documents en
+# attente une fois l'indexeur stable - il faut juste largement plus de
+# temps que 30s pour l'observer. Jamais rejoue WAZ_019_FLOOD pour ce
+# meme incident : le manager avait deja reellement genere les alertes
+# (confirme : 3862 occurrences de la regle 100102 dans
+# /var/ossec/logs/alerts/alerts.log) - seul l'acheminement avait besoin
+# de plus de temps, pas une nouvelle injection.
+WAZ_INDEX_VERIFY_TIMEOUT_SEC="${WAZ_INDEX_VERIFY_TIMEOUT_SEC:-240}"
+INTERVALLE=10
+TENTATIVES=$(( (WAZ_INDEX_VERIFY_TIMEOUT_SEC + INTERVALLE - 1) / INTERVALLE ))
+
+echo "[WAZ_020_VERIFY] Verification de l'indexation des alertes (jusqu'a ${WAZ_INDEX_VERIFY_TIMEOUT_SEC}s)..."
 i=1
 while [ "$i" -le "$TENTATIVES" ]; do
   curl -sk -u "${WAZ_INDEXER_ADMIN_USER}:${WAZ_INDEXER_ADMIN_PASSWORD}" \
@@ -56,4 +76,13 @@ except Exception:
   [ "$i" -le "$TENTATIVES" ] && sleep "$INTERVALLE"
 done
 
-echo "[WAZ_020_VERIFY] ERREUR, voir ${WORK_TMP_DIR}/waz020.json"; exit 1
+echo "[WAZ_020_VERIFY] ERREUR : toujours 0 alerte indexee apres ${WAZ_INDEX_VERIFY_TIMEOUT_SEC}s. Diagnostic :" >&2
+echo "[WAZ_020_VERIFY] --- Derniere reponse de l'indexeur (${WORK_TMP_DIR}/waz020.json) ---" >&2
+cat "${WORK_TMP_DIR}/waz020.json" 2>/dev/null >&2
+echo "[WAZ_020_VERIFY] --- Alertes reellement generees par le manager (regle 100102, test de charge) ---" >&2
+grep -c '"rule":{"id":"100102"' /var/ossec/logs/alerts/alerts.json 2>/dev/null >&2 || echo "(introuvable ou aucune)" >&2
+echo "[WAZ_020_VERIFY] --- Dernieres erreurs Logstash (pipeline wazuh-alerts, voir WAZ_014B) ---" >&2
+grep -i "wazuh-alerts" /var/log/logstash/logstash-plain.log 2>/dev/null | tail -n 15 >&2
+echo "[WAZ_020_VERIFY] --- Etat de wazuh-indexer ---" >&2
+systemctl status wazuh-indexer --no-pager 2>/dev/null | head -8 >&2
+exit 1

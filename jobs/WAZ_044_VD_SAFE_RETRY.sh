@@ -39,6 +39,33 @@ source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
 source "$PROJECT_ROOT/lib/commun.sh"
 
+# CORRIGE LE 2026-09-09 (3e incident reel le meme jour, meme VM) : ce
+# job redemarrait wazuh-manager INCONDITIONNELLEMENT a chaque appel -
+# meme quand le module avait DEJA demarre avec succes lors d'un
+# redemarrage precedent (constate en reel : le vrai journal montrait
+# "Vulnerability scanner module started." reussi, mais le job precedent
+# avait echoue a le DETECTER - bug de detection deja corrige separement
+# ce meme jour). Consequence reelle grave : chaque rejeu "pour corriger
+# le faux echec" redemarrait un module deja sain, l'interrompant en
+# plein milieu de sa decompression de 8,5G, et relancait une NOUVELLE
+# decompression partielle a chaque fois - le disque est passe de 16G a
+# 9G disponibles en seulement 3 rejeux, jusqu'a bloquer le job lui-meme
+# sur son propre controle de marge disque. Corrige par un controle
+# d'idempotence EN PREMIER, avant tout redemarrage : si le journal
+# actuel montre deja "module started" comme DERNIER evenement du
+# module (pas suivi d'un "Stopping" plus recent) et que wazuh-manager
+# est actif, le module est deja sain - rien a faire, jamais de
+# redemarrage inutile.
+OSSEC_LOG=/var/ossec/logs/ossec.log
+if systemctl is-active --quiet wazuh-manager 2>/dev/null; then
+  DERNIER_EVT_VD="$(grep -E "wm_vulnerability_scanner_stop\(\)|vulnerabilityScannerFacade\.cpp:611 at start\(\)" "$OSSEC_LOG" 2>/dev/null | tail -1)"
+  if echo "$DERNIER_EVT_VD" | grep -q "module started"; then
+    echo "[WAZ_044] Module deja demarre et actif (derniere ligne pertinente du journal) - aucun redemarrage necessaire."
+    echo "[WAZ_044] OK (deja sain, rien fait)."
+    exit 0
+  fi
+fi
+
 MARGE_MIN_GO=10
 
 echo "[WAZ_044] Verification de la marge disque disponible (minimum requis : ${MARGE_MIN_GO}G)..."
@@ -74,7 +101,6 @@ find /var/ossec/tmp -maxdepth 1 -name 'vd_*.tar' -mmin +10 -delete 2>/dev/null |
 # meme jour) : la contention reelle observee a ce stade avance de la
 # chaine (tous les services majeurs actifs a la fois) justifie plus que
 # les 6 minutes d'origine.
-OSSEC_LOG=/var/ossec/logs/ossec.log
 RESTART_LINE=$(wc -l < "$OSSEC_LOG" 2>/dev/null || echo 0)
 
 echo "[WAZ_044] Redemarrage de wazuh-manager..."

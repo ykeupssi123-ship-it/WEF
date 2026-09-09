@@ -3,7 +3,7 @@ Ce dossier est livre VOLONTAIREMENT VIDE (a part ce fichier).
 Il existe pour que vous n'ayez PAS a le recreer (mkdir) a chaque
 deploiement/mise a jour - seule la commande ci-dessous reste a taper,
 une fois par machine, pour activer l'alerte email sur echec de job
-(notifier.sh) :
+(notify.sh) :
 
   echo 'votre_mot_de_passe' > secrets/smtp_password.txt
   chmod 600 secrets/smtp_password.txt

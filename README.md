@@ -52,6 +52,7 @@ française) :
 | Set to OK | `./bin/confirm.sh <JOB_ID> "<raison>"` |
 | View History | `./bin/history.sh <JOB_ID>` |
 | Monitoring | `./bin/monitor.sh` |
+| Tableau de bord final (URLs/logins/scenarios) | `./bin/summary.sh` |
 
 ### Depuis n'importe quel répertoire (`$APP_BIN`)
 
@@ -122,7 +123,7 @@ vars.conf                       toute la configuration (aucune valeur en dur ail
 bin/                            actions d'exploitation Control-M (hold.sh, free.sh,
                                  order.sh, confirm.sh, history.sh, monitor.sh,
                                  notify.sh, profile.sh, audit.sh,
-                                 reset_es_password.sh, resume.sh,
+                                 reset_es_password.sh, resume.sh, summary.sh,
                                  dashboard.py)
 setup/                          installation ponctuelle (installer_service_*.sh,
                                  installer_env_cli.sh) - jamais utilise au quotidien,

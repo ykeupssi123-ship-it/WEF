@@ -96,6 +96,36 @@ def bulk_write(dst_url, dst_auth, bulk_body, max_retries=6, delay=5):
             time.sleep(delay)
     return result
 
+def migrate_all(src_url, src_auth, dst_url, dst_auth, index_pattern):
+    """Scroll+bulk TOUT ce qui est actuellement cote source vers la
+    destination. Retourne (nb_vu, dst_count_after_refresh)."""
+    migrated = 0
+    resp = call(f"{src_url}/{index_pattern}/_search?scroll=2m", 'POST', src_auth, {"size": 500, "query": {"match_all": {}}})
+    scroll_id = resp.get('_scroll_id')
+    hits = resp['hits']['hits']
+    while hits:
+        lines = []
+        for h in hits:
+            lines.append(json.dumps({"index": {"_index": h['_index'], "_id": h['_id']}}))
+            lines.append(json.dumps(h['_source']))
+        bulk_body = ("\n".join(lines) + "\n").encode()
+        result = bulk_write(dst_url, dst_auth, bulk_body)
+        if result.get('errors'):
+            for item in result.get('items', []):
+                if 'error' in item.get('index', {}):
+                    raise SystemExit(f"ERREUR bulk (copie) : {item['index']['error']}")
+        migrated += len(hits)
+        resp = call(f"{src_url}/_search/scroll", 'POST', src_auth, {"scroll": "2m", "scroll_id": scroll_id})
+        scroll_id = resp.get('_scroll_id')
+        hits = resp['hits']['hits']
+    # Rafraichissement explicite avant de compter - meme correctif reel
+    # que le code d'origine (2026-08-31, decouvert au premier test en
+    # direct) : sans lui, "_count" peut repondre avant que les documents
+    # fraichement "_bulk" inseres ne deviennent visibles (near-real-time
+    # normal d'OpenSearch/Elasticsearch, jamais une vraie perte).
+    call(f"{dst_url}/{index_pattern}/_refresh", 'POST', dst_auth)
+    return migrated, count(dst_url, dst_auth, index_pattern)
+
 src_count_before = count(src_url, src_auth, index_pattern)
 if src_count_before == 0:
     print("SOURCE_AVANT=0")
@@ -103,46 +133,52 @@ if src_count_before == 0:
     print("SOURCE_APRES_SUPPRESSION=0")
     raise SystemExit(0)
 
-migrated = 0
-resp = call(f"{src_url}/{index_pattern}/_search?scroll=2m", 'POST', src_auth, {"size": 500, "query": {"match_all": {}}})
-scroll_id = resp.get('_scroll_id')
-hits = resp['hits']['hits']
-while hits:
-    lines = []
-    for h in hits:
-        lines.append(json.dumps({"index": {"_index": h['_index'], "_id": h['_id']}}))
-        lines.append(json.dumps(h['_source']))
-    bulk_body = ("\n".join(lines) + "\n").encode()
-    result = bulk_write(dst_url, dst_auth, bulk_body)
-    if result.get('errors'):
-        for item in result.get('items', []):
-            if 'error' in item.get('index', {}):
-                raise SystemExit(f"ERREUR bulk (copie) : {item['index']['error']}")
-    migrated += len(hits)
-    resp = call(f"{src_url}/_search/scroll", 'POST', src_auth, {"scroll": "2m", "scroll_id": scroll_id})
-    scroll_id = resp.get('_scroll_id')
-    hits = resp['hits']['hits']
-
-# Rafraichissement explicite avant de compter - meme correctif reel que
-# le code d'origine (2026-08-31, decouvert au premier test en direct) :
-# sans lui, "_count" peut repondre avant que les documents fraichement
-# "_bulk" inseres ne deviennent visibles (near-real-time normal
-# d'OpenSearch/Elasticsearch, jamais une vraie perte).
-call(f"{dst_url}/{index_pattern}/_refresh", 'POST', dst_auth)
-dst_count_after = count(dst_url, dst_auth, index_pattern)
+migrated, dst_count_after = migrate_all(src_url, src_auth, dst_url, dst_auth, index_pattern)
 print(f"SOURCE_AVANT={src_count_before}")
 print(f"MIGRE={migrated}")
 print(f"DESTINATION_APRES={dst_count_after}")
 if dst_count_after < src_count_before:
     raise SystemExit(f"ERREUR : destination ({dst_count_after}) < source ({src_count_before}) apres copie - migration incomplete, SOURCE NON TOUCHEE (aucune suppression tentee).")
 
-# --- Etape "coupe" (nouvelle, 2026-09-03) : suppression source, jamais
-# tentee avant la verification stricte ci-dessus. ---
-call(f"{src_url}/{index_pattern}/_delete_by_query?conflicts=proceed&wait_for_completion=true", 'POST', src_auth, {"query": {"match_all": {}}}, timeout=180)
-call(f"{src_url}/{index_pattern}/_refresh", 'POST', src_auth)
-src_count_after = count(src_url, src_auth, index_pattern)
+# --- Etape "coupe" (2026-09-03) : suppression source, jamais tentee
+# avant la verification stricte ci-dessus. ---
+#
+# CORRIGE LE 2026-09-09 (incident reel, VM neuve : 12 documents restants
+# apres un premier passage complet - "SOURCE_AVANT=174, MIGRE=174,
+# DESTINATION_APRES=174, SOURCE_APRES_SUPPRESSION=12"). Cause reelle,
+# jamais un bug de comptage : WAZ_035A_PAUSE_DEP_JOBS (job precedent
+# dans la chaine) suspend les JOBS de l'orchestrateur qui dependent de
+# wazuh-indexer, mais ne coupe JAMAIS le pipeline Logstash reellement
+# actif (WAZ_014B_ALERTS_TO_INDEXER, service systemd toujours en marche)
+# qui continue d'ecrire de VRAIES nouvelles alertes en direct pendant
+# toute la duree de cette migration. "_delete_by_query" fait sa propre
+# recherche interne au moment ou il demarre - les documents arrives
+# APRES ce point de depart (mais avant sa fin) survivent, alors qu'ils
+# n'ont pas non plus ete captes par le scroll de migration (deja
+# termine plus tot). Donnee jamais perdue (toujours presente cote
+# source, jamais supprimee avant verification), mais le job echouait a
+# tort sur un flux d'ingestion normal et attendu.
+# Corrige par un reessai borne : si des documents restent apres la
+# suppression, ce sont par construction des arrivees recentes (jamais
+# la meme donnee deux fois, un cluster mono-noeud ne perd rien) - on les
+# migre et on les supprime a leur tour, jusqu'a convergence reelle vers
+# 0 ou epuisement du budget de tentatives (le flux d'ingestion de ce
+# projet est un flux de demo/test borne, pas un firehose infini - la
+# convergence est attendue, jamais garantie a l'infini).
+MAX_CUT_PASSES = 5
+for cut_attempt in range(1, MAX_CUT_PASSES + 1):
+    call(f"{src_url}/{index_pattern}/_delete_by_query?conflicts=proceed&wait_for_completion=true", 'POST', src_auth, {"query": {"match_all": {}}}, timeout=180)
+    call(f"{src_url}/{index_pattern}/_refresh", 'POST', src_auth)
+    src_count_after = count(src_url, src_auth, index_pattern)
+    if src_count_after == 0:
+        break
+    if cut_attempt < MAX_CUT_PASSES:
+        print(f"[cut_migrate] {src_count_after} document(s) arrive(s) pendant la coupure (ingestion en direct toujours active) - migration+suppression du reliquat (tentative {cut_attempt}/{MAX_CUT_PASSES})...")
+        extra_migrated, _ = migrate_all(src_url, src_auth, dst_url, dst_auth, index_pattern)
+        migrated += extra_migrated
+
 print(f"SOURCE_APRES_SUPPRESSION={src_count_after}")
 if src_count_after != 0:
-    raise SystemExit(f"ERREUR : {src_count_after} document(s) restant(s) cote source apres _delete_by_query - coupure incomplete (donnee dupliquee, PAS perdue : verifier manuellement avant de rejouer).")
+    raise SystemExit(f"ERREUR : {src_count_after} document(s) restant(s) cote source apres {MAX_CUT_PASSES} tentatives de coupure - donnee dupliquee, PAS perdue : verifier manuellement avant de rejouer (flux d'ingestion anormalement rapide ?).")
 PYEOF
 }

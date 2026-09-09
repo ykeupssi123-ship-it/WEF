@@ -2227,3 +2227,29 @@ Le certificat racine de la PKI d'usine (`factory_ca.crt`) est **VIDE (0 octet)**
 **Verifie** : `bash -n` propre sur les 7 fichiers modifies (`PKI_003` a `PKI_009`).
 
 **Limite honnete** : la cause exacte du tout premier `openssl req` silencieusement en echec (entropie, memoire, disque au moment precis du tout premier passage sur cette VM a 1 vCPU) n'est pas confirmee par une preuve directe - seule sa consequence (fichier vide) l'est. La correction protege contre TOUTES les causes possibles de ce symptome (verification du resultat, jamais de la cause), ce qui est suffisant ici, mais la cause initiale precise reste non identifiee.
+
+## 2026-09-09 (suite) - Deploiement complet reussi (PKI a WAZ_035A, ~1h de chaine continue) + 3 correctifs supplementaires
+
+**Contexte** : premiere execution en reel du correctif PKI_003-009 sur la meme VM (`git pull` + `rm -rf state logs` + `./orchestrator.sh`) - chaine complete PKI -> ES (61 jobs) -> LS (36 jobs) -> KB (29 jobs) -> WAZ (jusqu'a WAZ_035A) executee sans aucun echec sur pres d'une heure, preuve reelle que les correctifs PKI/ES_017/KB_005/LS_011 du jour tiennent en conditions reelles. Egalement observe et explique a l'utilisateur (sans changement de code) : `WAZ_018_NET` (crash-test reseau) n'a pas coupe la session PuTTY cette fois-ci - regle firewalld `ESTABLISHED,RELATED` deja posee par `ES_011-015` evaluee avant la regle DROP ajoutee en fin de chaine par ce job ; comportement non garanti (voir l'incident reel 2026-08-19 documente dans `installer_service_orchestrateur.sh`, ou l'inverse s'est produit).
+
+**1) References croisees oubliees lors du renommage `bin/` (meme correctif que plus tot, perimetre incomplet)** : le grep de verification initial du renommage des 12 outils ne couvrait que `.sh`/`.py`/`.md` - jamais `jobs_table.csv` (une description de job affichait encore `bin/order_job.sh` en toutes lettres dans le log reel de l'utilisateur), ni `secrets/README_SECRETS.txt`/`vars.conf` (`notifier.sh`, `tableau_de_bord.py`). 8 occurrences reelles trouvees et corrigees, verifie par un grep sans filtre d'extension cette fois (0 restante, y compris `.git` exclu et `JOURNAL_TECHNIQUE.md` qui garde volontairement les noms historiques).
+
+**2) `WAZ_035B_CUT_INDEXER_TO_ES` : 12 documents restants apres coupure, cause reelle trouvee (`jobs/lib/cut_migrate.sh`)** - log reel :
+```
+SOURCE_AVANT=174
+MIGRE=174
+DESTINATION_APRES=174
+SOURCE_APRES_SUPPRESSION=12
+ERREUR : 12 document(s) restant(s) cote source apres _delete_by_query...
+```
+Cause reelle, jamais un bug de comptage : `WAZ_035A_PAUSE_DEP_JOBS` (job precedent) suspend uniquement les JOBS de l'orchestrateur qui dependent de wazuh-indexer - il ne coupe JAMAIS le pipeline Logstash `WAZ_014B_ALERTS_TO_INDEXER` reellement actif, qui continue d'ecrire de vraies nouvelles alertes en direct pendant toute la migration. `_delete_by_query` fait sa propre recherche interne au moment ou il demarre : les documents arrives apres ce point de depart (mais avant sa fin) survivent, sans avoir non plus ete captes par le scroll de migration (deja termine plus tot) - donnee jamais perdue, mais le job echouait a tort sur un flux d'ingestion normal et attendu pendant la bascule.
+
+**Corrige** : `cut_migrate_alerts` reessaie desormais la sequence migration+suppression sur le reliquat, jusqu'a 5 tentatives, jusqu'a convergence reelle vers 0 documents cote source - jamais une boucle infinie, echec explicite et honnete si le flux d'ingestion ne se tarit jamais en 5 passes. Meme fonction partagee par `WAZ_039C_CUT_ES_TO_INDEXER` (bascule inverse), donc corrige des deux cotes a la fois.
+
+**3) Nouvel outil `bin/summary.sh`, demande explicite** : "je ne veux plus voir la liste des jobs qui se repete... je veux juste un tableau avec les URL, login et mot de passe et des scenarios de job a jouer." Lit l'etat REEL de la machine a l'appel (vars.conf, secrets/*.txt, state/es_bootstrap_password.secret, port reel de Wazuh Dashboard lu dans sa propre config) - jamais une valeur en dur, donc toujours juste meme si vars.conf est personnalise ou qu'un mot de passe n'a pas encore ete genere. Affiche : URLs+identifiants des 6 points d'acces (Wazuh Dashboard, Kibana, Elasticsearch, Wazuh Indexer, Wazuh API, tableau de bord de suivi), le mode actif (Wazuh Dashboard vs Kibana, detecte via `systemctl is-active`), et les commandes `$APP_BIN/order.sh` pretes a copier-coller pour les scenarios courants (bascule dans les deux sens, seed/purge de donnees de demo).
+
+**Verifie** : `bash -n` propre sur `cut_migrate.sh` (wrapper bash) et sur le bloc Python embarque (`py_compile`) ; `bash -n` propre sur `bin/summary.sh`.
+
+**A faire sur la VM (donne separement dans la conversation, jamais execute ici)** : `git pull origin main` puis relancer la chaine a partir de `WAZ_035B_CUT_INDEXER_TO_ES` (`./orchestrator.sh` reprend automatiquement, tous les jobs anterieurs restent `.ok`) ; `$APP_BIN/summary.sh` une fois le deploiement termine pour le tableau final.
+
+**Limite honnete** : le reessai borne de `cut_migrate_alerts` suppose un flux d'ingestion qui finit par se tarir/ralentir suffisamment pour converger en 5 passes - vrai pour ce projet (flux de demo/test borne), pas garanti dans l'absolu sous un flux constamment plus rapide que le cycle migration+suppression.

@@ -90,10 +90,25 @@ local_pki_copy(){
 # jamais que le job ait ete "fait ailleurs", on decide A L'AVANCE (dans
 # vars.conf, avant meme de lancer l'orchestrateur) qu'il n'a pas besoin
 # de tourner cette fois-ci. Voir vars.conf pour le format de SKIP_JOBS.
+# CORRIGE LE 2026-09-09 (voir jobs/lib/skip_jobs_toggle.sh pour le
+# detail complet de l'incident) : consulte desormais DEUX sources
+# distinctes - SKIP_JOBS (vars.conf, decision humaine a l'avance,
+# versionnee) ET STATE_DIR/skip_jobs_runtime.conf (pause temporaire
+# ecrite par WAZ_035A/WAZ_039D pendant une bascule de mode, jamais
+# versionnee) - jamais fusionnees dans le meme fichier, pour que
+# vars.conf ne soit plus jamais modifie par un job en cours d'execution.
 job_in_skip_list(){
   local job_id="$1"
-  [ -z "${SKIP_JOBS:-}" ] && return 1
-  [[ ",${SKIP_JOBS}," == *",${job_id},"* ]]
+  if [ -n "${SKIP_JOBS:-}" ] && [[ ",${SKIP_JOBS}," == *",${job_id},"* ]]; then
+    return 0
+  fi
+  local runtime_file="${STATE_DIR}/skip_jobs_runtime.conf"
+  if [ -f "$runtime_file" ]; then
+    local runtime_skip
+    runtime_skip="$(cat "$runtime_file")"
+    [ -n "$runtime_skip" ] && [[ ",${runtime_skip}," == *",${job_id},"* ]] && return 0
+  fi
+  return 1
 }
 
 check_dev_null(){

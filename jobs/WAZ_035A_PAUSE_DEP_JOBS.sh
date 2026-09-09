@@ -15,17 +15,21 @@
 #   - WAZ_014E_INDEXER_CONNECTOR (connecteur natif inventaire/vulns)
 #   - WAZ_042_INDEXER_UNLOCK (verrous flood-stage)
 #   - WAZ_043_DASHBOARD_FIELDS_REFRESH (cache de champs du Dashboard)
-# Ajoutes a SKIP_JOBS (vars.conf) - ne les empeche pas d'etre DEJA .ok
-# (ils ne seraient de toute facon pas rejoues), mais empeche un
+# Ajoutes a une pause RUNTIME (voir jobs/lib/skip_jobs_toggle.sh -
+# CORRIGE LE 2026-09-09 : vit desormais dans STATE_DIR/skip_jobs_runtime.conf,
+# jamais dans vars.conf - eviter qu'une bascule Kibana<->Wazuh ne laisse
+# une modification locale non commitee sur vars.conf, qui entrait en
+# conflit avec le prochain "git pull") - ne les empeche pas d'etre DEJA
+# .ok (ils ne seraient de toute facon pas rejoues), mais empeche un
 # reforcage accidentel ou un futur redeploiement partiel de les relancer
 # pendant que l'indexeur est bas.
 #
 # CAS A PART : INFRA_004_HEALTH_GUARDIAN n'est PAS un job reexecute par
 # l'orchestrateur en continu - c'est un INSTALLATEUR (execute une seule
 # fois) d'un timer systemd independant (wef-health-guardian.timer, toutes
-# les 5 min) qui, lui, ne consulte jamais SKIP_JOBS. L'ajouter a
-# SKIP_JOBS n'aurait donc aucun effet reel - le timer est directement
-# suspendu ici via systemctl.
+# les 5 min) qui, lui, ne consulte jamais cette pause. L'y ajouter
+# n'aurait donc aucun effet reel - le timer est directement suspendu ici
+# via systemctl.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -34,7 +38,7 @@ source "$PROJECT_ROOT/jobs/lib/skip_jobs_toggle.sh"
 
 DEP_JOBS="WAZ_014D_ALERTS_RETENTION,WAZ_014E_INDEXER_CONNECTOR,WAZ_042_INDEXER_UNLOCK,WAZ_043_DASHBOARD_FIELDS_REFRESH"
 
-echo "[WAZ_035A_PAUSE_DEP_JOBS] Ajout de ${DEP_JOBS} a SKIP_JOBS..."
+echo "[WAZ_035A_PAUSE_DEP_JOBS] Mise en pause runtime de ${DEP_JOBS}..."
 add_jobs_to_skip_list "$DEP_JOBS" || exit 1
 
 echo "[WAZ_035A_PAUSE_DEP_JOBS] Suspension du timer systemd wef-health-guardian (independant de SKIP_JOBS)..."

@@ -1,6 +1,7 @@
 #!/bin/bash
 # WAZ_039D_RESUME_DEP_JOBS - WEF_WAZ_RUN_RESUMEIDXJOBS
-# Reveil : retire de SKIP_JOBS les jobs mis en pause par
+# Reveil : retire de la pause runtime (STATE_DIR/skip_jobs_runtime.conf,
+# voir jobs/lib/skip_jobs_toggle.sh) les jobs mis en pause par
 # WAZ_035A_PAUSE_DEP_JOBS et redemarre le timer wef-health-guardian.
 # Dernier job de la cascade "retour vers Wazuh" - ecrit le marqueur
 # officiel de bascule (WAZ_ALERTS_ROUTE.state) une fois tout confirme.
@@ -16,7 +17,7 @@ source "$PROJECT_ROOT/jobs/lib/skip_jobs_toggle.sh"
 DEP_JOBS="WAZ_014D_ALERTS_RETENTION,WAZ_014E_INDEXER_CONNECTOR,WAZ_042_INDEXER_UNLOCK,WAZ_043_DASHBOARD_FIELDS_REFRESH"
 ROUTE_STATE_FILE="${STATE_DIR}/WAZ_ALERTS_ROUTE.state"
 
-echo "[WAZ_039D_RESUME_DEP_JOBS] Retrait de ${DEP_JOBS} de SKIP_JOBS..."
+echo "[WAZ_039D_RESUME_DEP_JOBS] Retrait de ${DEP_JOBS} de la pause runtime..."
 remove_jobs_from_skip_list "$DEP_JOBS" || exit 1
 
 echo "[WAZ_039D_RESUME_DEP_JOBS] Reactivation du timer systemd wef-health-guardian..."

@@ -17,3 +17,8 @@ __pycache__/
 *~
 .DS_Store
 Thumbs.db
+
+# Anciennes sauvegardes de vars.conf (mecanisme retire le 2026-09-09 -
+# voir jobs/lib/skip_jobs_toggle.sh - peut trainer sur une VM deja
+# deployee avant ce correctif)
+vars.conf.bak_*

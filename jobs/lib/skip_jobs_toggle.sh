@@ -1,24 +1,40 @@
-# skip_jobs_toggle.sh - ajoute/retire des JOB_ID precis de SKIP_JOBS
-# (vars.conf) sans jamais toucher aux autres entrees deja presentes
-# (ex: SKIP_JOBS="ES_001" de base, jamais notre affaire). Utilise par la
-# bascule de mode Kibana<->Wazuh (WAZ_035Ax/WAZ_039Dx) pour mettre en
-# pause, le temps de la bascule, les jobs qui presupposent wazuh-indexer
-# actif en permanence.
+# skip_jobs_toggle.sh - ajoute/retire des JOB_ID precis de la liste des
+# jobs sautes A L'EXECUTION (pause temporaire), sans jamais toucher au
+# SKIP_JOBS de vars.conf (decision humaine, a l'avance, distincte).
+# Utilise par la bascule de mode Kibana<->Wazuh (WAZ_035Ax/WAZ_039Dx)
+# pour mettre en pause, le temps de la bascule, les jobs qui
+# presupposent wazuh-indexer actif en permanence.
 #
 # AJOUTE LE 2026-09-03 (refonte demandee par l'utilisateur, voir
-# docs/JOURNAL_TECHNIQUE.md). Toujours : sauvegarde avant modification,
-# verification apres (meme discipline que chaque edition de fichier de
-# configuration critique cette nuit - jamais suppose, toujours confirme
-# par grep apres coup).
+# docs/JOURNAL_TECHNIQUE.md).
+#
+# CORRIGE LE 2026-09-09 (incident reel : ce mecanisme ecrivait
+# directement dans vars.conf via sed - un fichier VERSIONNE dans Git.
+# Chaque bascule Kibana<->Wazuh laissait donc une VRAIE modification
+# locale non commitee sur la VM, qui entrait en conflit avec le
+# "git pull" du prochain correctif ("Vos modifications locales... seraient
+# ecrasees par la fusion") - oblige a un detour git stash/pull/stash pop
+# a chaque fois. Cause racine : melange entre configuration D'INTENTION
+# (SKIP_JOBS pose par l'operateur dans vars.conf, doit survivre a un git
+# pull) et etat D'EXECUTION temporaire (pause du temps d'une bascule,
+# ne doit JAMAIS polluer un fichier versionne). Corrige : la pause
+# runtime vit desormais dans STATE_DIR/skip_jobs_runtime.conf (deja
+# gitignore comme tout STATE_DIR - voir .gitignore) - vars.conf n'est
+# plus JAMAIS modifie par un job. job_in_skip_list() (lib/commun.sh)
+# consulte desormais les DEUX sources (vars.conf ET ce fichier runtime).
+RUNTIME_SKIP_FILE="${STATE_DIR}/skip_jobs_runtime.conf"
 
-# add_jobs_to_skip_list "ID1,ID2,ID3" - ajoute ces JOB_ID a SKIP_JOBS
-# dans vars.conf (union, jamais de doublon, jamais touche aux entrees
-# deja presentes qui ne sont pas dans la liste donnee).
+_read_runtime_skip() {
+  [ -f "$RUNTIME_SKIP_FILE" ] && cat "$RUNTIME_SKIP_FILE" || echo ""
+}
+
+# add_jobs_to_skip_list "ID1,ID2,ID3" - ajoute ces JOB_ID a la pause
+# runtime (union, jamais de doublon, jamais touche a vars.conf).
 add_jobs_to_skip_list() {
   local ids_to_add="$1"
-  local current="${SKIP_JOBS:-}"
-  local merged="$current"
-  local id
+  local current merged id
+  current="$(_read_runtime_skip)"
+  merged="$current"
   IFS=',' read -ra NEW_IDS <<< "$ids_to_add"
   for id in "${NEW_IDS[@]}"; do
     [ -z "$id" ] && continue
@@ -32,27 +48,23 @@ add_jobs_to_skip_list() {
   done
   [ "$merged" = "$current" ] && return 0
 
-  cp -a "$VARS_FILE" "${VARS_FILE}.bak_$(date +%Y%m%d_%H%M%S)"
-  if grep -q '^SKIP_JOBS=' "$VARS_FILE"; then
-    sed -i "s|^SKIP_JOBS=.*|SKIP_JOBS=\"${merged}\"|" "$VARS_FILE"
-  else
-    printf '\nSKIP_JOBS="%s"\n' "$merged" >> "$VARS_FILE"
-  fi
-  if ! grep -q "^SKIP_JOBS=\"${merged}\"\$" "$VARS_FILE"; then
-    echo "[skip_jobs_toggle] ERREUR : l'ajout a SKIP_JOBS a echoue (valeur attendue non retrouvee apres ecriture)." >&2
+  echo -n "$merged" > "$RUNTIME_SKIP_FILE"
+  if [ "$(cat "$RUNTIME_SKIP_FILE")" != "$merged" ]; then
+    echo "[skip_jobs_toggle] ERREUR : l'ajout a la pause runtime a echoue (valeur attendue non retrouvee apres ecriture dans ${RUNTIME_SKIP_FILE})." >&2
     return 1
   fi
-  echo "[skip_jobs_toggle] SKIP_JOBS mis a jour : \"${merged}\""
+  echo "[skip_jobs_toggle] Pause runtime mise a jour (${RUNTIME_SKIP_FILE}) : \"${merged}\""
 }
 
 # remove_jobs_from_skip_list "ID1,ID2,ID3" - retire ces JOB_ID precis de
-# SKIP_JOBS, laisse toutes les autres entrees intactes.
+# la pause runtime, laisse les autres entrees runtime intactes (et ne
+# touche jamais a SKIP_JOBS dans vars.conf, qui n'est pas de son ressort).
 remove_jobs_from_skip_list() {
   local ids_to_remove="$1"
-  local current="${SKIP_JOBS:-}"
+  local current remaining id
+  current="$(_read_runtime_skip)"
   [ -z "$current" ] && return 0
-  local remaining=""
-  local id kept=0
+  remaining=""
   IFS=',' read -ra CUR_IDS <<< "$current"
   for id in "${CUR_IDS[@]}"; do
     [ -z "$id" ] && continue
@@ -67,11 +79,15 @@ remove_jobs_from_skip_list() {
   done
   [ "$remaining" = "$current" ] && return 0
 
-  cp -a "$VARS_FILE" "${VARS_FILE}.bak_$(date +%Y%m%d_%H%M%S)"
-  sed -i "s|^SKIP_JOBS=.*|SKIP_JOBS=\"${remaining}\"|" "$VARS_FILE"
-  if ! grep -q "^SKIP_JOBS=\"${remaining}\"\$" "$VARS_FILE"; then
-    echo "[skip_jobs_toggle] ERREUR : le retrait de SKIP_JOBS a echoue (valeur attendue non retrouvee apres ecriture)." >&2
+  if [ -z "$remaining" ]; then
+    rm -f "$RUNTIME_SKIP_FILE"
+    echo "[skip_jobs_toggle] Pause runtime videe (${RUNTIME_SKIP_FILE} supprime)."
+    return 0
+  fi
+  echo -n "$remaining" > "$RUNTIME_SKIP_FILE"
+  if [ "$(cat "$RUNTIME_SKIP_FILE")" != "$remaining" ]; then
+    echo "[skip_jobs_toggle] ERREUR : le retrait de la pause runtime a echoue (valeur attendue non retrouvee apres ecriture dans ${RUNTIME_SKIP_FILE})." >&2
     return 1
   fi
-  echo "[skip_jobs_toggle] SKIP_JOBS mis a jour : \"${remaining}\""
+  echo "[skip_jobs_toggle] Pause runtime mise a jour (${RUNTIME_SKIP_FILE}) : \"${remaining}\""
 }

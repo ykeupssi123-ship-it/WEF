@@ -2446,3 +2446,21 @@ $APP_BIN/order.sh WAZ_006B_FW_DASHAPI "ouverture port dashboard manquant"
 Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine normale, sans intervention.
 
 **Limite honnete** : le meme risque (port cru "ouvert par coincidence", jamais verifie depuis l'exterieur) pourrait exister ailleurs dans ce projet sur des ports non encore testes depuis un vrai navigateur/client externe - seul 443 a ete reellement confirme casse aujourd'hui ; 55000 est corrige par prudence/cohesion (meme hypothese non verifiee dans le meme historique), jamais reellement teste depuis l'exterieur a ce jour.
+
+## 2026-09-09 (suite) - Deploiement complet sur VM neuve, la chaine a tourne jusqu'a WAZ_022 (validation reelle de WAZ_006B_FW_DASHAPI) - un dernier echec, cause reelle trouvee sans deviner
+
+**Jalon reel majeur** : premier deploiement complet sur une VM authentiquement neuve depuis tous les correctifs du jour (PKI vide, ES_017/KB_005/LS_011, WAZ_035 ordre, WAZ_044, pare-feu 443/55000...). La chaine a tourne de `INFRA_002` a `WAZ_021_RECOVER` SANS AUCUN ECHEC - `WAZ_006B_FW_DASHAPI` (ajoute quelques heures plus tot le meme jour) s'est execute automatiquement dans la chaine normale et a reussi du premier coup, confirmant en conditions reelles que la correction du pare-feu tient sur une VM veritablement neuve.
+
+**Nouvel echec reel** : `WAZ_022` (generation du token API Wazuh) - "Le defaut 'wazuh' ne fonctionne pas contre cette instance". Demande explicite de l'operateur, fatigue exprimee sans ambiguite : diagnostic mene par Claude seul, UNE seule commande demandee a l'operateur (jamais une serie), reponse traitee immediatement.
+
+**Diagnostic** : `curl -u wazuh:wazuh -k -X POST https://127.0.0.1:55000/security/user/authenticate` lance manuellement par l'operateur quelques minutes apres l'echec -> vrai jeton JWT retourne (`{"data": {"token": "..."}, "error": 0}`). Le mot de passe par defaut EST correct - le job avait tort de rapporter un echec d'authentification.
+
+**Cause reelle trouvee par lecture du code (`jobs/WAZ_022.sh`) et correlation des horodatages, jamais supposee** : `WAZ_022` a tourne a 22:22:14, soit UNE SECONDE apres la fin de `WAZ_021_RECOVER` (retablissement du reseau coupe par le crash-test `WAZ_018_NET`). La fonction `_waz022_auth_reussie()` ne faisait qu'UN SEUL essai curl, sans retry, sans marge. Meme famille de bug deja rencontree et corrigee plusieurs fois ce jour (`WAZ_014`/`WAZ_020_VERIFY`/`WAZ_037`) : un composant qui vient de subir une perturbation reseau peut avoir besoin de quelques secondes de plus pour que SON PROPRE sous-systeme (ici l'API `wazuh-apid`) se stabilise, meme si le service parent est deja considere "actif" ailleurs dans la chaine.
+
+**Corrige (`jobs/WAZ_022.sh`)** : `_waz022_auth_reussie()` reessaie desormais jusqu'a 6 fois (5s d'ecart) avant de conclure a un echec - jamais un mot de passe different tente, uniquement une patience reelle. S'applique aux deux appels (tentative du defaut ET authentification avec le mot de passe reel deja connu).
+
+**Verifie** : `bash -n` propre.
+
+**A faire sur la VM** : `git pull origin main` puis `$APP_BIN/order.sh WAZ_022 "correctif reessai"` (ou reprise normale via `$APP_HOME/orchestrator.sh`).
+
+**Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - le reessai borne (30s) suppose que l'API se stabilise dans cette fenetre ; jamais mesure precisement combien de temps reel il lui faut apres une coupure reseau de ce type.

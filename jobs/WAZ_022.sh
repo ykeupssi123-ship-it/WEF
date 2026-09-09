@@ -23,11 +23,31 @@ source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
 source "$PROJECT_ROOT/lib/commun.sh"
 
+# CORRIGE LE 2026-09-09 (incident reel, VM neuve) : un seul essai,
+# lance a peine 1 seconde apres la fin de WAZ_021_RECOVER (retablissement
+# du reseau coupe par le crash-test WAZ_018_NET) - a tort rapporte "mot
+# de passe incorrect", alors qu'un test manuel identique (memes
+# identifiants "wazuh"/"wazuh") a rendu un vrai jeton JWT valide
+# quelques minutes plus tard. Meme famille de bug deja rencontree et
+# corrigee plusieurs fois ce jour (WAZ_014/WAZ_020_VERIFY/WAZ_037) : un
+# composant qui vient de subir une perturbation (ici, la coupure/
+# retablissement reseau) peut avoir besoin de quelques secondes de plus
+# pour stabiliser sa propre API, meme si le service lui-meme repond
+# "actif". Corrige par un reessai borne (6 tentatives, 5s d'ecart) -
+# jamais un mot de passe different tente, uniquement une patience reelle
+# avant de conclure a un echec.
 _waz022_auth_reussie(){
   local pw="$1"
-  curl -s -u "${WAZ_API_USER}:${pw}" -k \
-    "https://127.0.0.1:${WAZ_API_PORT}/security/user/authenticate" -X POST -o "${WORK_TMP_DIR}/waz022.json"
-  python3 -c "import json; d=json.load(open('${WORK_TMP_DIR}/waz022.json')); assert 'data' in d" 2>/dev/null
+  local tentative
+  for tentative in 1 2 3 4 5 6; do
+    curl -s -u "${WAZ_API_USER}:${pw}" -k \
+      "https://127.0.0.1:${WAZ_API_PORT}/security/user/authenticate" -X POST -o "${WORK_TMP_DIR}/waz022.json"
+    if python3 -c "import json; d=json.load(open('${WORK_TMP_DIR}/waz022.json')); assert 'data' in d" 2>/dev/null; then
+      return 0
+    fi
+    [ "$tentative" -lt 6 ] && sleep 5
+  done
+  return 1
 }
 
 if [ ! -f "$WAZ_API_PASSWORD_FILE" ]; then

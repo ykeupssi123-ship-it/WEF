@@ -31,6 +31,50 @@ echo " ${PROJECT_NAME:-WAZ_ELK_FACTORY} - TABLEAU DE BORD"
 echo " $(date '+%Y-%m-%d %H:%M:%S')"
 echo "===================================================================="
 echo ""
+
+# CORRIGE LE 2026-09-09 (demande explicite : audit de conformite
+# ELK_HOST/AGENT_HOST) : ce tableau (URLs/mots de passe ES/Kibana/Wazuh
+# Dashboard) n'a jamais eu de sens sur un AGENT_HOST - aucun de ces
+# services n'y tourne (seulement Filebeat/Metricbeat/agent Wazuh, sans
+# UI/API propre a resumer de la meme facon). bin/monitor.sh filtre deja
+# par ROLE (voir son propre code) - summary.sh ne le faisait pas,
+# affichant a tort des URLs/mots de passe de services absents de cette
+# machine. Corrige : branche dediee, courte et honnete, pour ce role.
+if [ "${ROLE:-}" = "AGENT_HOST" ]; then
+  echo "--- AGENT_HOST : ${AGENT_NAME:-(non defini)} ---"
+  echo "Composants actifs : ${AGENT_COMPONENTS:-(aucun)}"
+  echo "Machine ELK_HOST cible : ${FACTORY_HOST_IP:-(non defini)}"
+  echo ""
+  echo "--- ETAT DES SERVICES (uniquement les composants actives) ---"
+  IFS=',' read -ra ENABLED_COMPS <<< "${AGENT_COMPONENTS:-}"
+  for comp in "${ENABLED_COMPS[@]}"; do
+    case "$comp" in
+      FILEBEAT)
+        svc="filebeat" ;;
+      METRICBEAT)
+        svc="metricbeat" ;;
+      WAZUH_AGENT)
+        svc="wazuh-agent" ;;
+      *)
+        continue ;;
+    esac
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+      printf "%-14s actif\n" "$svc"
+    else
+      printf "%-14s INACTIF (verifier : systemctl status %s)\n" "$svc" "$svc"
+    fi
+  done
+  echo ""
+  echo "--- SCENARIOS ---"
+  echo "Historique d'un job        : \$APP_BIN/history.sh <JOB_ID>"
+  echo "Monitoring en direct (CLI) : \$APP_BIN/monitor.sh"
+  echo "Aucune URL/mot de passe a afficher ici - les tableaux de bord"
+  echo "(Wazuh Dashboard/Kibana) vivent sur ELK_HOST (\$FACTORY_HOST_IP),"
+  echo "jamais sur un AGENT_HOST."
+  echo "===================================================================="
+  exit 0
+fi
+
 echo "--- ACCES ---"
 printf "%-22s %-42s %-16s %s\n" "SERVICE" "URL" "UTILISATEUR" "MOT DE PASSE"
 printf "%-22s %-42s %-16s %s\n" "----------------------" "------------------------------------------" "----------------" "------------"

@@ -2464,3 +2464,23 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **A faire sur la VM** : `git pull origin main` puis `$APP_BIN/order.sh WAZ_022 "correctif reessai"` (ou reprise normale via `$APP_HOME/orchestrator.sh`).
 
 **Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - le reessai borne (30s) suppose que l'API se stabilise dans cette fenetre ; jamais mesure precisement combien de temps reel il lui faut apres une coupure reseau de ce type.
+
+## 2026-09-09 (suite) - Audit de conformite AGENT_HOST (VM2) : ROLE-awareness manquante dans bin/summary.sh, verifications dnf/pare-feu deja saines partout ailleurs
+
+**Demande explicite** : "regarder aussi ceux-la [les jobs AGENT_HOST] si c'est conforme avec l'architecture de ELK_HOST au niveau de l'appel des commandes, le nommage, le dossier exploitation et etc - bref tout tout et tout." Audit systematique des 47 jobs `AGENT_HOST` (`FB_*`, `MB_*`, `WAG_*`, `DIST_001`, `INFRA_002`/`INFRA_006`) contre chaque classe de bug corrigee aujourd'hui sur `ELK_HOST`.
+
+**Verifie sain, rien a corriger** :
+- Aucune reference residuelle aux anciens noms `bin/`/`setup/` (grep sans filtre d'extension, meme discipline que les audits precedents du jour).
+- Zero regle `firewall-cmd` dans les jobs agents - coherent : Filebeat/Metricbeat/l'agent Wazuh sont des clients purement sortants vers `ELK_HOST` (5044/1514/1515), jamais des serveurs ecoutant en entree - le bug "zone jamais liee a l'interface reelle" (ES/KB/WAZ_005/006 le meme jour) ne peut structurellement pas se produire ici.
+- `FB_004.sh`/`MB_004.sh`/`WAG_003.sh` avaient deja recu, avant meme aujourd'hui, le correctif "verification reelle de dnf install" (retry IPv4 + `rpm -q`) - deja dans la bonne famille de code, rien a refaire.
+- `docs/GUIDE_EXPLOITATION.md` (etape 0, section deploiement) deja generique aux deux roles depuis la reecriture du jour - `$APP_HOME/orchestrator.sh` fonctionne identiquement sur VM1 et VM2.
+- `jobs_table.csv` : chaine `AGENT_HOST` verifiee structurellement saine des le premier audit du jour (simulation de resolution : 3 passes, 0 job bloque) - `INFRA_006_AGENT_RESOURCE_CHECK` bien le point d'entree unique (`IN_COND=NONE`), `FB_001`/`INFRA_002`/`WAG_001` en dependent tous les trois.
+
+**Corrige, 3 ecarts reels trouves** :
+1. **`bin/summary.sh` n'etait pas conscient du `ROLE`** (contrairement a `bin/monitor.sh`, deja filtre par role) - lance sur un `AGENT_HOST`, il aurait affiche des URLs/mots de passe Elasticsearch/Kibana/Wazuh Dashboard totalement absents de cette machine (aucun de ces services n'y tourne). Corrige : branche dediee `ROLE=AGENT_HOST` - affiche `AGENT_NAME`, les composants actifs, la machine `ELK_HOST` cible, et l'etat systemd reel de chaque service actif (filebeat/metricbeat/wazuh-agent) - jamais de tableau URLs/mots de passe hors sujet.
+2. **`MB_016.sh`** (generation de charge stress-ng) : `dnf install` jamais verifie - meme classe que `ES_017`/`KB_005`/`LS_011`, impact reel moindre ici (la commande `stress-ng` suivante aurait de toute facon echoue bruyamment, jamais un echec masque), corrige par coherence.
+3. **`docs/GUIDE_EXPLOITATION.md`** : le paragraphe RAM/disque ne mentionnait que `ES_B001_RAM_CHECK` (ELK_HOST) - complete avec `INFRA_006_AGENT_RESOURCE_CHECK` (AGENT_HOST) et ses 3 variables de seuil dediees.
+
+**Verifie** : `bash -n` propre sur `bin/summary.sh` et `jobs/MB_016.sh`.
+
+**Limite honnete, deja documentee dans le code lui-meme avant aujourd'hui** : `INFRA_006_AGENT_RESOURCE_CHECK.sh` porte sa propre mise en garde depuis sa creation - "encore jamais teste en conditions reelles sur une vraie VM2 - a verifier des le premier lancement reel". Aucun deploiement `AGENT_HOST` reel n'a encore eu lieu a ce jour (tous les tests du jour portaient sur `ELK_HOST` uniquement) - cet audit est structurel/statique, jamais un test en conditions reelles.

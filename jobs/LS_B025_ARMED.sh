@@ -201,7 +201,7 @@ fi
 # CORRECTIF 2026-09-02 (incident reel, deploiement VM ELK_HOST Oracle
 # Linux 8) : ce job (comme tout ce qui invoque "logstash-keystore" via
 # LS_B025_ARMED, quel que soit le sous-chemin emprunte plus haut - create/
-# add/remove/list) tourne en root (service systemd wef-orchestrateur,
+# add/remove/list) tourne en root (service systemd wef,
 # User=root). Or "logstash-keystore" partage la meme configuration
 # log4j2 que Logstash lui-meme et ecrit dans les MEMES fichiers
 # /var/log/logstash/*.log. Consequence reelle observee : ces fichiers se

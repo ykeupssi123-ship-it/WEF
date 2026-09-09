@@ -170,11 +170,11 @@ log "=== Demarrage orchestrateur WAZ_ELK_FACTORY - ROLE=$ROLE - PROJET=$PROJECT_
 # (volontaire, WAZ_018_NET, ou accidentelle, hote/VM) tuerait alors tout
 # le groupe de processus, orchestrateur inclus, en plein milieu de la
 # chaine (meme incident deja documente le 2026-08-19, voir
-# setup/installer_service_orchestrateur.sh). Avertissement SEULEMENT,
+# setup/svc_orch.sh). Avertissement SEULEMENT,
 # jamais un blocage : un lancement direct reste legitime pour un test
 # ou une observation courte.
 if [ -z "${INVOCATION_ID:-}" ]; then
-  log "ATTENTION : orchestrator.sh tourne en direct dans cette session (non supervise par systemd) - une coupure reseau ou une deconnexion tuerait ce processus en plein milieu de la chaine. Pour un deploiement non surveille : ./setup/installer_service_orchestrateur.sh puis 'systemctl start wef-orchestrateur' (immunise contre les coupures)."
+  log "ATTENTION : orchestrator.sh tourne en direct dans cette session (non supervise par systemd) - une coupure reseau ou une deconnexion tuerait ce processus en plein milieu de la chaine. Pour un deploiement non surveille : ./setup/svc_orch.sh puis 'systemctl start wef' (immunise contre les coupures)."
 fi
 
 if [ "$ROLE" = "ELK_HOST" ] && [ -z "${FACTORY_HOST_IP:-}" ]; then
@@ -319,5 +319,20 @@ for pass in $(seq 1 $MAX_PASSES); do
 done
 
 log "=== Fin orchestrateur ==="
-log "Etat final (jobs termines) :"
-ls "$STATE_DIR" 2>/dev/null | grep '\.ok$' | tee -a "$RUN_LOG"
+
+# CORRIGE LE 2026-09-09 (demande explicite : "je ne veux plus voir ça"
+# - le defilement de ~270 lignes "*.ok" en fin de run n'apportait rien
+# d'exploitable a l'operateur). Remplace par le tableau de bord final
+# (bin/summary.sh - URLs, identifiants, scenarios prets a l'emploi),
+# ecrit dans un fichier ET affiche - mais UNIQUEMENT quand le
+# deploiement s'est termine sans aucun echec (un run interrompu n'a
+# rien de "pret a exploiter" a montrer). La liste exhaustive des jobs
+# .ok reste consultable dans state/RAPPORT_EXECUTION.txt (write_report,
+# ci-dessus) pour qui en a besoin - jamais perdue, juste plus imposee a
+# chaque run.
+if [ -z "$FAILED_JOB_ID" ] && [ -x "$SCRIPT_DIR/bin/summary.sh" ]; then
+  SUMMARY_FILE="$STATE_DIR/TABLEAU_DE_BORD_FINAL.txt"
+  "$SCRIPT_DIR/bin/summary.sh" > "$SUMMARY_FILE" 2>&1
+  log "Tableau de bord final ecrit dans $SUMMARY_FILE"
+  cat "$SUMMARY_FILE" | tee -a "$RUN_LOG"
+fi

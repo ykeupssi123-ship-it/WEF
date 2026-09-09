@@ -1,5 +1,6 @@
 #!/bin/bash
-# installer_service_orchestrateur.sh - AJOUTE LE 2026-08-19 (incident reel
+# svc_orch.sh (RENOMME LE 2026-09-09, ex-installer_service_orchestrateur.sh
+# - nom trop long, demande explicite) - AJOUTE LE 2026-08-19 (incident reel
 # wef-elk-core, meme journee que le passage a WAZ_018_NET)
 #
 # PROBLEME REEL CONSTATE : ./orchestrator.sh lance directement dans une
@@ -26,7 +27,7 @@
 # meme facon un orchestrateur lance en direct dans un terminal).
 #
 # CORRECTIF : ce script installe orchestrator.sh comme un VRAI service
-# systemd (wef-orchestrateur.service, Type=oneshot). Un service systemd
+# systemd (wef.service, Type=oneshot). Un service systemd
 # n'est PAS un enfant de la session SSH qui l'a demarre - il est
 # supervise par PID 1 (systemd lui-meme), totalement independant de tout
 # terminal. Une coupure reseau, volontaire (WAZ_018_NET) ou accidentelle,
@@ -42,10 +43,10 @@
 # d'exploitation).
 #
 # Usage apres installation :
-#   systemctl start wef-orchestrateur     # lance l'orchestrateur, detache de tout terminal
-#   systemctl status wef-orchestrateur    # etat du dernier lancement (actif/reussi/echoue)
-#   journalctl -u wef-orchestrateur -f    # suivre en direct (optionnel, purement pour observer)
-#   systemctl stop wef-orchestrateur      # n'arrete PAS le job en cours proprement (voir note ci-dessous)
+#   systemctl start wef     # lance l'orchestrateur, detache de tout terminal
+#   systemctl status wef    # etat du dernier lancement (actif/reussi/echoue)
+#   journalctl -u wef -f    # suivre en direct (optionnel, purement pour observer)
+#   systemctl stop wef      # n'arrete PAS le job en cours proprement (voir note ci-dessous)
 set -uo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -63,9 +64,9 @@ fi
 # d'un niveau pour continuer a designer la racine reelle du projet
 # (ou vivent orchestrator.sh, vars.conf, jobs_table.csv).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UNIT_PATH="/etc/systemd/system/wef-orchestrateur.service"
+UNIT_PATH="/etc/systemd/system/wef.service"
 
-echo "[installer_service_orchestrateur] Installation du service pour : ${SCRIPT_DIR}/orchestrator.sh"
+echo "[svc_orch] Installation du service pour : ${SCRIPT_DIR}/orchestrator.sh"
 
 if [ ! -x "${SCRIPT_DIR}/orchestrator.sh" ]; then
   echo "ERREUR : ${SCRIPT_DIR}/orchestrator.sh introuvable ou non executable." >&2
@@ -92,17 +93,17 @@ fi
 if command -v getenforce &>/dev/null && [ "$(getenforce 2>/dev/null)" = "Enforcing" ]; then
   CURRENT_CTX="$(stat -c '%C' "${SCRIPT_DIR}/orchestrator.sh" 2>/dev/null | cut -d: -f3)"
   if [ "$CURRENT_CTX" != "bin_t" ] && [ "$CURRENT_CTX" != "usr_t" ]; then
-    echo "[installer_service_orchestrateur] SELinux Enforcing detecte, contexte actuel '${CURRENT_CTX:-inconnu}' non executable par un service - application du contexte 'bin_t' sur ${SCRIPT_DIR}..."
+    echo "[svc_orch] SELinux Enforcing detecte, contexte actuel '${CURRENT_CTX:-inconnu}' non executable par un service - application du contexte 'bin_t' sur ${SCRIPT_DIR}..."
     if ! command -v semanage &>/dev/null; then
-      echo "[installer_service_orchestrateur] 'semanage' absent - installation de policycoreutils-python-utils..."
+      echo "[svc_orch] 'semanage' absent - installation de policycoreutils-python-utils..."
       dnf install -y policycoreutils-python-utils >/dev/null 2>&1 || yum install -y policycoreutils-python-utils >/dev/null 2>&1 || true
     fi
     if command -v semanage &>/dev/null && command -v restorecon &>/dev/null; then
       semanage fcontext -a -t bin_t "${SCRIPT_DIR}(/.*)?" 2>/dev/null || true
       restorecon -Rv "${SCRIPT_DIR}" >/dev/null
-      echo "[installer_service_orchestrateur] Contexte SELinux corrige."
+      echo "[svc_orch] Contexte SELinux corrige."
     else
-      echo "[installer_service_orchestrateur] ATTENTION : impossible d'installer/utiliser semanage+restorecon - si 'systemctl start' echoue ensuite avec status=203/EXEC, c'est SELinux (voir ausearch -m avc -ts recent) ; corrigez manuellement ou deplacez ce dossier sous /opt." >&2
+      echo "[svc_orch] ATTENTION : impossible d'installer/utiliser semanage+restorecon - si 'systemctl start' echoue ensuite avec status=203/EXEC, c'est SELinux (voir ausearch -m avc -ts recent) ; corrigez manuellement ou deplacez ce dossier sous /opt." >&2
     fi
   fi
 fi
@@ -126,7 +127,7 @@ User=root
 # en 1 sur echec de job) - visibilite immediate de l'issue reelle, sans
 # avoir besoin d'etre reste connecte pour la voir en direct.
 # Sortie standard/erreur du service capturee par journald automatiquement
-# (journalctl -u wef-orchestrateur) - en plus des logs deja ecrits par
+# (journalctl -u wef) - en plus des logs deja ecrits par
 # l'orchestrateur lui-meme dans logs/ et state/history/ (aucune perte,
 # simple redondance utile).
 
@@ -134,16 +135,16 @@ User=root
 WantedBy=multi-user.target
 UNITEOF
 
-echo "[installer_service_orchestrateur] Unite ecrite dans ${UNIT_PATH}."
+echo "[svc_orch] Unite ecrite dans ${UNIT_PATH}."
 systemctl daemon-reload
-echo "[installer_service_orchestrateur] OK."
+echo "[svc_orch] OK."
 echo ""
 echo "Pour lancer l'orchestrateur en service (detache de toute session SSH) :"
-echo "  systemctl start wef-orchestrateur"
+echo "  systemctl start wef"
 echo "Pour suivre en direct (facultatif, n'affecte pas l'execution) :"
-echo "  journalctl -u wef-orchestrateur -f"
+echo "  journalctl -u wef -f"
 echo "Pour verifier l'issue apres coup (meme apres une reconnexion) :"
-echo "  systemctl status wef-orchestrateur"
+echo "  systemctl status wef"
 echo "  ./bin/monitor.sh"
 echo "  ./bin/history.sh <JOB_ID>"
 exit 0

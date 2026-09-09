@@ -125,7 +125,7 @@ bin/                            actions d'exploitation Control-M (hold.sh, free.
                                  notify.sh, profile.sh, audit.sh,
                                  reset_es_password.sh, resume.sh, summary.sh,
                                  dashboard.py)
-setup/                          installation ponctuelle (installer_service_*.sh,
+setup/                          installation ponctuelle (svc_orch.sh, svc_dash.sh,
                                  installer_env_cli.sh) - jamais utilise au quotidien,
                                  seulement a la mise en place
 jobs/                          les scripts, un par job (jobs/lib/ = fonctions partagées)

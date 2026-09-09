@@ -40,6 +40,11 @@ source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
 source "$PROJECT_ROOT/lib/commun.sh"
 mkdir -p /etc/logstash/conf.d
+
+# CORRIGE LE 2026-09-09 (demande explicite : prefixe d'index generique
+# configurable, MEME variable que celle lue par ES_040.sh pour son
+# gabarit d'interception - une seule source de verite).
+ES_IDX_PREFIX="${ES_INDEX_NAME_PREFIX:-log}"
 # Copie locale des certs (voir lib/commun.sh) - idempotent, sans effet si
 # LS_020 l'a deja fait, mais garantit ce fichier correct meme si ce job
 # est rejoue seul (ex: bin/order.sh) avant LS_020.
@@ -75,7 +80,7 @@ if [ "${LS_OUTPUT_ES_ENABLED:-true}" = "true" ]; then
     user => \"factory_ingest_user\"
     password => \"\${factory_ingest_password}\"
     ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
-    index => \"log-%{+YYYY.MM.dd}\"
+    index => \"${ES_IDX_PREFIX}-%{+YYYY.MM.dd}\"
   }"
   else
     echo "[LS_024] Sortie Elasticsearch : mode TOKEN."
@@ -84,7 +89,7 @@ if [ "${LS_OUTPUT_ES_ENABLED:-true}" = "true" ]; then
     hosts => [\"https://127.0.0.1:${ES_PORT}\"]
     api_key => \"\${factory_ingest_token}\"
     ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
-    index => \"log-%{+YYYY.MM.dd}\"
+    index => \"${ES_IDX_PREFIX}-%{+YYYY.MM.dd}\"
   }"
   fi
 else

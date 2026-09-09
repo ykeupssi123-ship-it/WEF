@@ -13,7 +13,7 @@
 # CORRECTIF : ce script ecrit un fichier dans /etc/profile.d/, charge
 # automatiquement par bash a CHAQUE connexion (interactive login shell)
 # de CHAQUE utilisateur sur la machine - meme principe que
-# installer_service_orchestrateur.sh pour l'orchestrateur lui-meme,
+# svc_orch.sh pour l'orchestrateur lui-meme,
 # applique ici a l'environnement CLI.
 #
 # A LANCER UNE SEULE FOIS (racine, root) - idempotent, peut et DOIT etre
@@ -32,7 +32,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # CE SCRIPT vit dans setup/, jamais a la racine - meme calcul que
-# installer_service_orchestrateur.sh pour retrouver la racine reelle du
+# svc_orch.sh pour retrouver la racine reelle du
 # projet (ou vivent orchestrator.sh, vars.conf, jobs_table.csv).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROFILE_FILE="/etc/profile.d/wef-app-env.sh"

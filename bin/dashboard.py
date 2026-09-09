@@ -29,7 +29,7 @@ dependance") :
   ROUGE  = ECHEC         (derniere execution ECHEC/FORCE_ECHEC, pas encore OK)
 
 Usage direct (test/debug) :  python3 dashboard.py
-Usage normal : voir installer_service_tableau_de_bord.sh (installe comme
+Usage normal : voir svc_dash.sh (installe comme
 service systemd, ouvre le port dans firewalld, demarre au boot).
 """
 import csv

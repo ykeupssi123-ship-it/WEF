@@ -97,7 +97,7 @@ fi
 # passage de l'orchestrateur), sans jamais le nettoyer lui-meme -
 # constate deux fois EN REEL dans la meme session, chaque fois avec
 # EXACTEMENT le meme fichier/la meme taille. Deja documente comme
-# incident connu par MNT_purge_rapide_disque.sh (geste manuel,
+# incident connu par MNT_purge_disque.sh (geste manuel,
 # ON_DEMAND) - insuffisant pour l'objectif "zero intervention manuelle"
 # puisque rien ne l'appelle automatiquement. Le fichier .tar est un pur
 # scratch de decompression (le .tar.xz d'origine, rechargeable, est

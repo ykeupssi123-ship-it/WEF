@@ -1,5 +1,5 @@
 #!/bin/bash
-# MNT_purge_complete_reinstall.sh - rejoue MNT_010 a MNT_018 : desinstalle
+# MNT_reinstall.sh - rejoue MNT_010 a MNT_018 : desinstalle
 # COMPLETEMENT une ancienne stack ELK/Wazuh (paquets + repertoires de
 # donnees residuels + depot dnf) pour repartir d'une machine vraiment
 # vierge. DESTRUCTIF - inventaire affiche et confirmation demandee avant

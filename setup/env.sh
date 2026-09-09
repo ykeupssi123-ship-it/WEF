@@ -1,5 +1,5 @@
 #!/bin/bash
-# installer_env_cli.sh - AJOUTE LE 2026-09-09 (demande explicite
+# env.sh (RENOMME LE 2026-09-09, ex-installer_env_cli.sh - nom trop long) - AJOUTE LE 2026-09-09 (demande explicite
 # utilisateur : pouvoir taper, depuis n'importe quel repertoire d'une
 # session CLI Linux, "$APP_BIN/order.sh <job> <raison>" et obtenir le
 # resultat voulu, peu importe ou le depot a ete clone).
@@ -42,9 +42,9 @@ if [ ! -f "${SCRIPT_DIR}/vars.conf" ]; then
   exit 1
 fi
 
-echo "[installer_env_cli] Ecriture de ${PROFILE_FILE} pour APP_HOME=${SCRIPT_DIR}..."
+echo "[env] Ecriture de ${PROFILE_FILE} pour APP_HOME=${SCRIPT_DIR}..."
 cat > "$PROFILE_FILE" << ENVEOF
-# Genere par setup/installer_env_cli.sh - NE PAS EDITER A LA MAIN
+# Genere par setup/env.sh - NE PAS EDITER A LA MAIN
 # (relancez ce script si le depot WAZ_ELK_FACTORY est deplace/re-clone).
 export APP_HOME="${SCRIPT_DIR}"
 export APP_BIN="${SCRIPT_DIR}/bin"
@@ -52,7 +52,7 @@ export APP_INF="${SCRIPT_DIR}/setup"
 ENVEOF
 chmod 644 "$PROFILE_FILE"
 
-echo "[installer_env_cli] OK. Variables actives pour toute NOUVELLE session (SSH, su -, etc)."
+echo "[env] OK. Variables actives pour toute NOUVELLE session (SSH, su -, etc)."
 echo "Pour les rendre actives immediatement dans CETTE session :"
 echo "  source ${PROFILE_FILE}"
 echo "Verification :"

@@ -58,7 +58,7 @@ française) :
 
 Une seule fois par machine (root) :
 ```bash
-sudo setup/installer_env_cli.sh
+sudo setup/env.sh
 ```
 Ouvre une nouvelle session (ou `source /etc/profile.d/wef-app-env.sh`),
 et **tout script du dépôt, où qu'il vive, devient appelable en un
@@ -76,7 +76,7 @@ variable dédiée (ses scripts ne sont jamais lancés seuls, ils attendent
 `VARS_FILE` déjà exporté par l'orchestrateur ou `bin/order.sh`). Même
 raisonnement pour `jobs/lib/` et `lib/` (fonctions partagées).
 
-Relancez `setup/installer_env_cli.sh` après tout déplacement/re-clonage
+Relancez `setup/env.sh` après tout déplacement/re-clonage
 du dépôt sur une nouvelle machine.
 
 ## Topologie recommandée
@@ -127,13 +127,13 @@ vars.conf                       toute la configuration (aucune valeur en dur ail
 bin/                            actions d'exploitation Control-M (hold.sh, free.sh,
                                  order.sh, confirm.sh, history.sh, monitor.sh,
                                  notify.sh, profile.sh, audit.sh,
-                                 reset_es_password.sh, resume.sh, summary.sh,
+                                 pwreset.sh, resume.sh, summary.sh,
                                  dashboard.py)
 setup/                          admin systeme, jamais du pilotage de job quotidien :
                                  installation ponctuelle (svc_orch.sh, svc_dash.sh,
-                                 installer_env_cli.sh) + maintenance occasionnelle
-                                 (MNT_diagnostic.sh, MNT_purge_complete_reinstall.sh,
-                                 MNT_purge_rapide_disque.sh, MNT_purge_historique.sh)
+                                 env.sh) + maintenance occasionnelle
+                                 (MNT_diagnostic.sh, MNT_reinstall.sh,
+                                 MNT_purge_disque.sh, MNT_purge_hist.sh)
 jobs/                          les scripts, un par job (jobs/lib/ = fonctions partagées)
 jobs_windows/                  kit PowerShell (agents Windows)
 lib/                            fonctions communes à l'orchestrateur

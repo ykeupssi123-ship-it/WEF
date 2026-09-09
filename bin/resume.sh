@@ -46,7 +46,7 @@ echo "--- Paquets ELK/Wazuh deja presents sur cette machine ---"
 # avec un vrai ELK) - presents de base sur certaines images, meme sur une
 # machine totalement vierge cote deploiement WEF. Consequence reelle
 # observee : le script rendait un faux verdict "paquets deja presents",
-# recommandant a tort MNT_purge_complete_reinstall.sh sur une VM ou
+# recommandant a tort MNT_reinstall.sh sur une VM ou
 # aucun job n'avait encore tourne (0 .ok dans state/). Corrige en
 # ancrant le motif sur le DEBUT du nom de paquet (^) : un vrai paquet
 # ELK/Wazuh commence toujours par son nom de produit (elasticsearch-,
@@ -78,7 +78,7 @@ if [ -n "$FOUND_PKG" ] && [ "$NB_OK" -eq 0 ]; then
   echo "l'orchestrateur croirait repartir de zero sur des paquets deja la,"
   echo "risque de configuration incoherente."
   echo ""
-  echo ">>> A FAIRE : setup/MNT_purge_complete_reinstall.sh"
+  echo ">>> A FAIRE : setup/MNT_reinstall.sh"
   echo "    puis relancez ce script."
 elif [ "$NB_OK" -eq 0 ]; then
   echo "Machine vierge (aucun paquet, aucun etat) : premier lancement ici."

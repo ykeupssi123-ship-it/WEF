@@ -2355,3 +2355,25 @@ Cause reelle, jamais un bug de comptage : `WAZ_035A_PAUSE_DEP_JOBS` (job precede
 **Verifie** : `bash -n` propre sur les 8 fichiers `.sh` touches (`vars.conf`, `setup/installer_env_cli.sh`, `orchestrator.sh`, `bin/resume.sh`, les 4 `MNT_*.sh` deplaces) ; grep de controle final sans filtre d'extension : 0 reference residuelle a `maintenance/` ou aux 3 variables retirees (hors notes historiques volontaires dans ce journal et dans le commentaire d'explication de `vars.conf`) ; `git ls-files -s -- '*.sh'` confirme 0 fichier sans bit executable apres le deplacement.
 
 **Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - a confirmer au prochain `sudo setup/installer_env_cli.sh` + nouvelle session : `echo $APP_INF` doit pointer vers `setup/` et y trouver les 4 scripts `MNT_*.sh` en plus des 3 scripts d'installation.
+
+## 2026-09-09 (suite) - Deuxieme passe de raccourcissement : env.sh, pwreset.sh, MNT_reinstall.sh, MNT_purge_hist.sh, MNT_purge_disque.sh
+
+**Demande explicite, en deux temps** : l'utilisateur a d'abord repere que `setup/installer_env_cli.sh` restait long malgre le renommage de `svc_orch.sh`/`svc_dash.sh` (oubli reel - ce fichier avait ete cree le meme jour, apres coup, jamais inclus dans la premiere passe de raccourcissement). Puis, generalisation explicite : "partout ou les noms sont longs, reduisez".
+
+**Perimetre delibere** : uniquement les scripts **operateur-facing** (`bin/`, `setup/`) - jamais les 275 scripts de `jobs/`. Ces derniers portent le vrai nom Control-M de l'action qu'ils executent (deja un choix assume et documente dans `README.md` : "sous le vrai nom de l'action Control-M correspondante, jamais une paraphrase francaise") et sont references par leur nom exact dans `jobs_table.csv` (colonne `SCRIPT_FILE`, 275 lignes) - les renommer serait un chantier a tres large rayon d'impact, jamais demande, et sans aucun gain d'ergonomie reel (ces fichiers ne sont JAMAIS tapes directement par un operateur, uniquement via `bin/order.sh <JOB_ID>`).
+
+**Renommages effectues (`git mv`, historique preserve)** :
+- `setup/installer_env_cli.sh` -> `setup/env.sh`
+- `bin/reset_es_password.sh` -> `bin/pwreset.sh` (aligne sur l'alias deja existant `wpwreset` dans `bin/profile.sh`)
+- `setup/MNT_purge_complete_reinstall.sh` -> `setup/MNT_reinstall.sh`
+- `setup/MNT_purge_historique.sh` -> `setup/MNT_purge_hist.sh`
+- `setup/MNT_purge_rapide_disque.sh` -> `setup/MNT_purge_disque.sh`
+- `setup/MNT_diagnostic.sh` : conserve tel quel (deja court, deja clair)
+
+Prefixe `MNT_` conserve sur les 4 scripts de maintenance : rattache au blueprint numerote d'origine (chaque script rejoue une plage `MNT_0XX` documentee dans son propre en-tete, ex. "rejoue MNT_010 a MNT_018") - un renommage complet aurait rompu cette tracabilite pour un gain de longueur marginal.
+
+**Propage** : toutes les references croisees reelles mises a jour (`bin/profile.sh`, `bin/resume.sh`, `jobs/ES_022.sh`, `jobs/ES_027.sh`, `jobs/ES_050.sh`, `jobs/INFRA_003_DEVNULL_GUARDIAN.sh`, `jobs/lib/es_admin_curl.sh`, `jobs/PKI_004.sh`, `orchestrator.sh`, `README.md`, `docs/GUIDE_EXPLOITATION.md`, `vars.conf`, et les fichiers renommes eux-memes pour leurs propres tags de log internes, ex. `[reset_es_password]` -> `[pwreset]`, `[MNT_purge_historique]` -> `[MNT_purge_hist]`).
+
+**Verifie** : `bash -n` propre sur les 15 fichiers `.sh` touches ; grep de controle final sans filtre d'extension sur les 5 anciens noms retires ce tour : 0 occurrence residuelle (hors note historique volontaire "ex-..." dans chaque fichier renomme lui-meme) ; `git ls-files -s -- '*.sh'` confirme 0 fichier sans bit executable.
+
+**Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - a confirmer au prochain `git pull` + `sudo setup/env.sh` que `$APP_BIN/pwreset.sh` et `$APP_INF/MNT_reinstall.sh` fonctionnent tels quels.

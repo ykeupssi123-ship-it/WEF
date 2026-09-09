@@ -1,5 +1,5 @@
 #!/bin/bash
-# MNT_purge_rapide_disque.sh - rejoue MNT_006 a MNT_009 : vide le cache
+# MNT_purge_disque.sh - rejoue MNT_006 a MNT_009 : vide le cache
 # de flux CVE bruts du Vulnerability Detector (donnees rechargeables,
 # sans risque, cause reelle d'un incident disque plein deja rencontre
 # sur ce projet). N'affecte AUCUNE alerte ni donnee client.

@@ -32,7 +32,7 @@
 # cle existante n'a pas encore le nouveau privilege, elle est mise a jour
 # EN PLACE via _security/api_key/_update (meme id, meme secret deja
 # distribue aux consommateurs - aucune rotation, aucune interruption).
-# Meme principe que es_admin_curl.sh/reset_es_password.sh : la
+# Meme principe que es_admin_curl.sh/pwreset.sh : la
 # reparation doit se produire toute seule au prochain passage du job.
 #
 # CORRECTIF 2026-08-19 (deuxieme et troisieme sessions, meme journee,

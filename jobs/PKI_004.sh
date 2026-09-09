@@ -13,7 +13,7 @@ cd "${PKI_DIR}"
 # PKI_003.sh : factory_ca.crt s'est retrouve VIDE - "openssl req" n'etait
 # jamais verifie, et l'ancien test "[ -f factory_ca.crt ]" reconduisait
 # le fichier vide indefiniment, meme apres un "repartir a zero" complet
-# - le fichier n'est jamais nettoye par MNT_purge_complete_reinstall.sh
+# - le fichier n'est jamais nettoye par MNT_reinstall.sh
 # ni par "rm -rf state logs" (PKI_DIR est hors de leur perimetre). La
 # consequence reelle etait bien plus grave qu'un simple job en echec :
 # PKI_009 copiait ensuite ce certificat vide dans le magasin de confiance

@@ -1,5 +1,5 @@
 #!/bin/bash
-# reset_es_password.sh - SEUL point sanctionne pour reinitialiser
+# pwreset.sh - SEUL point sanctionne pour reinitialiser
 # le mot de passe du compte superutilisateur 'elastic'. Ajoute le
 # 2026-08-14 suite a un incident reel pre-demo : le mot de passe stocke
 # dans state/es_bootstrap_password.secret avait diverge du mot de passe
@@ -20,8 +20,8 @@
 # fonctionne).
 #
 # Usage :
-#   ./reset_es_password.sh              -> interactif, detaille chaque etape
-#   ./reset_es_password.sh --silencieux  -> pour appel automatique
+#   ./pwreset.sh              -> interactif, detaille chaque etape
+#   ./pwreset.sh --silencieux  -> pour appel automatique
 #                                                    (voir jobs/lib/es_admin_curl.sh,
 #                                                    qui invoque ce script tout seul
 #                                                    des qu'une desynchronisation

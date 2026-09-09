@@ -72,10 +72,10 @@ wlog(){
 # Ajoute le 2026-08-14, suite a un incident reel pre-demo (mot de passe
 # 'elastic' desynchronise entre le cluster et state/es_bootstrap_password.secret).
 # Seul point sanctionne pour reinitialiser ce mot de passe - voir
-# reset_es_password.sh pour le detail (verification automatique
+# pwreset.sh pour le detail (verification automatique
 # incluse, jamais suppose que ca a fonctionne).
 wpwreset(){
-  "${WEF_HOME}/reset_es_password.sh"
+  "${WEF_HOME}/pwreset.sh"
 }
 
 # Ajoute le 2026-08-14, suite a une demande reelle de l'operateur (VM1) :

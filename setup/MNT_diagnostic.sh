@@ -31,5 +31,5 @@ fi
 echo ""
 echo "===================================================================="
 echo " Si /var/ossec/queue/vd ou vd_updater pese plusieurs Go : lancez"
-echo " MNT_purge_rapide_disque.sh pour le vider sans rien casser."
+echo " MNT_purge_disque.sh pour le vider sans rien casser."
 echo "===================================================================="

@@ -1,5 +1,5 @@
 #!/bin/bash
-# MNT_purge_historique.sh - politique d'expiration de l'historique par
+# MNT_purge_hist.sh - politique d'expiration de l'historique par
 # job (SYSOUT), ajoutee le 2026-08-12. Equivalent fonctionnel de
 # l'expiration d'une SYSOUT JCL/mainframe : passe HISTORY_RETENTION_DAYS
 # (vars.conf), le job ET son entree de catalogue disparaissent ENSEMBLE
@@ -8,7 +8,7 @@
 #
 # Appelee AUTOMATIQUEMENT au demarrage de chaque orchestrator.sh
 # (silencieuse, rapide) - reste aussi lancable seule a tout moment :
-#   setup/MNT_purge_historique.sh
+#   setup/MNT_purge_hist.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
@@ -18,7 +18,7 @@ RETENTION_DAYS="${HISTORY_RETENTION_DAYS:-7}"
 LEDGER="${STATE_DIR:-$HERE/state}/JOBS_HISTORY.csv"
 HISTORY_DIR="${STATE_DIR:-$HERE/state}/history"
 
-[ -f "$LEDGER" ] || { echo "[MNT_purge_historique] Aucun historique pour l'instant, rien a purger."; exit 0; }
+[ -f "$LEDGER" ] || { echo "[MNT_purge_hist] Aucun historique pour l'instant, rien a purger."; exit 0; }
 
 CUTOFF_EPOCH=$(date -d "-${RETENTION_DAYS} days" +%s)
 NOW_TAG=$(date -Iseconds)
@@ -50,7 +50,7 @@ if [ -d "$HISTORY_DIR" ]; then
 fi
 
 if [ "$PURGED" -gt 0 ]; then
-  echo "[MNT_purge_historique] $NOW_TAG : $PURGED execution(s) de plus de ${RETENTION_DAYS} jours purgee(s), $KEPT conservee(s)."
+  echo "[MNT_purge_hist] $NOW_TAG : $PURGED execution(s) de plus de ${RETENTION_DAYS} jours purgee(s), $KEPT conservee(s)."
 else
-  echo "[MNT_purge_historique] Rien a purger (retention ${RETENTION_DAYS} jours, $KEPT execution(s) dans la fenetre)."
+  echo "[MNT_purge_hist] Rien a purger (retention ${RETENTION_DAYS} jours, $KEPT execution(s) dans la fenetre)."
 fi

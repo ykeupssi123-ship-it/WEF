@@ -53,6 +53,30 @@ echo "[WAZ_044] ${DISPO_GO}G disponibles, marge suffisante."
 echo "[WAZ_044] Nettoyage de tout fichier .tar partiel abandonne (plus de 10 min, jamais un fichier en cours d'usage)..."
 find /var/ossec/tmp -maxdepth 1 -name 'vd_*.tar' -mmin +10 -delete 2>/dev/null || true
 
+# CORRIGE LE 2026-09-09 (incident reel, meme VM, stade avance du
+# deploiement - ES+LS+KB+WAZ tous actifs simultanement) : "tail -n 50"
+# suivi d'un grep repete toutes les 5s supposait implicitement que le
+# message cible resterait visible dans les 50 dernieres lignes assez
+# longtemps pour etre vu. Preuve reelle : a ce stade, ossec.log est tres
+# bavard (wazuh-db se reconnecte toutes les ~10s, syscheckd/logcollector
+# journalisent aussi en continu, niveau debug actif) - largement plus de
+# 50 lignes peuvent s'ecrire entre deux sondages, poussant le message
+# (demarrage OU erreur) hors de la fenetre AVANT le sondage suivant :
+# `wazuh-manager` confirme actif (systemctl status), aucune ligne
+# Vulnerability* visible dans les 50 dernieres lignes a aucun moment -
+# jamais un vrai blocage, juste un defaut de detection.
+# Corrige par une fenetre de lecture CROISSANTE : le nombre de lignes du
+# journal est fige au moment du redemarrage, chaque sondage relit TOUT
+# ce qui a ete ecrit DEPUIS ce point precis (jamais de fenetre glissante
+# qui peut perdre un message, jamais de risque de reagir a une ancienne
+# ligne d'un run precedent). Budget egalement remonte (meme discipline
+# que WAZ_CONVERGENT_TEST_TIMEOUT_SEC/WAZ_INDEX_VERIFY_TIMEOUT_SEC le
+# meme jour) : la contention reelle observee a ce stade avance de la
+# chaine (tous les services majeurs actifs a la fois) justifie plus que
+# les 6 minutes d'origine.
+OSSEC_LOG=/var/ossec/logs/ossec.log
+RESTART_LINE=$(wc -l < "$OSSEC_LOG" 2>/dev/null || echo 0)
+
 echo "[WAZ_044] Redemarrage de wazuh-manager..."
 systemctl restart wazuh-manager 2>/dev/null || true
 if ! wait_for_service_active wazuh-manager 120 5; then
@@ -60,19 +84,21 @@ if ! wait_for_service_active wazuh-manager 120 5; then
   exit 1
 fi
 
-echo "[WAZ_044] Attente de la confirmation reelle du module (jusqu'a 6 minutes, decompression 8,5G observee)..."
-for i in $(seq 1 72); do
-  if tail -n 50 /var/ossec/logs/ossec.log 2>/dev/null | grep -q "Vulnerability scanner module started"; then
+WAZ_VD_RETRY_TIMEOUT_SEC="${WAZ_VD_RETRY_TIMEOUT_SEC:-600}"
+echo "[WAZ_044] Attente de la confirmation reelle du module (jusqu'a ${WAZ_VD_RETRY_TIMEOUT_SEC}s, decompression 8,5G observee)..."
+for i in $(seq 1 $((WAZ_VD_RETRY_TIMEOUT_SEC / 5))); do
+  NEW_LINES="$(tail -n +$((RESTART_LINE + 1)) "$OSSEC_LOG" 2>/dev/null)"
+  if echo "$NEW_LINES" | grep -q "Vulnerability scanner module started"; then
     echo "[WAZ_044] OK (module demarre et confirme actif dans le journal reel)."
     exit 0
   fi
-  if tail -n 50 /var/ossec/logs/ossec.log 2>/dev/null | grep -qE "VulnerabilityScannerFacade::start: (Error|Write failed)"; then
-    echo "[WAZ_044] ERREUR : le module a signale un echec reel dans le journal - voir /var/ossec/logs/ossec.log." >&2
-    tail -n 10 /var/ossec/logs/ossec.log >&2 2>/dev/null || true
+  if echo "$NEW_LINES" | grep -qE "VulnerabilityScannerFacade::start: (Error|Write failed)"; then
+    echo "[WAZ_044] ERREUR : le module a signale un echec reel dans le journal - voir ${OSSEC_LOG}." >&2
+    echo "$NEW_LINES" | grep -E "VulnerabilityScannerFacade::start: (Error|Write failed)" | tail -n 10 >&2
     exit 1
   fi
   sleep 5
 done
 
-echo "[WAZ_044] ERREUR : timeout, aucune confirmation de demarrage ni d'echec explicite trouvee dans le journal apres 6 minutes." >&2
+echo "[WAZ_044] ERREUR : timeout, aucune confirmation de demarrage ni d'echec explicite trouvee dans le journal apres ${WAZ_VD_RETRY_TIMEOUT_SEC}s (fenetre complete depuis le redemarrage, ligne ${RESTART_LINE})." >&2
 exit 1

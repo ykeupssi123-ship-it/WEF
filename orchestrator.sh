@@ -141,7 +141,19 @@ write_report() {
     done < "$JOBS_CSV"
     [ $NOT_REACHED -eq 0 ] && echo "(aucun - tout ce qui concerne ce ROLE/composants est termine)"
     echo "=================================================="
-  } > "$REPORT_FILE"
+  # CORRIGE LE 2026-09-09 (incident reel signale par l'operateur : un
+  # message "xargs: '/dev/null': Aucun fichier ou dossier de ce type"
+  # s'affichait nu dans le terminal, sans horodatage, entre le log
+  # "Arret orchestrateur" et "Rapport ecrit") : ce bloc ne redirigeait
+  # que STDOUT vers REPORT_FILE - tout STDERR genere a l'interieur
+  # (dont celui de "xargs -n1 basename" ci-dessus) fuyait directement
+  # dans le terminal de l'operateur au lieu d'etre journalise. Cause
+  # exacte de CE message xargs precis non reproduite/confirmee (le
+  # rapport s'ecrivait quand meme correctement juste apres - jamais un
+  # blocage reel), mais desormais capturee dans RUN_LOG au lieu de
+  # polluer silencieusement la session de l'operateur, pour analyse
+  # future si ca se represente.
+  } > "$REPORT_FILE" 2>>"$RUN_LOG"
   log "Rapport ecrit dans $REPORT_FILE"
 }
 trap 'cleanup_running; write_report' EXIT

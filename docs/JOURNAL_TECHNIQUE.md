@@ -2322,3 +2322,21 @@ Cause reelle, jamais un bug de comptage : `WAZ_035A_PAUSE_DEP_JOBS` (job precede
 **Verifie** : `bash -n` propre sur `vars.conf` et `setup/installer_env_cli.sh`.
 
 **Limite honnete** : non teste en reel sur la VM (pas d'acces direct) - a verifier au prochain `sudo setup/installer_env_cli.sh` + nouvelle session : `echo $APP_JOBS`, `echo $APP_MNT`.
+
+## 2026-09-09 (suite) - docs/GUIDE_EXPLOITATION.md reecrit en entier : $APP_* partout, synthese systemique, remplissage confirme manuel des deux cotes
+
+**Demande explicite, plusieurs volets** : (1) confirmer que `WAZ_048_SEED_INDEXER_LIVE`/`WAZ_049_SEED_ES_LIVE` restent strictement manuels, des deux cotes (wazuh-indexer ET Elasticsearch) ; (2) les documenter avec toutes les commandes que ca implique ; (3) TOUTE commande du guide d'exploitation doit utiliser les variables `$APP_*` - "je ne veux rien voir qui n'utilise pas les variables" ; (4) une rubrique de synthese systemique listant les 6 variables, leur contenu, ET une colonne "pourquoi" (role de chaque repertoire) ; (5) un document qui ne garde que l'essentiel - le document precedent portait des sections datant de juillet, jamais retravaillees depuis.
+
+**Verification demandee, faite avant toute redaction (jamais suppose)** : `grep -n ",WAZ_PURGE_MANUAL_GATE$" jobs_table.csv` (chercher si cette condition est produite par un OUT_COND quelconque) -> **0 resultat**. Confirme : `WAZ_045A/045B/046/047/048/049` (les 6 jobs qui touchent aux donnees de test/demo, des deux cotes wazuh-indexer et Elasticsearch) ont tous `IN_COND=WAZ_PURGE_MANUAL_GATE` - une condition que rien ne produit jamais, donc strictement inatteignable par l'orchestrateur seul, uniquement declenchable via `bin/order.sh` (force explicite). Aucune ambiguite, verifie sur les 6 lignes.
+
+**`docs/GUIDE_EXPLOITATION.md` reecrit integralement** (jamais un patch incrementiel - le contenu precedent melangeait plusieurs mois d'ajouts successifs, jamais retravaille en un tout coherent) :
+- Nouvelle rubrique "Synthese systemique" en tete de document : tableau des 6 variables `$APP_*`, avec une colonne "Pourquoi ce repertoire existe" (role architectural de chaque dossier, pas juste son chemin).
+- Etape 0 explicite : `git clone` (remplace l'ancien flux "copiez l'archive tar.gz" - jamais utilise en pratique aujourd'hui, le vrai flux reel de toute la session a ete `git clone`/`git pull`) + `setup/installer_env_cli.sh`, AVANT le premier deploiement (les variables sont donc actives des le tout premier `orchestrator.sh`).
+- Toutes les commandes (deploiement, controle des jobs, scenarios demo, reglages) reecrites avec `$APP_HOME`/`$APP_BIN`/`$APP_CONF`/`$APP_INF`/`$APP_MNT` - plus aucun chemin relatif (`./bin/...`, `./orchestrator.sh`) nulle part dans le document.
+- Nouvelle section "Scenario demo" avec un tableau comparant explicitement `WAZ_045A/045B` (chargement instantane, test de migration) et `WAZ_048/049` (remplissage visible, demo) plus la sequence complete (connexion -> bascule -> remplissage -> observation -> purge).
+- Section "Vocabulaire operateur" (`bin/profile.sh`, alias `wenv`/`escreds`/`kburl`...) retiree deliberement : redondante avec le nouveau systeme `$APP_*`, qui couvre desormais le meme besoin sans necessiter de sourcer un fichier par session. `bin/profile.sh` lui-meme n'est pas supprime, seulement sa mise en avant dans la doc.
+- Document ramene de 360 a ~215 lignes - contenu operationnel conserve integralement, reformule en tableaux plutot qu'en prose repetitive.
+
+**Verifie** : contenu recoupe avec le code reel avant publication - `bin/notify.sh --test` (option confirmee presente), `jobs_windows/orchestrator_windows.ps1` (auto-localisation via `$MyInvocation.MyCommand.Path`, fonctionne quel que soit le repertoire d'appel), `AGENT_COMPONENTS` par defaut (`FILEBEAT,METRICBEAT,WAZUH_AGENT,HOSTNAME_RENAME`, corrige une premiere version incomplete de ce tableau avant publication), `DASHBOARD_PORT` (8088).
+
+**Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - a confirmer au prochain passage que chaque commande du guide fonctionne telle quelle une fois `setup/installer_env_cli.sh` actif.

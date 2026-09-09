@@ -12,6 +12,24 @@
 # (jobs dependants deja mis en pause) et AVANT WAZ_035D (arret effectif
 # de wazuh-indexer) - il faut que l'indexeur soit encore JOIGNABLE pour
 # pouvoir en lire le contenu.
+#
+# ORDRE CORRIGE LE 2026-09-09 (incident reel, VM neuve : 5 documents
+# encore residuels apres 5 tentatives de coupure, malgre le reessai
+# borne deja ajoute plus tot le meme jour dans jobs/lib/cut_migrate.sh).
+# Cause racine reelle, jamais un simple manque de reessais : ce job
+# tournait AVANT WAZ_035C_REROUTE_PIPELINE_ES - le pipeline Logstash
+# dedie (WAZ_014B) continuait donc d'ecrire de VRAIES nouvelles alertes
+# dans wazuh-indexer PENDANT toute la coupure, une cible mouvante. Sens
+# inverse (WAZ_039_WAZUH_TRIGGER) deja construit dans le bon ordre
+# (reroute AVANT coupure, WAZ_039B puis WAZ_039C) - jamais rencontre ce
+# probleme, reussi du premier coup a chaque test. Corrige en alignant
+# WAZ_035 sur ce meme ordre deja prouve : jobs_table.csv fait desormais
+# tourner WAZ_035C (aiguillage, gele la source) AVANT ce job (IN_COND=
+# WAZ_PIPELINE_ELK_ACTIVE au lieu de WAZ_DEP_JOBS_PAUSED) - wazuh-indexer
+# reste JOIGNABLE (lecture) mais ne recoit plus AUCUNE nouvelle ecriture
+# des l'instant ou ce job commence. Le reessai borne dans cut_migrate.sh
+# reste en place comme filet de securite, mais ne devrait plus jamais
+# se declencher en fonctionnement normal.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

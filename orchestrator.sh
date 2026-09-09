@@ -148,6 +148,23 @@ trap 'cleanup_running; write_report' EXIT
 
 log "=== Demarrage orchestrateur WAZ_ELK_FACTORY - ROLE=$ROLE - PROJET=$PROJECT_NAME ==="
 
+# AJOUTE LE 2026-09-09 (demande explicite utilisateur, suite a un
+# incident reel : acces SSH perdu plusieurs minutes suite a une coupure
+# disque cote hote pendant une execution directe de ce script dans une
+# session SSH interactive). systemd exporte INVOCATION_ID vers CHAQUE
+# processus qu'il supervise directement (systemd.exec(5)) - absent ici
+# signifie que ce script tourne comme un enfant ordinaire du
+# shell/de la session qui l'a lance (SSH, console) : une coupure reseau
+# (volontaire, WAZ_018_NET, ou accidentelle, hote/VM) tuerait alors tout
+# le groupe de processus, orchestrateur inclus, en plein milieu de la
+# chaine (meme incident deja documente le 2026-08-19, voir
+# setup/installer_service_orchestrateur.sh). Avertissement SEULEMENT,
+# jamais un blocage : un lancement direct reste legitime pour un test
+# ou une observation courte.
+if [ -z "${INVOCATION_ID:-}" ]; then
+  log "ATTENTION : orchestrator.sh tourne en direct dans cette session (non supervise par systemd) - une coupure reseau ou une deconnexion tuerait ce processus en plein milieu de la chaine. Pour un deploiement non surveille : ./setup/installer_service_orchestrateur.sh puis 'systemctl start wef-orchestrateur' (immunise contre les coupures)."
+fi
+
 if [ "$ROLE" = "ELK_HOST" ] && [ -z "${FACTORY_HOST_IP:-}" ]; then
   log "ATTENTION : FACTORY_HOST_IP est vide dans vars.conf. Certains jobs reseau (LS_008, LS_009, LS_020...) en ont besoin."
 fi

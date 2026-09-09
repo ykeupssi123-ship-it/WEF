@@ -1,4 +1,8 @@
 JOB_ID,JOB_NAME,JOB_ROLE,COMPONENT,SCRIPT_FILE,DESC,IN_COND,OUT_COND
+INFRA_001,WEF_INFRA_BLD_RENAMEELK,ELK_HOST,ALWAYS,INFRA_001.sh,[PROJET-SPECIFIQUE - SUPPRIMABLE] Renommage de la VM ELK_HOST avec un nom explicite,NONE,ELK_HOSTNAME_SET
+INFRA_003_DEVNULL_GUARDIAN,WEF_INFRA_BLD_DEVNULLGRD,ALL,ALWAYS,INFRA_003_DEVNULL_GUARDIAN.sh,Résilience : gardes permanentes contre la corruption récurrente de /dev/null (timer 3s) et le remplissage disque du cache CVE Vulnerability Detector (timer 60s),NONE,DEVNULL_GUARDIAN_OK
+INFRA_004_HEALTH_GUARDIAN,WEF_INFRA_RUN_HEALTHGRD,ALL,ALWAYS,INFRA_004_HEALTH_GUARDIAN.sh,Exploitation continue : contrôle de santé fonctionnelle toutes les 5 min (services/DNS/certificat PKI/disque),NONE,HEALTH_GUARDIAN_OK
+INFRA_005_DISK_HYGIENE,WEF_INFRA_RUN_DISKHYG,ALL,ALWAYS,INFRA_005_DISK_HYGIENE.sh,Exploitation continue : désactivation de PCP (inutilisé) et purge cache dnf - entretien hebdomadaire permanent,NONE,DISK_HYGIENE_OK
 PKI_001,WEF_PKI_BLD_GRPNEW,ELK_HOST,ALWAYS,PKI_001.sh,Raccordement : Création du groupe de confiance partagé de l'usine,NONE,PKI_GROUP_OK
 PKI_002,WEF_PKI_BLD_DIRNEW,ELK_HOST,ALWAYS,PKI_002.sh,Structures : Création du coffre-fort neutre d'ancrage des clés de l'usine,PKI_GROUP_OK,PKI_DIR_OK
 PKI_003,WEF_PKI_BLD_CAKEYGEN,ELK_HOST,ALWAYS,PKI_003.sh,Génération d'Ancre : Création de la clé privée de la CA racine globale,PKI_DIR_OK,PKI_CA_KEY_OK
@@ -252,11 +256,7 @@ WAZ_045B_SEED_ES_DATA,WEF_WAZ_RUN_SEEDESDATA,ELK_HOST,ALWAYS,WAZ_045B_SEED_ES_DA
 WAZ_046_PURGE_INDEXER_DATA,WEF_WAZ_RUN_PURGEIDXDATA,ELK_HOST,ALWAYS,WAZ_046_PURGE_INDEXER_DATA.sh,[MANUEL UNIQUEMENT - bin/order_job.sh] Nettoyage : purge complète et irréversible des alertes dans wazuh-indexer,WAZ_PURGE_MANUAL_GATE,WAZ_PURGE_IDX_OK
 WAZ_047_PURGE_ES_DATA,WEF_WAZ_RUN_PURGEESDATA,ELK_HOST,ALWAYS,WAZ_047_PURGE_ES_DATA.sh,[MANUEL UNIQUEMENT - bin/order_job.sh] Nettoyage : purge complète et irréversible des alertes dans Elasticsearch,WAZ_PURGE_MANUAL_GATE,WAZ_PURGE_ES_OK
 DIST_001,WEF_BEATS_BLD_CADIST,AGENT_HOST,FILEBEAT|METRICBEAT,DIST_001.sh,Distribution : Copie du certificat de la CA d'usine depuis ELK_HOST vers BEATS_HOST,FB_BIN_OK,CA_DISTRIBUTED_OK
-INFRA_001,WEF_INFRA_BLD_RENAMEELK,ELK_HOST,ALWAYS,INFRA_001.sh,[PROJET-SPECIFIQUE - SUPPRIMABLE] Renommage de la VM ELK_HOST avec un nom explicite,NONE,ELK_HOSTNAME_SET
 INFRA_002,WEF_INFRA_BLD_RENAMEBEATS,AGENT_HOST,HOSTNAME_RENAME,INFRA_002.sh,[PROJET-SPECIFIQUE - SUPPRIMABLE] Renommage de la VM BEATS_HOST avec un nom explicite,AGENT_RESOURCES_OK,BEATS_HOSTNAME_SET
-INFRA_003_DEVNULL_GUARDIAN,WEF_INFRA_BLD_DEVNULLGRD,ALL,ALWAYS,INFRA_003_DEVNULL_GUARDIAN.sh,Résilience : gardes permanentes contre la corruption récurrente de /dev/null (timer 3s) et le remplissage disque du cache CVE Vulnerability Detector (timer 60s),NONE,DEVNULL_GUARDIAN_OK
-INFRA_004_HEALTH_GUARDIAN,WEF_INFRA_RUN_HEALTHGRD,ALL,ALWAYS,INFRA_004_HEALTH_GUARDIAN.sh,Exploitation continue : contrôle de santé fonctionnelle toutes les 5 min (services/DNS/certificat PKI/disque),NONE,HEALTH_GUARDIAN_OK
-INFRA_005_DISK_HYGIENE,WEF_INFRA_RUN_DISKHYG,ALL,ALWAYS,INFRA_005_DISK_HYGIENE.sh,Exploitation continue : désactivation de PCP (inutilisé) et purge cache dnf - entretien hebdomadaire permanent,NONE,DISK_HYGIENE_OK
 DNS_001_INSTALL,WEF_DNS_BLD_INSTALL,ELK_HOST,ALWAYS,DNS_001_INSTALL.sh,DNS interne : installation de dnsmasq + bind-utils,NONE,DNS_INSTALLED_OK
 DNS_002_ZONE,WEF_DNS_BLD_ZONE,ELK_HOST,ALWAYS,DNS_002_ZONE.sh,DNS interne : déclaration de la zone (un FQDN par service),DNS_INSTALLED_OK,DNS_ZONE_OK
 DNS_003_FIREWALL,WEF_DNS_BLD_FIREWALL,ELK_HOST,ALWAYS,DNS_003_FIREWALL.sh,DNS interne : ouverture du port 53 (tcp+udp) sur la zone active,DNS_ZONE_OK,DNS_FW_OK

@@ -48,9 +48,20 @@ logger -t wazuh-canary-test "WEF_CANARY_TEST id=${CANARY_ID} - test de bascule c
 # deja ecoulee AVANT que le pipeline n'ait meme commence a lire
 # alerts.json. Corrige par un sondage repete (meme discipline que
 # WAZ_044_VD_SAFE_RETRY.sh) au lieu d'un delai fixe parie a l'avance.
-echo "[WAZ_037_CONVERGENT_TEST] Verification presence dans Elasticsearch (wazuh-alerts-4.x-*, jusqu'a 90s)..."
+# BUDGET REMONTE LE 2026-09-09 (incident reel, meme classe de
+# contention que WAZ_014/WAZ_020_VERIFY le meme jour) : "systemctl
+# restart logstash" (WAZ_035C, juste avant dans la chaine) confirmait
+# l'UNITE active bien avant que le PIPELINE lui-meme n'ait fini de
+# recharger - preuve reelle dans logstash-plain.log : SIGTERM recu a
+# 07:40:28, mais le pipeline "wazuh-alerts" n'a commence a lire
+# alerts.json qu'a 07:47:32 (pres de 7 minutes plus tard, sous la
+# charge deja bien documentee de cette VM) - largement au-dela des 90s
+# alloues ici. Remonte a 480s (8 min) par prudence, marge reelle sur le
+# pire cas observe.
+WAZ_CONVERGENT_TEST_TIMEOUT_SEC="${WAZ_CONVERGENT_TEST_TIMEOUT_SEC:-480}"
+echo "[WAZ_037_CONVERGENT_TEST] Verification presence dans Elasticsearch (wazuh-alerts-4.x-*, jusqu'a ${WAZ_CONVERGENT_TEST_TIMEOUT_SEC}s)..."
 FOUND=0
-for i in $(seq 1 9); do
+for i in $(seq 1 $((WAZ_CONVERGENT_TEST_TIMEOUT_SEC / 10))); do
   sleep 10
   RESULT=$(es_admin_curl "https://127.0.0.1:${ES_PORT}/wazuh-alerts-4.x-*/_search?q=WEF_CANARY_TEST+AND+${CANARY_ID}" 2>/dev/null || echo "")
   if echo "$RESULT" | grep -q "${CANARY_ID}"; then
@@ -61,7 +72,7 @@ done
 if [ "$FOUND" -eq 1 ]; then
   echo "[WAZ_037_CONVERGENT_TEST] Alerte retrouvee dans Elasticsearch. Mode convergent valide de bout en bout."
 else
-  echo "[WAZ_037_CONVERGENT_TEST] ERREUR : alerte introuvable dans Elasticsearch apres 90s - le routage convergent ne fonctionne pas." >&2
+  echo "[WAZ_037_CONVERGENT_TEST] ERREUR : alerte introuvable dans Elasticsearch apres ${WAZ_CONVERGENT_TEST_TIMEOUT_SEC}s - le routage convergent ne fonctionne pas." >&2
   exit 1
 fi
 echo "[WAZ_037_CONVERGENT_TEST] OK."

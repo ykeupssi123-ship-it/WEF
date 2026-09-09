@@ -194,7 +194,8 @@ WAZ_003,WEF_WAZ_BLD_USRNEW,ELK_HOST,ALWAYS,WAZ_003.sh,Confinement : Création de
 WAZ_004,WEF_WAZ_BLD_DIRSTRUCT,ELK_HOST,ALWAYS,WAZ_004.sh,Structures : Initialisation des répertoires de données et d'alertes de l'usine,WAZ_USER_READY,WAZ_DIRS_OK
 WAZ_005,WEF_WAZ_BLD_INTRFC,ELK_HOST,ALWAYS,WAZ_005.sh,Châssis Réseau : Liaison permanente des fiches d'interconnexion locales,WAZ_DIRS_OK,WAZ_FW_ZONE_OK
 WAZ_006,WEF_WAZ_BLD_FWINDXR,ELK_HOST,ALWAYS,WAZ_006.sh,Désoperculage Port : Ouverture permanente du port d'ingestion direct local,WAZ_FW_ZONE_OK,WAZ_FW_OK
-WAZ_007,WEF_WAZ_BLD_PKICHECK,ELK_HOST,ALWAYS,WAZ_007.sh,Validation Inter-Blocs : Vérification de la présence des ancres de l'usine,WAZ_FW_OK,WAZ_PKI_READY
+WAZ_006B_FW_DASHAPI,WEF_WAZ_BLD_FWDASHAPI,ELK_HOST,ALWAYS,WAZ_006B_FW_DASHAPI.sh,Désoperculage Port : Ouverture permanente des ports Wazuh Dashboard (443) et Wazuh API (55000),WAZ_FW_OK,WAZ_FW_DASHAPI_OK
+WAZ_007,WEF_WAZ_BLD_PKICHECK,ELK_HOST,ALWAYS,WAZ_007.sh,Validation Inter-Blocs : Vérification de la présence des ancres de l'usine,WAZ_FW_DASHAPI_OK,WAZ_PKI_READY
 WAZ_008,WEF_WAZ_BLD_ACLJOIN,ELK_HOST,ALWAYS,WAZ_008.sh,Raccordement : Inclusion de wazuh au groupe de confiance factory_crypto,WAZ_PKI_READY,WAZ_CERTS_READY
 WAZ_009,WEF_WAZ_BLD_REPOSET,ELK_HOST,ALWAYS,WAZ_009.sh,Acheminement : Configuration du dépôt officiel certifié Wazuh,WAZ_CERTS_READY,WAZ_REPO_OK
 WAZ_010,WEF_WAZ_BLD_INDXRINSTLL,ELK_HOST,ALWAYS,WAZ_010.sh,Pose Parpaings : Installation du moteur d'indexation Wazuh Indexer,WAZ_REPO_OK,WAZ_INDEXER_BIN_OK

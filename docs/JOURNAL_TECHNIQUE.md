@@ -2427,3 +2427,22 @@ Prefixe `MNT_` conserve sur les 4 scripts de maintenance : rattache au blueprint
 **A faire sur la VM** : `git pull origin main` puis `$APP_BIN/order.sh WAZ_044_VD_SAFE_RETRY "controle idempotence"` - devrait desormais soit confirmer OK immediatement (module deja sain), soit proceder normalement si un vrai redemarrage est necessaire. Le disque (actuellement sous le seuil) devra etre verifie/nettoye separement avant tout redemarrage reel eventuel (voir `INFRA_005_DISK_HYGIENE.sh`/verification manuelle de `/var/ossec/tmp`).
 
 **Limite honnete** : non verifie en reel sur la VM (pas d'acces direct) - le controle d'idempotence suppose que le format exact des deux lignes de journal recherchees (`wm_vulnerability_scanner_stop()`/`vulnerabilityScannerFacade.cpp:611 at start()`) reste stable entre versions de Wazuh - deja confirme present sur cette VM (version Wazuh 4.14.7 vue dans les logs), mais jamais teste sur une version differente.
+
+## 2026-09-09 (suite) - Deploiement complet reussi, tableau final affiche - mais Wazuh Dashboard injoignable depuis un navigateur externe (ERR_CONNECTION_TIMED_OUT)
+
+**Jalon reel** : deploiement complet de la VM neuve termine sans aucun echec (DNS_001 a ES_063), tableau de bord final ecrit et affiche automatiquement pour la premiere fois en conditions reelles - exactement le comportement demande. L'utilisateur tente ensuite de se connecter au Wazuh Dashboard depuis son navigateur (`https://192.168.50.128:443/`, URL fournie par le tableau lui-meme) : `ERR_CONNECTION_TIMED_OUT` - symptome de paquets silencieusement bloques par le pare-feu, pas d'un service a l'arret (qui aurait plutot produit un refus de connexion immediat).
+
+**Cause racine reelle, trouvee en relisant l'historique du projet** : `KB_007.sh`/`WAZ_005.sh`/`WAZ_006.sh` documentent chacun, dans leur propre en-tete, un incident deja resolu le 2026-08-31 - la zone firewalld ciblee a l'origine ("internal"/"UI_Zone") n'etait liee a AUCUNE interface reseau reelle, rendant les regles ajoutees invisibles au trafic reel. Corrige a l'epoque pour 1514/1515 (agents, `WAZ_005`), 9200/9300 (indexer, `WAZ_006`) et 5601 (Kibana, `KB_007`) - tous recibles sur la zone "public", la seule reellement active. Mais ces memes en-tetes listent EXPLICITEMENT 443 (Dashboard) et 55000 (API) comme "ouverts par coincidence, via le post-install du paquet RPM" - une hypothese JAMAIS verifiee depuis un vrai navigateur externe, et qui vient de se reveler fausse pour 443. Angle mort reel : ces deux ports precis n'ont jamais recu leur propre job dedie, contrairement a tous les autres ports externes de ce projet.
+
+**Corrige** : nouveau job `WAZ_006B_FW_DASHAPI` (entre `WAZ_006` et `WAZ_007` dans la chaine de dependances) - ouvre `WAZ_DASH_PORT` (443, nouvelle variable `vars.conf`) et `WAZ_API_PORT` (55000, deja existant) sur la zone `public`, meme idiome exact que `WAZ_005`/`WAZ_006`/`KB_007`. `WAZ_007` (job suivant) repointe son `IN_COND` vers la nouvelle condition `WAZ_FW_DASHAPI_OK`.
+
+**Verifie** : `bash -n` propre ; `jobs_table.csv` toujours a 8 colonnes ; `git ls-files -s` confirme le nouveau fichier executable.
+
+**A faire sur la VM** : cette VM a DEJA termine sa chaine (tous les jobs anterieurs a `WAZ_007` sont deja `.ok`) - l'orchestrateur ne rejouera JAMAIS ce nouveau job automatiquement (son `OUT_COND` n'est requis par rien qui ne soit pas deja satisfait en aval). Forcage manuel necessaire, une seule fois sur cette VM :
+```
+git pull origin main
+$APP_BIN/order.sh WAZ_006B_FW_DASHAPI "ouverture port dashboard manquant"
+```
+Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine normale, sans intervention.
+
+**Limite honnete** : le meme risque (port cru "ouvert par coincidence", jamais verifie depuis l'exterieur) pourrait exister ailleurs dans ce projet sur des ports non encore testes depuis un vrai navigateur/client externe - seul 443 a ete reellement confirme casse aujourd'hui ; 55000 est corrige par prudence/cohesion (meme hypothese non verifiee dans le meme historique), jamais reellement teste depuis l'exterieur a ce jour.

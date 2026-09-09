@@ -2118,3 +2118,17 @@ systemctl status wazuh-indexer --no-pager
 **Incident reel** : `secrets/wazuh_api_password.txt` absent sur cette VM - `WAZ_022` echoue avec le message d'erreur deja honnetement documente depuis le 2026-08-30 (aucun job ne pousse ce mot de passe, le generer au hasard casserait l'authentification). Verifie en reel avec l'operateur avant de coder quoi que ce soit : `curl -u wazuh:wazuh -k -X POST https://127.0.0.1:55000/security/user/authenticate` -> vrai jeton JWT retourne - le defaut d'installation Wazuh (utilisateur `wazuh`, mot de passe `wazuh`) est bien actif sur cette instance.
 
 **Corrige** : `WAZ_022.sh` tente desormais ce defaut connu UNE fois si le fichier est absent - jamais ecrit en aveugle, seule une authentification REELLEMENT reussie (meme fonction de verification qu'avant, un vrai appel `/security/user/authenticate` avec assertion sur le champ `data`) fait persister la valeur dans `secrets/wazuh_api_password.txt`. Si ce defaut a ete change par l'operateur sur une autre VM, le comportement retombe exactement sur l'erreur claire d'origine (jamais un mot de passe invente a la place). Ferme l'ecart entre "limite honnetement documentee" et "verifiee comme un vrai defaut d'installation reproductible" - sans jamais risquer de casser une instance ou ce defaut aurait deja ete change.
+
+## 2026-09-09 (suite) - WAZ_035B_CUT_INDEXER_TO_ES : meme classe de contention, cette fois sur l'allocation de shard Elasticsearch
+
+**Incident reel** : la bascule vers Kibana echoue au premier vrai transfert de donnees (8230 alertes deja confirmees cote wazuh-indexer par `WAZ_020_VERIFY`) :
+```
+ERREUR bulk (copie) : {'type': 'unavailable_shards_exception', 'reason': '[wazuh-alerts-4.x-2026.09.09][0] primary shard is not active Timeout: [1m], ...'}
+```
+**Cause reelle** : le tout premier lot `_bulk` vers Elasticsearch (jamais ecrit avant) declenche la creation automatique de l'index de destination - son shard primaire unique (cluster mono-noeud) n'a pas eu le temps de devenir actif sous la charge deja bien documentee de cette VM ce jour (2 vCPU, 6 services). Meme famille exacte d'incident que `WAZ_014`/`WAZ_020_VERIFY` - un composant du pipeline pas encore pret prend plus de temps que le code ne lui en laisse, jamais une vraie corruption de donnees.
+
+**Verifie avant de corriger** : source jamais touchee (la suppression ne se declenche qu'apres verification stricte du compte destination, jamais atteinte ici) - aucun risque de perte, juste a rejouer.
+
+**Corrige** (`jobs/lib/cut_migrate.sh`) : le lot `_bulk` en echec est desormais rejoue automatiquement (6 tentatives, 5s d'ecart) - UNIQUEMENT si TOUTES les erreurs du lot sont bien du type transitoire `unavailable_shards_exception` (toute autre erreur reelle, mapping incompatible ou document malforme, remonte immediatement, jamais masquee). Rejouer le meme lot est sans risque : un `_bulk` de type "index" avec les memes `_id` source ecrase, ne duplique jamais.
+
+**Deblocage** : `bin/order_job.sh WAZ_035B_CUT_INDEXER_TO_ES` - source intacte, rejouable sans effet de bord.

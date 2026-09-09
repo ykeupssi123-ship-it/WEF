@@ -33,7 +33,7 @@ cut_migrate_alerts() {
   DST_URL="$dst_url" DST_USER="$dst_user" DST_PW="$dst_pw" \
   CA_FILE="$ca_file" INDEX_PATTERN="$index_pattern" \
   python3 << 'PYEOF'
-import os, json, ssl, base64, urllib.request, urllib.error
+import os, json, ssl, base64, time, urllib.request, urllib.error
 
 src_url = os.environ['SRC_URL']; src_auth = (os.environ['SRC_USER'], os.environ['SRC_PW'])
 dst_url = os.environ['DST_URL']; dst_auth = (os.environ['DST_USER'], os.environ['DST_PW'])
@@ -66,6 +66,36 @@ def count(url, auth, pattern):
             return 0
         raise
 
+# AJOUTE LE 2026-09-09 (incident reel deploiement MIPREL2, meme classe
+# de contention deja rencontree plusieurs fois ce jour) : le premier lot
+# _bulk vers un index de destination JAMAIS ECRIT AVANT declenche sa
+# creation automatique - son shard primaire (1 seul, cluster mono-noeud)
+# met parfois plus de temps a devenir actif que le lot suivant n'en
+# laisse, sous la charge deja connue de cette VM (2 vCPU, 6 services).
+# Erreur reelle observee : "unavailable_shards_exception ... primary
+# shard is not active Timeout: [1m]". Jamais une erreur de donnee (le
+# lot lui-meme est intact, rejouer le MEME lot avec les MEMES _id est
+# sans risque - un bulk "index" ecrase, ne duplique jamais). Reessai
+# borne (6 tentatives, 5s d'ecart) UNIQUEMENT si TOUTES les erreurs du
+# lot sont bien ce type transitoire precis - toute autre erreur reelle
+# (mapping incompatible, document malforme...) remonte immediatement,
+# jamais masquee par une boucle de reessai aveugle.
+def bulk_write(dst_url, dst_auth, bulk_body, max_retries=6, delay=5):
+    result = None
+    for attempt in range(1, max_retries + 1):
+        req = urllib.request.Request(f"{dst_url}/_bulk", data=bulk_body, method='POST', headers=hdr(*dst_auth))
+        with urllib.request.urlopen(req, context=ctx, timeout=120) as r2:
+            result = json.loads(r2.read().decode())
+        if not result.get('errors'):
+            return result
+        items_en_erreur = [item['index']['error'] for item in result.get('items', []) if 'error' in item.get('index', {})]
+        toutes_transitoires = items_en_erreur and all(e.get('type') == 'unavailable_shards_exception' for e in items_en_erreur)
+        if not toutes_transitoires:
+            return result
+        if attempt < max_retries:
+            time.sleep(delay)
+    return result
+
 src_count_before = count(src_url, src_auth, index_pattern)
 if src_count_before == 0:
     print("SOURCE_AVANT=0")
@@ -83,9 +113,7 @@ while hits:
         lines.append(json.dumps({"index": {"_index": h['_index'], "_id": h['_id']}}))
         lines.append(json.dumps(h['_source']))
     bulk_body = ("\n".join(lines) + "\n").encode()
-    req = urllib.request.Request(f"{dst_url}/_bulk", data=bulk_body, method='POST', headers=hdr(*dst_auth))
-    with urllib.request.urlopen(req, context=ctx, timeout=120) as r2:
-        result = json.loads(r2.read().decode())
+    result = bulk_write(dst_url, dst_auth, bulk_body)
     if result.get('errors'):
         for item in result.get('items', []):
             if 'error' in item.get('index', {}):

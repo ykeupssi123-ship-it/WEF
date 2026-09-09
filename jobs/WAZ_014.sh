@@ -34,8 +34,37 @@ fi
 # CORRECTIF 2026-08-19 (meme famille d'incident reel que LS_026_FINAL,
 # wef-elk-core) : "systemctl enable --now" ne redemarre pas un service
 # deja actif. Enable + restart explicite.
-echo "[WAZ_014] Demarrage de wazuh-indexer..."
+#
+# CORRECTIF 2026-09-09 (incident reel deploiement MIPREL2) : meme classe
+# de bug DEJA documentee et corrigee pour wazuh-manager dans WAZ_015.sh
+# (2026-08-30) - son propre en-tete anticipait meme explicitement que
+# wazuh-indexer/wazuh-manager/wazuh-dashboard demarrant tous les trois
+# ensemble au boot pouvaient etre concernes, mais le correctif n'avait
+# jamais ete applique ICI. Constate en reel : au redemarrage de la VM,
+# le TimeoutStartSec vendor de wazuh-indexer.service (180s, confirme via
+# "systemctl show wazuh-indexer -p TimeoutStartUSec") a ete atteint
+# ("start operation timed out. Terminating.", journalctl) - service tue
+# et marque "failed" DEFINITIVEMENT (aucun redemarrage automatique
+# ensuite). Angle mort reel decouvert par ce meme incident : WAZ_014
+# etait deja marque .ok d'un run precedent, donc jamais rejoue par
+# l'orchestrateur apres ce redemarrage - seul INFRA_004_HEALTH_GUARDIAN
+# (desormais actif des le debut de la chaine, voir plus haut ce jour) a
+# detecte et journalise la panne (toutes les 5 min), sans jamais la
+# corriger lui-meme (deliberement, voir son en-tete). Ce drop-in
+# (300s, aligne sur WAZ_INDEXER_READY_TIMEOUT_SEC ci-dessous - meme
+# ordre de grandeur deja prouve necessaire sous charge reelle) survit
+# aux redemarrages de VM ET aux mises a jour du paquet (jamais editer le
+# .service fourni directement) - protege desormais aussi le demarrage
+# AUTOMATIQUE au boot par systemd, pas seulement celui declenche par ce
+# job.
+mkdir -p /etc/systemd/system/wazuh-indexer.service.d
+cat > /etc/systemd/system/wazuh-indexer.service.d/override.conf << 'EOF'
+[Service]
+TimeoutStartSec=300
+EOF
 systemctl daemon-reload
+
+echo "[WAZ_014] Demarrage de wazuh-indexer..."
 systemctl enable wazuh-indexer 2>/dev/null || true
 if ! systemctl restart wazuh-indexer; then
   echo "[WAZ_014] ERREUR : wazuh-indexer.service n'a pas demarre. Diagnostic (journalctl -u wazuh-indexer -n 30) :"

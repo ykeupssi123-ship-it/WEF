@@ -2091,3 +2091,24 @@ ERROR: The given user does not exist
 **Corrige** : budget de `WAZ_020_VERIFY` remonte de 30s (6x5s) a `WAZ_INDEX_VERIFY_TIMEOUT_SEC` (nouvelle variable `vars.conf`, defaut 240s, pas de 10s) - laisse le temps a `retry_non_idempotent` (deja actif dans `WAZ_014B`) et a la Persistent Queue Logstash de livrer les documents en attente une fois l'indexeur stable. **Jamais rejoue `WAZ_019_FLOOD`** pour cet incident : le manager avait deja reellement produit les alertes, seul l'acheminement manquait de temps - rejouer l'injection aurait ete inutile et aurait gonfle le flood sans regler la vraie cause.
 
 **Diagnostic d'echec enrichi** (pour que le prochain incident se lise en un seul log, sans aller-retour) : `WAZ_020_VERIFY` affiche desormais, en cas d'echec final, le compte reel d'alertes generees par le manager, les 15 dernieres lignes Logstash concernant le pipeline `wazuh-alerts`, et l'etat de `wazuh-indexer` - trois preuves directes au lieu de devoir les redemander une par une.
+
+## 2026-09-09 (suite) - Cause racine finale trouvee : wazuh-indexer.service timeout systemd au boot, angle mort de l'idempotence
+
+**Diagnostic definitif** (le "Connexion refusee" Logstash de l'entree precedente n'etait qu'un symptome) :
+```
+systemctl status wazuh-indexer --no-pager
+● wazuh-indexer.service - wazuh-indexer
+   Active: failed (Result: timeout) since Wed 2026-09-09 04:10:15 WAT; 1h 18min ago
+ Main PID: 1494 (code=exited, status=143)
+```
+`journalctl -u wazuh-indexer --since "04:06" --until "04:11"` confirme : `wazuh-indexer.service: start operation timed out. Terminating.` a 04:10:13, exactement 3 minutes (`TimeoutStartUSec=3min`, valeur vendor) apres le debut du demarrage a 04:07:13 - la VM avait redemarre (`Logs begin at ... 04:06:59`), et wazuh-indexer, wazuh-manager, wazuh-dashboard, Elasticsearch, Logstash et Kibana ont tous tente de demarrer simultanement au boot sur 2 vCPU - le meme scenario de contention deja rencontre, mais cette fois assez severe pour depasser le delai systemd lui-meme, pas seulement le sondage HTTP applicatif de `WAZ_014.sh`.
+
+**Precedent deja existant, jamais applique ici** : `WAZ_015.sh` (wazuh-manager) documente EXACTEMENT ce risque depuis le 2026-08-30, avec un drop-in `TimeoutStartSec=180` deja en place (`/etc/systemd/system/wazuh-manager.service.d/override.conf`, confirme present sur cette VM). Son propre en-tete anticipait meme explicitement que wazuh-indexer pouvait souffrir du meme probleme - jamais corrige a l'epoque cote indexeur.
+
+**Angle mort reel decouvert par cet incident** : `WAZ_014` etait deja marque `.ok` (`WAZ_INDEXER_UP`) d'un run anterieur a ce redemarrage de VM - l'orchestrateur ne l'a donc jamais rejoue apres le boot, et n'a eu aucune occasion de detecter que le service avait echoue a redemarrer tout seul. Seul `INFRA_004_HEALTH_GUARDIAN` (installe le jour meme, desormais en tete de chaine) a detecte et journalise la panne, en continu, toutes les 5 minutes depuis son installation (`journalctl -t wef-health-guardian` : 9 alertes consecutives entre 04:57 et 05:37) - sans jamais la corriger lui-meme (choix deliberement documente : jamais d'action corrective automatique sur un service metier). Sans cette garde, la panne serait restee invisible indefiniment.
+
+**Corrige** : `WAZ_014.sh` installe desormais le meme type de drop-in systemd que `WAZ_015.sh`, `TimeoutStartSec=300` (aligne sur `WAZ_INDEXER_READY_TIMEOUT_SEC`, deja prouve necessaire sous charge reelle) - survit aux redemarrages de VM ET aux mises a jour du paquet. Protege desormais le demarrage AUTOMATIQUE au boot par systemd (`enable`d), pas seulement celui declenche manuellement par ce job.
+
+**Deblocage immediat verifie en reel** : `systemctl reset-failed wazuh-indexer && systemctl restart wazuh-indexer` - actif et repondant HTTP 401 en 15 secondes une fois la contention de demarrage a froid retombee (tous les autres services deja stables a ce moment).
+
+**Limite honnete restante** : le nouveau drop-in protege les FUTURS demarrages (prochain boot, prochain deploiement neuf) mais ne s'applique pas retroactivement sur une VM ou `WAZ_014` est deja `.ok` - a appliquer manuellement une fois sur les VM deja deployees (voir commande de deblocage ci-dessus + creation manuelle du drop-in), ou en rejouant `WAZ_014` via `bin/order_job.sh`.

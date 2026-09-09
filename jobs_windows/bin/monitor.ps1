@@ -10,7 +10,8 @@
 # fait/en attente uniquement - jamais "en cours" ou "gele", features
 # qui n'existent pas (encore) dans ce kit et ne sont pas simulees ici.
 #
-# Usage : $env:APP_BIN\monitor.ps1
+# Usage : & "$env:APP_BIN\monitor.ps1"
+# (operateur d'appel "&" necessaire - voir bin/summary.ps1 pour le detail).
 
 $BinDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $WinRoot = Split-Path -Parent $BinDir

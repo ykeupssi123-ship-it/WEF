@@ -13,7 +13,10 @@
 # Appele automatiquement par orchestrator_windows.ps1 en fin de run
 # reussi (ecrit dans state\TABLEAU_DE_BORD_FINAL.txt) - egalement
 # appelable a tout moment :
-#   $env:APP_BIN\summary.ps1
+#   & "$env:APP_BIN\summary.ps1"
+# (l'operateur d'appel "&" est necessaire ici : sans lui, PowerShell
+# tente d'evaluer $env:APP_BIN\... comme une expression et echoue sur
+# "\" avec "Jeton inattendu" - erreur reelle rencontree le 2026-09-10).
 
 $BinDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $WinRoot = Split-Path -Parent $BinDir
@@ -47,9 +50,9 @@ foreach ($comp in $EnabledComponents) {
 }
 Write-Host ""
 Write-Host "--- SCENARIOS ---"
-Write-Host "Etat des jobs (fait / en attente)  : `$env:APP_BIN\monitor.ps1"
+Write-Host 'Etat des jobs (fait / en attente)  : & "$env:APP_BIN\monitor.ps1"'
 Write-Host "Rapport complet du dernier run      : $WinRoot\state\RAPPORT_EXECUTION.txt"
-Write-Host "Relancer la chaine (rejoue le reste): `$env:APP_HOME\orchestrator_windows.ps1"
+Write-Host 'Relancer la chaine (rejoue le reste): & "$env:APP_HOME\orchestrator_windows.ps1"'
 Write-Host "Aucune URL/mot de passe a afficher ici - les tableaux de bord"
 Write-Host "(Wazuh Dashboard/Kibana) vivent sur ELK_HOST ($FACTORY_HOST_IP), jamais"
 Write-Host "sur ce poste Windows."

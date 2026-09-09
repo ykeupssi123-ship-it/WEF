@@ -2520,3 +2520,20 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **A faire sur la VM Windows** : `git pull` (ou re-cloner), puis relancer `.\env.ps1` en PowerShell normal (non-admin) depuis `WEF\jobs_windows`.
 
 **Limite honnete** : non re-teste en reel sur la VM au moment de ce correctif (correctif ecrit a partir du message d'erreur reel colle par l'operateur, jamais devine) - a confirmer au prochain lancement reel.
+
+**Confirme ensuite en reel** : `env.ps1` corrige relance avec succes (portee User), variables `$env:APP_HOME`/`$env:APP_BIN` bien actives dans une nouvelle session (verifie par l'operateur avec `echo $env:APP_HOME`/`echo $env:APP_BIN`, valeurs correctes retournees).
+
+## 2026-09-10 - Deuxieme echec reel : `$env:APP_HOME\orchestrator_windows.ps1` - erreur de syntaxe PowerShell dans ma propre documentation
+
+**Echec reel observe** : `$env:APP_HOME\orchestrator_windows.ps1` tape tel quel -> `Jeton inattendu « \orchestrator_windows.ps1 »`. Erreur de conception dans les instructions donnees (`docs/GUIDE_EXPLOITATION.md` et les messages `Write-Host` de `bin/summary.ps1`/`bin/monitor.ps1`), jamais testee en reel avant ce jour faute d'environnement Windows disponible pour executer une vraie ligne de commande PowerShell (seul le parsing syntaxique des fichiers `.ps1` avait ete verifie, pas la syntaxe d'invocation suggeree en dehors d'un fichier).
+
+**Cause reelle** : en debut de ligne, PowerShell parse `$env:APP_HOME\...` en **mode expression**, pas en mode commande. `$env:APP_HOME` s'evalue en chaine, puis `\orchestrator_windows.ps1` n'est ni un operateur ni la suite valide d'une expression - d'ou le jeton inattendu. Pour invoquer un script dont le chemin vient d'une variable/expression, PowerShell exige l'operateur d'appel `&` avec la chaine entre guillemets : `& "$env:APP_HOME\orchestrator_windows.ps1"`.
+
+**Corrige** :
+- `docs/GUIDE_EXPLOITATION.md` : les 3 commandes Windows (`orchestrator_windows.ps1`, `bin/summary.ps1`, `bin/monitor.ps1`) reecrites avec `& "..."`, plus une phrase expliquant pourquoi (pour que l'operateur comprenne l'erreur s'il la retape a la main ailleurs).
+- `jobs_windows/bin/summary.ps1` : commentaire d'usage et les 2 lignes `Write-Host` suggerant des commandes a l'operateur, memes corrections.
+- `jobs_windows/bin/monitor.ps1` : commentaire d'usage, meme correction.
+
+**Verifie** : parse PowerShell propre sur les 2 fichiers modifies.
+
+**Limite honnete** : toujours aucun acces a une vraie VM Windows depuis cet environnement - chaque commande suggeree n'est confirmee correcte qu'apres que l'operateur l'ait reellement tapee et collee le resultat, jamais avant. Prochaine etape reelle a confirmer : `& "$env:APP_HOME\orchestrator_windows.ps1"` en PowerShell administrateur.

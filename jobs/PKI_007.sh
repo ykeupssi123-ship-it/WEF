@@ -93,10 +93,24 @@ extendedKeyUsage=serverAuth,clientAuth
 subjectAltName=${SAN}
 CNFEOF
 
+# CORRIGE LE 2026-09-09 (meme incident/correctif que PKI_003/004/005/006.sh) :
+# code de sortie de la signature verifie, et certificat produit valide
+# via openssl x509 avant de declarer OK - la comparaison SAN ci-dessus
+# protegeait deja contre un fichier absent/perime, mais pas contre un
+# "openssl x509 -req" qui echoue en laissant un fichier vide/tronque.
+SIGN_OK=1
 openssl x509 -req -in factory_server.csr -CA factory_ca.crt -CAkey factory_ca.key \
   -CAcreateserial -out factory_server.crt -days "${PKI_DAYS}" -sha256 \
-  -extfile factory_server-ext.cnf
+  -extfile factory_server-ext.cnf || SIGN_OK=0
 
 rm -f factory_server-ext.cnf
-echo "[PKI_007] OK."
+if [ "$SIGN_OK" -ne 1 ]; then
+  echo "[PKI_007] ERREUR : 'openssl x509 -req' (signature) a echoue (voir message ci-dessus)." >&2
+  exit 1
+fi
+if ! openssl x509 -in factory_server.crt -noout &>/dev/null; then
+  echo "[PKI_007] ERREUR : factory_server.crt signe mais invalide a la verification openssl x509." >&2
+  exit 1
+fi
+echo "[PKI_007] OK (certificat verifie valide)."
 exit 0

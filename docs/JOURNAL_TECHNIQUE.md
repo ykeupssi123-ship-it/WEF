@@ -2202,3 +2202,28 @@ Mais `ES_017` (`WEF_ES_BLD_BININST`, installation du paquet), 4 jobs plus tot da
 **Verifie** : `bash -n` propre sur les 3 fichiers modifies.
 
 **Limite honnete** : non teste en reel sur la VM (pas d'acces direct) - la cause racine exacte du premier echec `dnf install` (reseau/DNS/depot/GPG) n'a jamais ete confirmee par une commande reelle (`rpm -qa`, sortie brute de `dnf`) avant ce correctif ; la correction s'appuie sur le pattern d'echec deja prouve identique ailleurs dans ce meme depot (echec silencieux + symptome retarde), pas sur un diagnostic direct de cette VM precise.
+
+## 2026-09-09 (suite) - Cause racine reelle et bien plus grave : la CA racine d'usine (factory_ca.crt) generee VIDE, jamais verifiee, jamais nettoyee par le "retour a zero"
+
+**Incident reel, decouvert en creusant un symptome qui semblait sans rapport** : sur la VM apres le correctif ES_017/KB_005/LS_011, `git pull origin main` echoue avec `error setting certificate verify locations: CAfile: /etc/pki/tls/certs/ca-bundle.crt` - impossible de recuperer le correctif lui-meme. `update-ca-trust extract` lance a la main debloque immediatement le pull. Diagnostic demande et obtenu :
+```
+ls -la /etc/pki/ca-trust/source/anchors/factory_ca.crt
+-rw-r--r--. 1 root root 0  9 sept. 15:14 /etc/pki/ca-trust/source/anchors/factory_ca.crt
+
+openssl x509 -in ... -noout -dates -subject
+unable to load certificate
+...error:0909006C:PEM routines:get_name:no start line...
+```
+Le certificat racine de la PKI d'usine (`factory_ca.crt`) est **VIDE (0 octet)**, injecte tel quel dans le magasin de confiance systeme - cassant TOUT le TLS sortant de la machine (git y compris), pas seulement le TLS interne du projet.
+
+**Cause racine reelle, remontee jusqu'au bout** : `PKI_003.sh` (`openssl genrsa`), `PKI_004.sh` (`openssl req -new -x509`), `PKI_005/006/007.sh` (cle/CSR/signature serveur) et `PKI_008.sh` (assemblage fullchain) - **exactement la meme classe de bug que ES_017/KB_005/LS_011 le meme jour**, jamais reliee jusqu'ici : leurs commandes `openssl` n'etaient jamais verifiees (code de sortie ignore), et leurs tests d'idempotence se contentaient de `[ -f fichier ]` - la PRESENCE du fichier, jamais son CONTENU. Consequence, bien plus grave que pour un simple paquet dnf : une fois `factory_ca.crt` genere vide au tout premier passage (cause exacte non confirmee - VM alors limitee a 1 vCPU, memoire sous pression, `openssl req` a tres probablement echoue en silence en laissant un fichier tronque), **aucun "retour a zero" ne pouvait jamais le corriger** : ni `rm -rf state logs` (n'efface que les marqueurs `.ok` de l'orchestrateur, jamais les fichiers reels du systeme), ni `MNT_purge_complete_reinstall.sh` (nettoie les paquets ELK/Wazuh, jamais `PKI_DIR` ni le magasin de confiance OS) - le fichier vide etait donc reconduit identique a chaque nouvelle tentative, "deja present" au sens du vieux test.
+
+**Deuxieme defaut cumule, trouve dans `PKI_009.sh`** : `update-ca-trust` etait appele SANS argument. Preuve directe et immediate : `update-ca-trust extract` (sous-commande explicite) a resolu le probleme a l'instant ou l'operateur l'a lance a la main - la forme sans argument n'assurait pas de facon fiable la regeneration de `/etc/pki/tls/certs/ca-bundle.crt` sur cette VM.
+
+**Corrige (PKI_003 a PKI_009, meme idiome partout)** : chaque generation `openssl` verifie desormais son code de sortie ET la validite cryptographique reelle de son propre resultat (`openssl rsa -check`, `openssl x509 -noout`, `openssl req -noout`, comptage de blocs PEM pour la fullchain) avant de declarer OK. Les tests d'idempotence ne sautent plus jamais un fichier juste parce qu'il existe : un fichier present mais invalide declenche desormais une regeneration automatique, avec un avertissement explicite - **auto-guerison reelle**, sans devoir jamais trouver et supprimer le fichier corrompu a la main. `PKI_009.sh` : `update-ca-trust` -> `update-ca-trust extract` (sous-commande explicite), plus verification de la source AVANT toute injection dans le magasin de confiance systeme (jamais plus de corruption propagee la ou elle a le plus de consequences).
+
+**A faire sur la VM (donne separement dans la conversation, jamais execute ici)** : `git pull origin main` (deja confirme fonctionnel une fois `update-ca-trust extract` lance a la main) puis `rm -rf state logs` (une fois de plus, necessaire pour que PKI_003-011 soient rejoues et que les nouvelles verifications s'appliquent reellement - sans ca, les `.ok` du run precedent les feraient sauter) puis `./orchestrator.sh`.
+
+**Verifie** : `bash -n` propre sur les 7 fichiers modifies (`PKI_003` a `PKI_009`).
+
+**Limite honnete** : la cause exacte du tout premier `openssl req` silencieusement en echec (entropie, memoire, disque au moment precis du tout premier passage sur cette VM a 1 vCPU) n'est pas confirmee par une preuve directe - seule sa consequence (fichier vide) l'est. La correction protege contre TOUTES les causes possibles de ce symptome (verification du resultat, jamais de la cause), ce qui est suffisant ici, mais la cause initiale precise reste non identifiee.

@@ -11,6 +11,21 @@
 # un champ "wef_test_seed": true distinctif sur chaque document genere,
 # pour pouvoir un jour filtrer/auditer sans ambiguite ce qui vient d'un
 # essai plutot que d'une vraie detection.
+#
+# ETOFFE LE 2026-09-10 (demande explicite : "10 lignes variantes ...
+# alerte wazuh, wazuh monitoring ou wazuh statistic") : le jeu de regles
+# synthetiques est passe de 4 a 10 variantes (auth PAM/sshd, brute
+# force, canari WEF, attaques web SQLi/XSS, integrite syscheck,
+# rootcheck, vulnerabilite) - toutes au format REEL wazuh-alerts-4.x-*
+# (deja verifie contre le modele officiel, voir WAZ_014C_ALERTS_TEMPLATE).
+# LIMITE HONNETE, assumee : ceci peuple UNIQUEMENT wazuh-alerts-4.x-* -
+# "Wazuh Monitoring" (wazuh-monitoring-*) et "Wazuh Statistics"
+# (wazuh-statistics-*) sont des index DISTINCTS, alimentes
+# automatiquement par le manager/l'API Wazuh eux-memes (etat des
+# agents, metriques internes) - jamais par un document au format
+# "alerte". Aucun mecanisme de ce fichier ne peuple ces deux-la ; non
+# demande explicitement au-dela du terme employe par l'utilisateur, non
+# invente ici plutot que de simuler un format non verifie.
 
 # seed_test_alerts <url> <user> <pw> <ca_file> <index_name> <count>
 # Insere <count> documents synthetiques (forme d'alerte Wazuh plausible)
@@ -32,8 +47,13 @@ ctx.verify_mode = ssl.CERT_NONE
 tok = base64.b64encode(f"{user}:{pw}".encode()).decode()
 headers = {"Authorization": f"Basic {tok}", "Content-Type": "application/json"}
 
-rules = [(5501, 3, "PAM: Login session opened"), (5710, 5, "sshd: Attempt to login using a non-existent user"),
-         (100101, 3, "WEF canary"), (31151, 6, "Web attack: SQL injection")]
+rules = [(5501, 3, "PAM: Login session opened"), (5502, 3, "PAM: Login session closed"),
+         (5710, 5, "sshd: Attempt to login using a non-existent user"),
+         (5712, 10, "sshd: brute force trying to get access to the system"),
+         (100101, 3, "WEF canary"), (31151, 6, "Web attack: SQL injection"),
+         (31106, 6, "Web attack: XSS"), (550, 7, "Integrity checksum changed (syscheck)"),
+         (510, 5, "Host-based anomaly detection event (rootcheck)"),
+         (23506, 9, "Vulnerability Detector: CVE affecting installed package")]
 inserted = 0
 batch_size = 1000
 while inserted < count:
@@ -96,8 +116,13 @@ ctx.verify_mode = ssl.CERT_NONE
 tok = base64.b64encode(f"{user}:{pw}".encode()).decode()
 headers = {"Authorization": f"Basic {tok}", "Content-Type": "application/json"}
 
-rules = [(5501, 3, "PAM: Login session opened"), (5710, 5, "sshd: Attempt to login using a non-existent user"),
-         (100101, 3, "WEF canary"), (31151, 6, "Web attack: SQL injection")]
+rules = [(5501, 3, "PAM: Login session opened"), (5502, 3, "PAM: Login session closed"),
+         (5710, 5, "sshd: Attempt to login using a non-existent user"),
+         (5712, 10, "sshd: brute force trying to get access to the system"),
+         (100101, 3, "WEF canary"), (31151, 6, "Web attack: SQL injection"),
+         (31106, 6, "Web attack: XSS"), (550, 7, "Integrity checksum changed (syscheck)"),
+         (510, 5, "Host-based anomaly detection event (rootcheck)"),
+         (23506, 9, "Vulnerability Detector: CVE affecting installed package")]
 
 inserted = 0
 for i in range(count):
@@ -124,6 +149,80 @@ for i in range(count):
     req = urllib.request.Request(f"{url}/{index_name}/_refresh", method='POST', headers=headers)
     urllib.request.urlopen(req, context=ctx, timeout=30)
     print(f"[seed_live] {inserted}/{count} document(s) inseres dans {index_name}")
+    if i + 1 < count:
+        time.sleep(interval)
+
+print(f"INSERE={inserted}")
+PYEOF
+}
+
+# seed_ankrrwef_transactions_live <url> <user> <pw> <ca_file> <index_name> <count> <interval_sec>
+# AJOUTE LE 2026-09-10 (demande explicite : le cote Elasticsearch/Kibana
+# de la demo ne doit plus mimer de fausses alertes Wazuh - il doit
+# representer une application METIER distincte supervisee via ELK,
+# comme un vrai client le ferait. Scenario choisi par l'utilisateur :
+# "AnkrrWEF", des microservices de transfert d'argent (remittance,
+# billpay) tournant sur Glassfish/Tomcat. Un document = un evenement de
+# transaction (succes/echec/en attente), jamais une alerte de securite -
+# format volontairement different de seed_test_alerts_live pour ne pas
+# laisser croire que c'est du Wazuh. Meme mecanique d'insertion (1
+# document a la fois + _refresh, visible en direct) et meme champ
+# distinctif "wef_test_seed": true que le reste de ce fichier.
+seed_ankrrwef_transactions_live() {
+  local url="$1" user="$2" pw="$3" ca_file="$4" index_name="$5" count="$6" interval="$7"
+  URL="$url" USER="$user" PW="$pw" CA_FILE="$ca_file" INDEX_NAME="$index_name" COUNT="$count" INTERVAL="$interval" \
+  python3 << 'PYEOF'
+import os, json, ssl, base64, random, time, uuid, urllib.request, datetime
+
+url = os.environ['URL']; user = os.environ['USER']; pw = os.environ['PW']
+ca_file = os.environ['CA_FILE']; index_name = os.environ['INDEX_NAME']
+count = int(os.environ['COUNT']); interval = float(os.environ['INTERVAL'])
+
+ctx = ssl.create_default_context(cafile=ca_file)
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+tok = base64.b64encode(f"{user}:{pw}".encode()).decode()
+headers = {"Authorization": f"Basic {tok}", "Content-Type": "application/json"}
+
+# Poids volontairement domines par SUCCESS (une vraie plateforme de
+# paiement echoue rarement) - le reste sert a avoir des variantes
+# visibles (histogrammes de statut) dans un tableau de bord Kibana.
+statuses = ["SUCCESS"] * 7 + ["FAILED"] * 2 + ["PENDING"] * 1
+services = ["remittance", "billpay", "account-transfer", "fx-exchange"]
+app_servers = ["glassfish-01", "tomcat-02"]
+currencies = ["USD", "EUR", "XAF", "GBP"]
+http_by_status = {"SUCCESS": 200, "FAILED": 500, "PENDING": 202}
+
+inserted = 0
+for i in range(count):
+    status = random.choice(statuses)
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    doc = {
+        "timestamp": now,
+        "application": "AnkrrWEF",
+        "service": random.choice(services),
+        "app_server": random.choice(app_servers),
+        "transaction_id": f"TXN-{uuid.uuid4().hex[:12].upper()}",
+        "amount": round(random.uniform(5, 5000), 2),
+        "currency": random.choice(currencies),
+        "sender_account": f"ACC-{random.randint(100000, 999999)}",
+        "receiver_account": f"ACC-{random.randint(100000, 999999)}",
+        "status": status,
+        "http_status": http_by_status[status],
+        "response_time_ms": random.randint(30, 1200),
+        "full_log": f"AnkrrWEF demo transaction #{i + 1}/{count} - {status}",
+        "wef_test_seed": True,
+    }
+    req = urllib.request.Request(f"{url}/{index_name}/_doc", data=json.dumps(doc).encode(), method='POST', headers=headers)
+    with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
+        result = json.loads(resp.read().decode())
+    if result.get('result') not in ('created', 'updated'):
+        raise SystemExit(f"ERREUR insertion (AnkrrWEF live seed) document #{i + 1} : {result}")
+    inserted += 1
+    req = urllib.request.Request(f"{url}/{index_name}/_refresh", method='POST', headers=headers)
+    urllib.request.urlopen(req, context=ctx, timeout=30)
+    print(f"[seed_ankrrwef] {inserted}/{count} transaction(s) inseree(s) dans {index_name}")
     if i + 1 < count:
         time.sleep(interval)
 

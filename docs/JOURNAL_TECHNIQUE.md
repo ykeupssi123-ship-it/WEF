@@ -2537,3 +2537,17 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **Verifie** : parse PowerShell propre sur les 2 fichiers modifies.
 
 **Limite honnete** : toujours aucun acces a une vraie VM Windows depuis cet environnement - chaque commande suggeree n'est confirmee correcte qu'apres que l'operateur l'ait reellement tapee et collee le resultat, jamais avant. Prochaine etape reelle a confirmer : `& "$env:APP_HOME\orchestrator_windows.ps1"` en PowerShell administrateur.
+
+## 2026-09-10 (suite) - Deploiement complet ELK_HOST sur VM neuve : ZERO echec de bout en bout, tableau de bord final confirme en conditions reelles
+
+**Jalon reel majeur** : premiere execution complete de `INFRA_002_RECLAIM_HOME` (01:13:59) a `ES_063_SNAPSHOTPOLICY` (02:10:38) sur une VM authentiquement neuve (`git clone` frais, HEAD au moment du clone deja sur le commit du correctif `WAZ_022` - voir plus bas), **sans un seul echec**, sur toute la chaine : PKI (11 jobs), Elasticsearch (63 jobs, snapshots S3 inclus), Logstash (36 jobs, crash-tests reseau/PID/DLQ inclus), Kibana (29 jobs), Wazuh (indexeur + manager + dashboard, ~60 jobs, crash-tests inclus), les deux bascules Kibana<->Wazuh Dashboard dans les deux sens avec preuve reelle de convergence (`WAZ_037_CONVERGENT_TEST` : alerte reelle injectee puis retrouvee dans Elasticsearch), DNS interne (4 jobs), snapshots S3 OVH (2 jobs).
+
+**Confirmations reelles precises, closant plusieurs limites honnetes notees precedemment comme "non re-teste"** :
+- `WAZ_022` (correctif du 2026-09-09, 6 essais/5s) : reussi en **2 secondes** (`02:02:00` -> `02:02:02`), premier essai, aucun retry necessaire cette fois - le correctif tient sans meme avoir besoin de sa marge complete.
+- `WAZ_006B_FW_DASHAPI` (ouverture pare-feu 443/55000, ajoutee le 2026-09-09) : de nouveau reussie automatiquement dans la chaine normale.
+- `WAZ_035`/`WAZ_039` (bascule Kibana<->Wazuh Dashboard, ordre reroute-avant-cut corrige le 2026-09-09) : les deux sens rejoues integralement avec succes, preuve reelle de convergence des deux cotes.
+- `bin/summary.sh` -> `state/TABLEAU_DE_BORD_FINAL.txt` : genere et affiche automatiquement en fin de run (le run n'a subi aucun echec), avec les vraies URLs/utilisateurs/mots de passe reels de chaque service - fonctionne exactement comme concu, en conditions reelles, pour la premiere fois.
+
+**Note annexe verifiee dans ce meme log** : le clone utilise pour ce run partait deja du commit `a0f8983` (celui du correctif `WAZ_022`) au moment du `git clone` - confirmant qu'un clone frais aujourd'hui inclut deja tous les correctifs `ELK_HOST` du 2026-09-09, sans action supplementaire necessaire.
+
+**Rien a corriger ici** - entree purement de confirmation, a la demande explicite de closer les limites honnetes en suspens des que des preuves reelles existent.

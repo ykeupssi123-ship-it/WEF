@@ -22,3 +22,8 @@ Thumbs.db
 # voir jobs/lib/skip_jobs_toggle.sh - peut trainer sur une VM deja
 # deployee avant ce correctif)
 vars.conf.bak_*
+
+# Identite de CETTE machine (ROLE/AGENT_NAME/...) - AJOUTE LE 2026-09-13
+# (demande explicite : un "git pull" ne doit plus jamais entrer en
+# conflit avec la config propre a une machine). Voir vars.local.conf.example.
+vars.local.conf

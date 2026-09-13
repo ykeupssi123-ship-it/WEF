@@ -1,0 +1,19 @@
+# vars.local.conf.example - modele de config PROPRE A CETTE MACHINE.
+#
+# Copiez ce fichier en "vars.local.conf" (jamais suivi par git, voir
+# .gitignore) et decommentez/ajustez ce qui concerne cette machine
+# precise. Charge EN DERNIER par vars.conf : n'importe quelle variable
+# du depot peut y etre surchargee, sans jamais risquer de conflit au
+# prochain "git pull" - ni sur cette machine, ni sur aucune autre.
+#
+#   cp vars.local.conf.example vars.local.conf
+#   nano vars.local.conf   # decommentez ce qu'il faut pour CETTE machine
+
+# --- Sur un AGENT_HOST (VM2 ou tout hote Linux supplementaire) ---
+# ROLE="AGENT_HOST"
+# AGENT_NAME="mon-agent-01"                                    # UNIQUE par machine
+# AGENT_COMPONENTS="FILEBEAT,METRICBEAT,WAZUH_AGENT,HOSTNAME_RENAME"
+
+# --- Reglages ponctuels (exemples) ---
+# MIN_RAM_GB_REQUIRED_AGENT=1
+# MIN_DISK_GB_REQUIRED_AGENT=10

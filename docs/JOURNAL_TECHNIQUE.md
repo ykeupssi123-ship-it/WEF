@@ -2602,3 +2602,30 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **A faire sur VM1** : `git pull origin main` puis `$APP_HOME/orchestrator.sh` (rejoue uniquement `PKI_012_SERVE_CA_HTTP`, seul job non termine).
 
 **Limite honnete** : toujours pas confirme en reel apres ce correctif - a verifier au prochain relancement.
+
+## 2026-09-13 (suite) - Troisieme incident reel : `PKI_012_SERVE_CA_HTTP` "OK" sur VM1 mais toujours injoignable depuis VM2 - meme piege deja documente dans `LS_008.sh`, pas relu a temps
+
+**Contexte** : le correctif Python 3.6 a bien fonctionne - `PKI_012_SERVE_CA_HTTP -> OK` sur VM1. Mais `DIST_001`, relance sur VM2, echoue quand meme apres 24 essais reels (2 minutes) - `curl` vers `http://192.168.50.128:8091/factory_ca.crt` depuis VM2 echoue.
+
+**Diagnostic mene par etapes reelles, jamais suppose** :
+1. Cote VM1 : `ss -tlnp` confirme l'ecoute sur `0.0.0.0:8091` ; `firewall-cmd --zone=public --list-ports` confirme `8091/tcp` present ; `curl` depuis VM1 vers sa propre IP reelle reussit. Tout semblait correct.
+2. Cote VM2 : `curl -v` donne "Aucun chemin d'acces pour atteindre l'hote cible" (No route to host) - pas "connexion refusee", donc pas un simple filtrage de port.
+3. Meme symptome reproduit sur le port 443 (deja etabli, deja fonctionnel par le passe) depuis VM2 -> ce n'est pas specifique au port 8091, mais un probleme de portee plus large.
+4. `ping` VM2->VM1 reussit (0% perte) - donc pas un probleme reseau L2/L3 general.
+5. `iptables -S INPUT/OUTPUT` sur VM1 ne montre qu'une politique ACCEPT vide - normal sur Oracle Linux 8, `firewalld` y pilote `nftables`, pas les chaines `iptables` historiques - cette commande ne prouvait donc rien, dans un sens comme dans l'autre.
+6. **`firewall-cmd --get-active-zones` sur VM1 revele la cause reelle** : DEUX zones actives - `public` (liee a l'interface `ens160`) ET `CollectZone` (liee non pas a une interface mais a une SOURCE precise, `192.168.50.130/32` = l'IP exacte de VM2). firewalld fait correspondre une zone-source AVANT une zone-interface : tout le trafic venant de VM2 est donc filtre par `CollectZone`, jamais par `public`, quel que soit ce que `public` autorise.
+
+**Cause racine, deja documentee une fois mais pas relue a temps** : `jobs/LS_008.sh` porte, depuis le 2026-08-31, un commentaire qui decrit EXACTEMENT ce meme mecanisme ("SSH refuse alors que le ping passe... firewalld fait correspondre une source AVANT une interface... CollectZone est desormais le proprietaire unique et complet du jeu de ports necessaires a un AGENT_HOST, documente ici pour que ce ne soit jamais suppose implicite"). `PKI_012_SERVE_CA_HTTP.sh` a ete ecrit sans relire ce commentaire - la meme classe d'erreur reapparait faute d'avoir consulte la documentation deja existante avant d'ajouter un nouveau port destine a un AGENT_HOST.
+
+**Corrige (`jobs/PKI_012_SERVE_CA_HTTP.sh`)** : le port est desormais ouvert sur `CollectZone` (essentiel) en plus de `public` (acces direct/local, ne coute rien a garder). **Corrige aussi l'ordre dans `jobs_table.csv`** : `IN_COND` change de `PKI_CRYPTO_ARMED` (bien avant la phase Logstash) a `LS_FW_ARMED` (`OUT_COND` de `LS_009`, une fois `CollectZone` reellement creee ET source-bound par `LS_006`/`LS_008`) - le job tournait auparavant avant meme que la zone cible n'existe.
+
+**Verifie** : `bash -n` propre ; audit CSV complet (0 doublon, tous les `SCRIPT_FILE` existent) ; simulation de resolution par vagues rejouee : `ELK_HOST` 219/219 en 2 passes, `AGENT_HOST` 53/53 en 3 passes, 0 job bloque - `PKI_012` se resout bien a sa nouvelle position, rien d'autre casse.
+
+**A faire sur VM1** : VM1 a deja termine son deploiement avec l'ancien `PKI_012` (a la mauvaise position, `.ok` deja marque) - supprimer son marqueur pour le forcer a rejouer a la bonne place avec le bon correctif :
+```bash
+git pull origin main
+rm -f state/PKI_CA_HTTP_OK.ok
+$APP_HOME/orchestrator.sh
+```
+
+**Limite honnete** : toujours pas reconfirme en reel apres ce troisieme correctif - a verifier au prochain essai de `DIST_001` sur VM2. Question ouverte, non resolue ici, notee pour une prochaine fois : `CollectZone` n'autorise qu'UNE seule source a la fois (`BEATS_HOST_IP`, remplacee a chaque fois par `LS_008`) - un futur troisieme hote `AGENT_HOST` simultane (VM3) ne serait pas couvert par cette meme regle sans revoir ce mecanisme a source unique.

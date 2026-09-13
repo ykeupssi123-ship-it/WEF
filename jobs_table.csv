@@ -15,7 +15,6 @@ PKI_008,WEF_PKI_BLD_CHAINGEN,ELK_HOST,ALWAYS,PKI_008.sh,Assemblage : Constructio
 PKI_009,WEF_PKI_BLD_SYSTEMTRUST,ELK_HOST,ALWAYS,PKI_009.sh,Ancrage Local : Injection de la CA d'usine dans le magasin de confiance de l'OS,PKI_CHAIN_READY,PKI_TRUST_OK
 PKI_010,WEF_PKI_BLD_CLEANCSR,ELK_HOST,ALWAYS,PKI_010.sh,Nettoyage : Évacuation des résidus de calcul éphémères du coffre central,PKI_TRUST_OK,PKI_CLEAN_OK
 PKI_011,WEF_PKI_BLD_PERMRSTRCT,ELK_HOST,ALWAYS,PKI_011.sh,Verrouillage Hermétique : Isolation et attribution des droits au groupe partagé,PKI_CLEAN_OK,PKI_CRYPTO_ARMED
-PKI_012_SERVE_CA_HTTP,WEF_PKI_RUN_CAHTTPSRV,ELK_HOST,ALWAYS,PKI_012_SERVE_CA_HTTP.sh,Distribution : sert factory_ca.crt (certificat public) en HTTP permanent pour que tout AGENT_HOST le recupere sans identifiant,PKI_CRYPTO_ARMED,PKI_CA_HTTP_OK
 ES_001,WEF_ES_BLD_OSUPDATE,ELK_HOST,ALWAYS,ES_001.sh,Terrassement : Mise à jour OS Oracle Linux 8.10,PKI_CRYPTO_ARMED,ES_OS_UPDATED
 ES_B001_RAM_CHECK,WEF_ES_BLD_MINRAMVERIFY,ELK_HOST,ALWAYS,ES_B001_RAM_CHECK.sh,Contrôle Capacitaire : Vérification du seuil minimal de mémoire physique,ES_OS_UPDATED,ES_RAM_CONFIRMED
 ES_B001B_CPU_CHECK,WEF_ES_BLD_MINVCPUVERIFY,ELK_HOST,ALWAYS,ES_B001B_CPU_CHECK.sh,Contrôle Capacitaire : Vérification du seuil minimal de cœurs processeur,ES_RAM_CONFIRMED,ES_CPU_CONFIRMED
@@ -90,6 +89,7 @@ LS_006,WEF_LS_BLD_FWZONE,ELK_HOST,ALWAYS,LS_006.sh,Châssis Réseau : Déclarati
 LS_007,WEF_LS_BLD_FWPORT514,ELK_HOST,ALWAYS,LS_007.sh,Désoperculage Fiche : Ouverture du port Syslog standard local 514,LS_FW_ZONE_OK,LS_FW_514_OK
 LS_008,WEF_LS_BLD_FWPORTUNVRSL,ELK_HOST,ALWAYS,LS_008.sh,Désoperculage Fiche : Ouverture du port de collecte sécurisé local 5044,LS_FW_514_OK,LS_FW_5044_OK
 LS_009,WEF_LS_BLD_FWAPPLY,ELK_HOST,ALWAYS,LS_009.sh,Mise en ligne Barrière : Fixation persistante des règles,LS_FW_5044_OK,LS_FW_ARMED
+PKI_012_SERVE_CA_HTTP,WEF_PKI_RUN_CAHTTPSRV,ELK_HOST,ALWAYS,PKI_012_SERVE_CA_HTTP.sh,Distribution : sert factory_ca.crt (certificat public) en HTTP permanent sur CollectZone pour que tout AGENT_HOST le recupere sans identifiant,LS_FW_ARMED,PKI_CA_HTTP_OK
 LS_010,WEF_LS_BLD_REPOSET,ELK_HOST,ALWAYS,LS_010.sh,Acheminement : Configuration du dépôt officiel de confiance,LS_FW_ARMED,LS_REPO_OK
 LS_011,WEF_LS_BLD_BININST,ELK_HOST,ALWAYS,LS_011.sh,Pose Parpaings : Installation physique du paquet Logstash,LS_REPO_OK,LS_BIN_OK
 LS_012,WEF_LS_BLD_CRYPCHK,ELK_HOST,ALWAYS,LS_012.sh,Validation Inter-Blocs : Contrôle d'accès au coffre neutre de l'usine,LS_BIN_OK|PKI_CRYPTO_ARMED,LS_PKI_READY

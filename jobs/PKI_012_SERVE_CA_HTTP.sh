@@ -30,6 +30,24 @@
 # demarre deja dans le bon repertoire via "WorkingDirectory=" (unit
 # systemd ci-dessous) - "--directory" etait redondant, jamais
 # necessaire pour ce besoin precis.
+#
+# CORRIGE LE 2026-09-13 (meme jour, deuxieme incident reel : DIST_001
+# toujours injoignable depuis VM2 malgre un service actif et un port
+# ouvert - meme "curl https://.../443" depuis VM2 echouait, alors que
+# le ping passait) : port ouvert uniquement sur la zone "public", or
+# firewalld fait correspondre une SOURCE avant une INTERFACE - tout le
+# trafic venant de BEATS_HOST_IP (VM2) est deja capture par la zone
+# "CollectZone" (creee par LS_006, source-bound a BEATS_HOST_IP par
+# LS_008), jamais par "public", quel que soit ce que "public" autorise.
+# Exactement le meme constat deja documente dans LS_008.sh (incident du
+# 2026-08-31, "SSH refuse alors que le ping passe") - CollectZone y est
+# explicitement designee comme "le proprietaire unique et complet du
+# jeu de ports necessaires a un AGENT_HOST". Corrige : le port est
+# desormais aussi ouvert sur CollectZone. Corrige aussi l'ordre dans
+# jobs_table.csv (IN_COND passe de PKI_CRYPTO_ARMED a LS_FW_ARMED) :
+# CollectZone n'existe pas encore au moment ou PKI_CRYPTO_ARMED est
+# rempli (bien avant la phase Logstash) - ce job doit donc jouer APRES
+# que CollectZone soit cree ET source-bound, jamais avant.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -74,8 +92,9 @@ UNITEOF
 systemctl daemon-reload
 systemctl enable --now wef-ca-server
 
-echo "[PKI_012_SERVE_CA_HTTP] Ouverture du port ${PKI_CA_HTTP_PORT}/tcp (zone public, seule liee a l'interface reelle - voir WAZ_006B_FW_DASHAPI pour le meme constat)..."
-firewall-cmd --zone=public --add-port="${PKI_CA_HTTP_PORT}/tcp" --permanent
+echo "[PKI_012_SERVE_CA_HTTP] Ouverture du port ${PKI_CA_HTTP_PORT}/tcp sur CollectZone (seule zone reellement appliquee au trafic venant d'un AGENT_HOST - firewalld fait correspondre une source avant une interface, meme constat que LS_008.sh) et sur public (acces direct/local)..."
+firewall-cmd --permanent --zone=CollectZone --add-port="${PKI_CA_HTTP_PORT}/tcp"
+firewall-cmd --permanent --zone=public --add-port="${PKI_CA_HTTP_PORT}/tcp"
 firewall-cmd --reload
 
 echo "[PKI_012_SERVE_CA_HTTP] Verification reelle (requete locale, comparaison au fichier source)..."

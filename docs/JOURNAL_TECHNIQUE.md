@@ -2730,3 +2730,18 @@ Puis rejouer le seed LCB-FT sur VM2 - aucun redemarrage de Logstash necessaire c
 **Retrospective honnete sur la duree de ce diagnostic** : gagne uniquement par elimination methodique de CHAQUE etape reelle du pipeline (config Logstash, nom de champ, harvester Filebeat, connexion reseau, condition de routage via les statistiques internes du plugin, puis enfin le reglage cluster) - jamais par une supposition non verifiee acceptee comme suffisante. La cause finale (`action.auto_create_index`) etait un reglage de securite deja en place depuis longtemps dans ce meme projet, jamais reconsidere avant parce que sa seule autre collision connue (`ES_046`/incident 10) avait ete resolue autrement (renommage d'index) sans jamais toucher a ce reglage - premiere fois qu'un NOUVEAU prefixe d'index legitime devait y etre ajoute explicitement.
 
 **Reste a faire, non urgent** : confirmer `CyrielleMoney` (`BEAC_002_SEED_CYRIELLEMONEY_LIVE`) de la meme facon - meme mecanisme, meme correctif deja en place (`cyriellemoney-*` deja dans la liste blanche `ES_041`), tres probablement deja fonctionnel mais jamais teste en reel a ce jour. Fusion sur `main` toujours en attente de validation explicite de l'utilisateur.
+
+## 2026-09-13 (suite) - `ES_041` simplifie : liste blanche generique dans vars.conf, plus jamais besoin de modifier ce fichier
+
+**Demande explicite** : "meme ca (ambargo-*) un job doit s'en occuper... il doit avoir une ligne dans vars.conf un peu comme un allow[aut]ho[r]iz[e]d[connect]ssh ou l'on peut lister les noms des comptes autorises a se connecter par ssh mais ici c'est les racines des noms d'index... tout ce qu'il y aura a cette ligne leur index doit etre cree."
+
+**Corrige (`jobs/ES_041.sh`)** : au lieu de verifier individuellement `LCBFT_INDEX_PREFIX`/`CYRIELLEMONEY_INDEX_PREFIX` (ce qui obligeait a modifier ce fichier a chaque nouveau scenario), lit desormais une seule liste generique **`ES_DEMO_INDEX_PREFIXES`** (nouvelle variable `vars.conf`, separee par des virgules, tolerante aux espaces) - exactement le modele "liste blanche" demande, calque sur l'exemple SSH donne par l'operateur. Ajouter un futur scenario de demo (un 3e, un 4e...) ne touchera plus jamais `ES_041.sh` : juste ajouter son prefixe a cette ligne.
+
+**Verifie** : `bash -n` propre ; rendu du motif final verifie a la main dans 3 cas (liste normale, liste absente/vide - comportement `main` inchange, liste avec espaces superflus) - les 3 corrects.
+
+**A appliquer sur VM1 (si deja deployee avec l'ancien `ES_041.sh`)** :
+```bash
+git pull origin demo-donnees-realistes  # ou "git merge origin/demo-donnees-realistes" si branches divergentes
+rm -f state/ES_AUTO_BLOCK_OK.ok
+$APP_BIN/order.sh ES_041 "passage a la liste blanche generique ES_DEMO_INDEX_PREFIXES"
+```

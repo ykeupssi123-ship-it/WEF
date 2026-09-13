@@ -2629,3 +2629,13 @@ $APP_HOME/orchestrator.sh
 ```
 
 **Limite honnete** : toujours pas reconfirme en reel apres ce troisieme correctif - a verifier au prochain essai de `DIST_001` sur VM2. Question ouverte, non resolue ici, notee pour une prochaine fois : `CollectZone` n'autorise qu'UNE seule source a la fois (`BEATS_HOST_IP`, remplacee a chaque fois par `LS_008`) - un futur troisieme hote `AGENT_HOST` simultane (VM3) ne serait pas couvert par cette meme regle sans revoir ce mecanisme a source unique.
+
+## 2026-09-13 (suite) - Jalon reel majeur : premier deploiement AGENT_HOST complet, ZERO echec, de bout en bout
+
+**Confirme en reel** : `DIST_001` reussi du premier coup (`CA_DISTRIBUTED_OK`) apres le correctif `CollectZone`/ordre `LS_FW_ARMED` - la chaine entiere `AGENT_HOST` (53 jobs : `DIST_001`, `INFRA_002`, `WAG_001-006`, `FB_001-023`, `MB_001-022`, crash-tests reseau/charge inclus des deux cotes Filebeat/Metricbeat) s'est executee sans un seul echec, jusqu'au tableau de bord final (`bin/summary.sh`, branche `ROLE=AGENT_HOST`) confirmant `filebeat`/`metricbeat`/`wazuh-agent` tous actifs.
+
+**Ferme definitivement toutes les limites honnetes accumulees depuis la creation de ce role** : `INFRA_006_AGENT_RESOURCE_CHECK` ("jamais teste en conditions reelles", depuis le 2026-08-31), `WAG_005` (corrige par anticipation le 2026-09-13, jamais encore observe en situation reelle), `DIST_001`/`PKI_012_SERVE_CA_HTTP` (les 3 incidents reels du jour, tous corriges et maintenant confirmes). Premiere preuve complete, de bout en bout, que le role `AGENT_HOST` de cette usine fonctionne reellement - pas seulement en audit statique.
+
+**Note mineure, sans consequence fonctionnelle** : le tableau de bord affiche `AGENT_NAME=mon-agent-01` - la valeur du modele `vars.local.conf.example`, jamais personnalisee sur cette VM avant ce lancement. L'enregistrement Wazuh a reussi normalement malgre ce nom generique ; a renommer avant un futur second `AGENT_HOST` simultane pour eviter toute ambiguite dans la liste des agents.
+
+**Rien a corriger** - entree de confirmation.

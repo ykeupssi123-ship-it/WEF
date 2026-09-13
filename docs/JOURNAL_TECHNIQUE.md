@@ -2745,3 +2745,16 @@ git pull origin demo-donnees-realistes  # ou "git merge origin/demo-donnees-real
 rm -f state/ES_AUTO_BLOCK_OK.ok
 $APP_BIN/order.sh ES_041 "passage a la liste blanche generique ES_DEMO_INDEX_PREFIXES"
 ```
+
+## 2026-09-13 (suite) - Nouveau job dedie pour une demo "presentation live" (jamais un vars.conf a retoucher a la main)
+
+**Demande explicite, avec critique justifiee** : pour la premiere demo de l'etudiante, l'operateur voulait 50 detections LCB-FT a 2s d'intervalle (au lieu du defaut 1-5 aleatoire/1s) - la reponse initialement proposee (`sed` sur `vars.conf` avant de lancer) a ete refusee a raison : "l'INTJ dans tout ce bidouillement de ce soir aurait pratique quoi ?".
+
+**Corrige en appliquant un principe deja etabli ailleurs dans ce meme projet, jamais reapplique ici par oubli** : `WAZ_045A_SEED_INDEXER_DATA` (bulk/test de charge) et `WAZ_048_SEED_INDEXER_LIVE` (remplissage visible normal) sont deja 2 jobs DISTINCTS avec leurs propres reglages, jamais un seul job reconfigure a la main selon l'usage. Meme logique appliquee ici :
+- **`jobs/BEAC_003_SEED_LCBFT_BULK_LIVE.sh`** (nouveau) : nombre FIXE (jamais aleatoire, contrairement a `BEAC_001`) de detections, a un rythme dedie - reutilise `seed_lcbft_detections_file()` deja existante (meme min/max = nombre fixe, aucun changement de bibliotheque necessaire).
+- **`vars.conf`** : `LCBFT_DEMO_BULK_COUNT` (defaut 50), `LCBFT_DEMO_BULK_INTERVAL_SEC` (defaut 2) - reglages PERMANENTS et dedies, jamais a modifier pour lancer une demo, contrairement au `sed` initialement propose.
+- `jobs_table.csv` : nouvelle ligne, meme famille (`WAZ_PURGE_MANUAL_GATE`, `AGENT_HOST`/`FILEBEAT`) - description ecrite SANS virgule non protegee cette fois (lecon du bug de decalage de colonnes trouve plus tot dans la soiree, verifiee explicitement par l'audit CSV rejoue).
+
+**Verifie** : `bash -n` propre ; bit executable corrige ; audit CSV complet (283 lignes, 0 doublon, 0 ligne a colonnes incorrectes) ; simulation de resolution par vagues : `ELK_HOST` 220/220, `AGENT_HOST` 53/53, 0 bloque.
+
+**Limite honnete** : jamais teste en conditions reelles (nouveau job, meme mecanisme deja confirme fonctionnel pour `BEAC_001` - risque residuel tres faible, mais pas encore une preuve directe pour celui-ci precisement).

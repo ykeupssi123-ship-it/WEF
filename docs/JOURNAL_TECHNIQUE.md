@@ -2758,3 +2758,21 @@ $APP_BIN/order.sh ES_041 "passage a la liste blanche generique ES_DEMO_INDEX_PRE
 **Verifie** : `bash -n` propre ; bit executable corrige ; audit CSV complet (283 lignes, 0 doublon, 0 ligne a colonnes incorrectes) ; simulation de resolution par vagues : `ELK_HOST` 220/220, `AGENT_HOST` 53/53, 0 bloque.
 
 **Limite honnete** : jamais teste en conditions reelles (nouveau job, meme mecanisme deja confirme fonctionnel pour `BEAC_001` - risque residuel tres faible, mais pas encore une preuve directe pour celui-ci precisement).
+
+## 2026-09-13 (suite) - Nouveau job pour rendre les Data Views Kibana automatiques (capture d'ecran reelle : `ambargo-*` absent du selecteur)
+
+**Constat reel, capture d'ecran a l'appui** : dans Kibana Discover, le selecteur "Data view" ne proposait que "All logs" et "Wazuh Alerts", malgre des documents deja presents dans `ambargo-*` (confirme plus tot par `_count`). Cause connue et deja documentee ailleurs dans ce projet pour `AnkrrWEF` : ecrire des documents dans un index ne cree jamais automatiquement l'objet Kibana "Data View" necessaire pour le voir dans Discover - jusqu'ici traite comme une etape manuelle ("Creez le Data View... au premier essai"), jamais automatisee.
+
+**Corrige** : nouveau job **`jobs/BEAC_004_CREATE_KIBANA_DATAVIEWS.sh`**, `ELK_HOST`/`ALWAYS`, `IN_COND=KB_NOMINAL_OK|ES_AUTO_BLOCK_OK`, `OUT_COND=BEAC_KIBANA_DATAVIEWS_OK`. Generique par construction (jamais "ambargo"/"cyriellemoney" codes en dur) : lit **`ES_DEMO_INDEX_PREFIXES`** (la meme liste blanche que `ES_041`) et cree, via l'API Kibana `POST /api/data_views/data_view` (meme authentification `elastic`/mot de passe bootstrap et header `kbn-xsrf` que `jobs/KB_025.sh`/`jobs/WAZ_036_KIBANA_INDEX.sh`), un Data View par prefixe - `id` deterministe (`<prefixe>-dataview`) + `override:true` pour rester idempotent si le job est rejoue (ex: apres l'ajout d'un nouveau prefixe). Contrairement a `WAZ_036_KIBANA_INDEX.sh` (pas de verification d'erreur), reprend ici la discipline etablie par l'audit `KB_025` : code HTTP verifie explicitement, corps de reponse affiche en cas d'echec.
+
+**Design deliberement non manuel** : contrairement a `BEAC_001`/`002`/`003` (donnees de demo, doivent rester un acte volontaire), rendre un index VISIBLE dans Kibana est une etape d'infrastructure, pas une donnee metier simulee - ce job depend de conditions reelles deja satisfaites (`KB_NOMINAL_OK`, `ES_AUTO_BLOCK_OK`), jamais du gate manuel `WAZ_PURGE_MANUAL_GATE`. Verifie par simulation : `BEAC_KIBANA_DATAVIEWS_OK` se resout automatiquement des le premier passage, `./orchestrator.sh` seul suffit sur une installation lancee a partir de zero - aucun forcage necessaire dans ce cas, contrairement aux 4 jobs BEAC precedents qui avaient du etre forces un par un sur une VM deja entierement deployee avant leur creation.
+
+**Verifie** : `bash -n` propre ; bit executable corrige ; audit CSV complet (285 lignes, 0 doublon d'ID, 0 doublon d'OUT_COND, 0 ligne a colonnes incorrectes) ; simulation de resolution par vagues : `ELK_HOST` 218/228 auto-resolus (10 bloques = exactement les jobs de demo/purge manuels deja connus, aucun nouveau blocage), `AGENT_HOST` 50/53 (3 bloques = `BEAC_001`/`002`/`003`, attendu).
+
+**A appliquer sur une VM1 deja deployee avant ce job** (comme les 4 precedents, puisque `.ok` n'existe pas encore mais que la VM ne relancera pas `./orchestrator.sh` en entier d'elle-meme) :
+```bash
+git pull origin demo-donnees-realistes  # ou ./bin/sync_branch.sh demo-donnees-realistes si divergence
+echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBANA_DATAVIEWS "creation data views BEAC"
+```
+
+**Limite honnete** : jamais confirme en conditions reelles a l'instant de cette entree (nouveau job, mecanisme identique et deja confirme fonctionnel pour `WAZ_036_KIBANA_INDEX.sh`/Wazuh - risque residuel faible mais pas encore une preuve directe pour celui-ci). A confirmer : relancer la commande ci-dessus puis rafraichir le selecteur "Data view" dans Kibana.

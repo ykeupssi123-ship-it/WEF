@@ -2696,3 +2696,27 @@ $APP_HOME/orchestrator.sh
 **Verifie** : `bash -n` propre sur tous les fichiers touches ; audit CSV complet REJOUE APRES le bug ci-dessus et sa correction (282 lignes, 0 doublon `JOB_ID`/`OUT_COND`, 0 ligne a nombre de colonnes incorrect, tous les `SCRIPT_FILE` existent) ; simulation de resolution par vagues : `ELK_HOST` 220/220, `AGENT_HOST` 53/53, 0 bloque ; `diff` confirmant `LS_020.sh` strictement identique a `main` apres le revert ; texte Logstash re-rendu a la main pour le nouveau filtre et le nouveau routage par chemin.
 
 **Limite honnete, inchangee** : toujours jamais teste contre un vrai Logstash/Elasticsearch/Filebeat - en particulier, la capacite reelle du champ `[log][file][path]` a arriver dans cette forme exacte via le canal `beats{}` (dependant de la version de Filebeat/du codec ECS reellement utilise) n'a jamais ete verifiee en conditions reelles. Reste sur la branche `demo-donnees-realistes`.
+
+## 2026-09-13 (suite) - Cause reelle trouvee : `action.auto_create_index` bloquait silencieusement `ambargo-*`/`cyriellemoney-*`
+
+**Contexte** : premier essai reel du scenario BEAC de bout en bout (fichier ecrit sur AGENT_HOST, Filebeat, Logstash) - `ambargo-*` reste a 0 document malgre plusieurs tentatives, harvester Filebeat confirme actif, aucune erreur dans les journaux Filebeat NI Logstash. Diagnostic mene entierement en direct avec l'operateur, par elimination systematique - chaque hypothese testee avec une preuve reelle avant d'etre abandonnee :
+1. Config Logstash mal generee ? Non - `cat` confirme le contenu exact attendu des deux cotes (filtre + sortie).
+2. Mauvais nom de champ (`[log][file][path]`) ? Non - confirme correct par un vrai document indexe (`/var/log/messages`).
+3. Filebeat n'a pas remarque le fichier ? Non - harvester demarre confirme dans `journalctl -u filebeat`, exactement au moment de l'ecriture.
+4. Connexion Filebeat->Logstash coupee (redemarrage Logstash en cours) ? Vrai UNE FOIS (incident reel distinct, deja documente), mais pas la cause du blocage persistant apres stabilisation.
+5. Condition de routage jamais vraie ? Non - **statistiques internes du plugin de sortie Logstash** (`_node/stats/pipelines/main`, plugin par plugin) montrent EXACTEMENT le bon nombre d'evenements ("in"=5, "out"=5, correspondant pile a un lot de 5 detections) sur le plugin Elasticsearch dedie - la condition matche bel et bien, et Logstash considere l'envoi reussi.
+6. Erreur silencieuse cote Elasticsearch, jamais loggee avec les mots-cles deja essayes ? **Confirme** : `GET _cluster/settings?include_defaults=true` revele `action.auto_create_index: "log-*,wazuh-*,-*"` - un disjoncteur de securite DEJA EN PLACE (`ES_041.sh`, pose deliberement il y a longtemps, meme classe d'incident deja rencontree une fois avec `ES_046`/"factory-stresstest", voir plus haut dans ce journal) qui refuse la creation de tout index hors de cette liste blanche explicite - "ambargo-*"/"cyriellemoney-*" n'y figuraient pas. Logstash envoie sa requete groupee (d'ou "out"=5, un succes de transport HTTP), mais Elasticsearch refuse de creer l'index lui-meme - un rejet qui ne remonte pas forcement comme une "exception" bruyante cote Logstash pour ce type d'erreur precis.
+
+**Corrige (`jobs/ES_041.sh`)** : la liste blanche est ETENDUE (jamais desactivee - le principe de durcissement reste intact) pour inclure `${LCBFT_INDEX_PREFIX}-*`/`${CYRIELLEMONEY_INDEX_PREFIX}-*` en plus de `log-*`/`wazuh-*`, lues depuis `vars.conf` (jamais codees en dur - si l'operateur renomme un jour ces prefixes, la liste blanche suit automatiquement). Retro-compatible : sur une VM `main` (sans ces 2 variables), le comportement reste identique bit pour bit a avant (verifie par simulation bash des deux cas, avec et sans les variables).
+
+**Verifie** : `bash -n` propre ; rendu du JSON genere verifie a la main dans les deux cas (avec/sans variables BEAC) - `log-*,wazuh-*,ambargo-*,cyriellemoney-*,-*` et `log-*,wazuh-*,-*` respectivement, tous deux corrects.
+
+**A faire pour appliquer sur VM1** : `ES_041` a deja tourne une fois avec l'ancienne liste (`.ok` deja marque) - le rejouer pour appliquer la nouvelle liste blanche :
+```bash
+git pull origin demo-donnees-realistes
+rm -f state/ES_AUTO_BLOCK_OK.ok
+$APP_BIN/order.sh ES_041 "extension liste blanche pour le scenario BEAC"
+```
+Puis rejouer le seed LCB-FT sur VM2 - aucun redemarrage de Logstash necessaire cette fois (le reglage `auto_create_index` est un parametre de CLUSTER Elasticsearch, pas une config Logstash - s'applique immediatement, sans redemarrage d'aucun service).
+
+**Limite honnete** : toujours pas confirme par un document reellement visible dans `ambargo-*` au moment de cette entree - la cause est identifiee avec un tres haut degre de confiance (preuve directe du reglage cluster bloquant), mais la confirmation finale (compter a nouveau apres ce correctif) reste a faire.

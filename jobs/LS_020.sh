@@ -1,5 +1,15 @@
 #!/bin/bash
 # LS_020 - WEF_LS_BLD_INPUTUNVRSL - Entrees SSL universelles
+#
+# AJOUTE LE 2026-09-13 (scenario metier BEAC, demande explicite) : 2
+# entrees "file" supplementaires, lisant en direct (comme "tail -f")
+# les 2 fichiers de log simules (LCB-FT/CyrielleMoney, voir
+# jobs/lib/beac_scenario_tools.sh) - chaque ligne JSON ecrite par les
+# jobs de demo est reprise ici, taguee par "type", puis routee vers le
+# bon index par LS_024.sh. "sincedb_path" dedie par fichier (jamais
+# "/dev/null") pour ne jamais reindexer tout l'historique a chaque
+# redemarrage de Logstash - seule la position de lecture est suivie,
+# jamais le contenu.
 # CORRECTIF 2-VM : le bloc "beats" ecoute sur 0.0.0.0 (au lieu de
 # 127.0.0.1 uniquement) pour accepter BEATS_HOST (VM2). Le pare-feu
 # (LS_008) reste la ligne de defense qui limite la source a BEATS_HOST_IP.
@@ -89,6 +99,20 @@ input {
     host => "127.0.0.1"
     codec => json_lines
     type => "wazuh-alerts"
+  }
+  file {
+    path => "${LCBFT_LOG_FILE}"
+    start_position => "beginning"
+    sincedb_path => "/var/lib/logstash/sincedb_lcbft"
+    codec => "json_lines"
+    type => "lcbft_detection"
+  }
+  file {
+    path => "${CYRIELLEMONEY_LOG_FILE}"
+    start_position => "beginning"
+    sincedb_path => "/var/lib/logstash/sincedb_cyriellemoney"
+    codec => "json_lines"
+    type => "cyriellemoney_transfer"
   }
 }
 CONFEOF

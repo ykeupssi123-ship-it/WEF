@@ -70,28 +70,31 @@ fi
 
 BLOCKS=""
 
+# CORRIGE LE 2026-09-13 (scenario metier BEAC, demande explicite) :
+# lignes d'authentification ES extraites dans une variable partagee -
+# reutilisees telles quelles par le bloc generique ci-dessous ET par le
+# routage BEAC plus bas (meme mode token/mot de passe partout, jamais
+# duplique de facon divergente). Guillemets simples : "${...}" doit
+# rester une reference LITTERALE au coffre Logstash (jamais interpretee
+# par bash), plus simple a lire que l'echappement "\${...}" utilise
+# historiquement plus bas dans ce fichier.
+if [ "${ES_AUTH_MODE:-token}" = "password" ]; then
+  ES_AUTH_LINES='    user => "factory_ingest_user"
+    password => "${factory_ingest_password}"'
+else
+  ES_AUTH_LINES='    api_key => "${factory_ingest_token}"'
+fi
+
 # --- Bloc Elasticsearch (token ou mot de passe, selon ES_AUTH_MODE) ---
 if [ "${LS_OUTPUT_ES_ENABLED:-true}" = "true" ]; then
-  if [ "${ES_AUTH_MODE:-token}" = "password" ]; then
-    echo "[LS_024] Sortie Elasticsearch : mode MOT DE PASSE."
-    BLOCKS="${BLOCKS}
+  echo "[LS_024] Sortie Elasticsearch : mode $([ "${ES_AUTH_MODE:-token}" = "password" ] && echo "MOT DE PASSE" || echo "TOKEN")."
+  BLOCKS="${BLOCKS}
   elasticsearch {
     hosts => [\"https://127.0.0.1:${ES_PORT}\"]
-    user => \"factory_ingest_user\"
-    password => \"\${factory_ingest_password}\"
+${ES_AUTH_LINES}
     ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
     index => \"${ES_IDX_PREFIX}-%{+YYYY.MM.dd}\"
   }"
-  else
-    echo "[LS_024] Sortie Elasticsearch : mode TOKEN."
-    BLOCKS="${BLOCKS}
-  elasticsearch {
-    hosts => [\"https://127.0.0.1:${ES_PORT}\"]
-    api_key => \"\${factory_ingest_token}\"
-    ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
-    index => \"${ES_IDX_PREFIX}-%{+YYYY.MM.dd}\"
-  }"
-  fi
 else
   echo "[LS_024] Sortie Elasticsearch : DESACTIVEE (LS_OUTPUT_ES_ENABLED=false)."
 fi
@@ -142,8 +145,37 @@ if [ -z "$BLOCKS" ]; then
   echo "[LS_024] AVERTISSEMENT : aucune sortie activee, un bloc output vide sera ecrit."
 fi
 
+# AJOUTE LE 2026-09-13 (scenario metier BEAC) : les evenements LCB-FT et
+# CyrielleMoney (types poses par les entrees "file" de LS_020.sh) sont
+# routes vers LEUR PROPRE index dedie, jamais vers "${ES_IDX_PREFIX}-*"
+# ni les autres sorties - le "else" ci-dessous garantit l'exclusivite
+# mutuelle (un evenement ne part JAMAIS vers deux sorties a la fois).
+# Uniquement si la sortie ES est activee : sans elle, ce routage n'a pas
+# de sens (memes coordonnees de connexion que le bloc generique).
+if [ "${LS_OUTPUT_ES_ENABLED:-true}" = "true" ]; then
+  FINAL_OUTPUT="
+  if [type] == \"lcbft_detection\" {
+    elasticsearch {
+      hosts => [\"https://127.0.0.1:${ES_PORT}\"]
+${ES_AUTH_LINES}
+      ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
+      index => \"${LCBFT_INDEX_PREFIX}-%{+YYYY.MM.dd}\"
+    }
+  } else if [type] == \"cyriellemoney_transfer\" {
+    elasticsearch {
+      hosts => [\"https://127.0.0.1:${ES_PORT}\"]
+${ES_AUTH_LINES}
+      ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
+      index => \"${CYRIELLEMONEY_INDEX_PREFIX}-%{+YYYY.MM.dd}\"
+    }
+  } else {${BLOCKS}
+  }"
+else
+  FINAL_OUTPUT="${BLOCKS}"
+fi
+
 cat > "$OUT_FILE" << CONFEOF
-output {${BLOCKS}
+output {${FINAL_OUTPUT}
 }
 CONFEOF
 

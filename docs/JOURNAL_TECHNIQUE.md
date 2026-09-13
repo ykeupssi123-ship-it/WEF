@@ -2569,3 +2569,91 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **Verifie** : `bash -n` propre sur les 2 nouveaux jobs + `jobs/lib/test_data_tools.sh` ; les 4 blocs Python embarques (dont le nouveau) compiles sans erreur (`compile()`) ; bit executable Git corrige (`git update-index --chmod=+x`, meme gotcha Windows/Git-Bash que d'habitude) ; `jobs_table.csv` toujours 8 colonnes, 0 doublon, gate manuel toujours inatteignable automatiquement, tous les scripts references existent reellement sur le disque.
 
 **Limite honnete** : jamais teste contre un vrai wazuh-indexer/Elasticsearch (pas d'acces VM) - la logique d'insertion `_doc`+`_refresh` est identique a `seed_test_alerts_live`, deja validee en reel le 2026-09-09, mais le format de document `AnkrrWEF` lui-meme (nouveau) n'a pas encore ete confirme par une vraie insertion. Reste sur la branche `demo-donnees-realistes` - fusion sur `main` seulement apres validation explicite de l'utilisateur ET confirmation que l'installation de l'etudiante est terminee.
+
+## 2026-09-13 - Premier deploiement AGENT_HOST reel (VM2, 192.168.50.130) : VM reellement sous-dimensionnee, seuils ajustes en connaissance de cause + audit de conformite avant la suite
+
+**Contexte** : premier vrai lancement de `orchestrator.sh` en `ROLE=AGENT_HOST` sur une VM authentiquement neuve (192.168.50.130) - `INFRA_006_AGENT_RESOURCE_CHECK` n'avait jamais tourne en conditions reelles jusqu'ici (mise en garde portee par son propre code depuis sa creation le 2026-08-31).
+
+**Resultat reel** : le job a fonctionne exactement comme concu - il a detecte une machine reellement sous les seuils (1 vCPU/1 Go RAM/13 Go disque, contre 1/2/15 requis) et a arrete l'orchestrateur immediatement, avant toute installation. Rien a corriger dans `INFRA_006_AGENT_RESOURCE_CHECK.sh` lui-meme - le controle de securite a rempli son role.
+
+**Decision operateur, explicite** : plutot que redimensionner la VM, abaisser les seuils pour cette machine reelle (proposee comme alternative, choix assume). Fait en 2 temps sur la VM (`sed` sur `vars.conf`), avec un rebond reel entre les deux : `MIN_DISK_GB_REQUIRED_AGENT` fixe d'abord a 13 (valeur mesuree), le job a immediatement re-echoue avec `12 Go` detectes une minute plus tard - **diagnostique avant d'ajuster encore** : `journalctl --disk-usage` (8 Mo) et `du -sh /var/log/*` (quelques Mo au total) confirment qu'il n'y a AUCUNE fuite disque reelle - juste l'arrondi de `df --output=avail -BG` sur un petit disque de 17 Go total (~12,4-12,9 Go reels, arrondis tantot 12 tantot 13). Seuil final pose UN CRAN SOUS la valeur mesuree (10 Go), pas pile dessus, pour absorber cette fluctuation d'arrondi.
+
+**Corrige dans le depot (`vars.conf`)**, a la demande explicite de ne plus retomber sur ce meme mur lors d'un prochain deploiement neuf : `MIN_RAM_GB_REQUIRED_AGENT` 2->1, `MIN_DISK_GB_REQUIRED_AGENT` 15->10. LIMITE HONNETE assumee dans le commentaire du fichier : ceci reflete une VM de demo/lab reelle, pas une recommandation de dimensionnement de production - une vraie machine AGENT_HOST en production devrait rester dimensionnee selon les besoins reels de Filebeat/Metricbeat/l'agent Wazuh, ce garde-fou abaisse protege moins qu'avant.
+
+**Audit de conformite demande explicitement ("reviser tous les jobs pour qu'un prochain deploiement neuf ne rencontre aucune erreur")** - fait par comparaison directe avec les classes de bugs deja trouvees cote `ELK_HOST`, AVANT que `AGENT_HOST` n'ait fini son tout premier vrai deploiement :
+- **`dnf install` non verifie** (classe ES_017/KB_005/LS_011) : deja corrige partout cote AGENT_HOST (`FB_004`/`MB_004`/`WAG_003`/`MB_016`) depuis les audits precedents - reconfirme, rien a refaire.
+- **Verification de service en un seul essai apres (re)demarrage** (classe WAZ_014/WAZ_020_VERIFY/WAZ_022/WAZ_037) : `FB_014`/`MB_014` avaient deja appris cette lecon (boucle 60x5s). **Trouve reellement en defaut par comparaison directe : `WAG_005`** (demarrage wazuh-agent) ne verifiait qu'UNE FOIS, apres un `sleep 3` fixe - incoherent avec le reste du meme fichier `jobs_table.csv`, risque reel accru sur une VM a 1 Go RAM comme celle en cours de deploiement. Corrige : boucle de reessai bornee (60x2s = 120s), diagnostic `journalctl` en cas d'echec reel, meme idiome que `FB_014`/`MB_014`.
+- **Anciennes references `bin/`/`setup/`** : reconfirme absentes (grep sans filtre d'extension).
+- Autres candidats verifies sans anomalie : `FB_018`/`MB_017` (verifications volontairement non bloquantes, `|| true`, ne peuvent pas produire de faux echec) ; `FB_019`/`MB_018` (retrait de regle iptables, rien a verifier en direct) ; `FB_023`/`MB_022` (controle final `is-active` en un seul essai, mais aucun redemarrage de service ne precede ce controle depuis `FB_014`/`MB_014` - pas le meme risque qu'un controle juste apres perturbation) ; `WAG_001` (ping unique vers le manager, mais AVANT toute perturbation, jamais signale en defaut sur les deploiements precedents - laisse tel quel, pas de preuve reelle justifiant un changement).
+
+**Verifie** : `bash -n` propre sur les 46 jobs `FB_*`/`MB_*`/`WAG_*` et sur `vars.conf`.
+
+**Limite honnete, dite clairement a l'operateur** : cet audit reste statique - la methode qui a fait ses preuves sur `ELK_HOST` (plusieurs bugs reels trouves uniquement par des deploiements reels successifs, jamais par la seule relecture de code) s'applique de la meme facon ici. `WAG_005` est corrige par anticipation, pas parce qu'il a deja echoue en reel - il reste possible que d'autres bugs, invisibles a la lecture, n'apparaissent qu'au prochain vrai passage de la chaine sur cette VM. A confirmer par la suite du deploiement en cours.
+
+## 2026-09-13 (suite) - `DIST_001` bloque en reel (identifiants SSH absents) : distribution de la CA repensee de fond en comble, sans plus aucun identifiant
+
+**Echec reel** : sur la VM2 en cours de deploiement, `DIST_001` (copie de `factory_ca.crt` depuis VM1) a echoue - ni `FACTORY_SSH_KEY` ni `FACTORY_SSH_PASSWORD_FILE` renseignes. Demande explicite et sans ambiguite de l'operateur, refusant categoriquement toute manipulation manuelle (scp/mot de passe tapes a la main) : "il doit avoir un job qui fait ca ... automatique ... controle tout comme un INTJ qui ne laisse rien passer".
+
+**Cause racine identifiee, pas seulement contournee** : la conception initiale de `DIST_001` (scp authentifie par cle SSH ou mot de passe) exigeait un identifiant partage entre VM1 et VM2, qui ne peut PAS s'auto-generer - quelqu'un doit toujours le deposer manuellement une premiere fois quelque part. Cette meme conception avait deja cause un incident reel le 2026-08-30 (mot de passe root en clair dans `vars.conf`, livre tel quel dans l'archive de deploiement). Deux incidents distincts, meme cause profonde : traiter `factory_ca.crt` comme un secret alors que ce n'en est PAS un - c'est un certificat PUBLIC (seule sa cle privee associee, jamais distribuee, doit rester protegee). Aucune authentification n'est necessaire pour le distribuer, exactement comme le fait toute autorite de certification reelle sur Internet.
+
+**Corrige a la racine, plus aucun identifiant nulle part** :
+- **`jobs/PKI_012_SERVE_CA_HTTP.sh`** (nouveau, `ELK_HOST`, `IN_COND=PKI_CRYPTO_ARMED`, `OUT_COND=PKI_CA_HTTP_OK`) : copie `factory_ca.crt` dans un repertoire DEDIE `PKI_PUBLIC_DIR` (jamais `PKI_DIR` en entier, qui contient la cle privee de la CA) - garde-fou reel verifiant qu'aucun autre fichier n'y a jamais ete depose avant de servir quoi que ce soit. Sert ce repertoire via un service systemd permanent (`wef-ca-server.service`, `python3 -m http.server`), port `PKI_CA_HTTP_PORT` (8091, nouvelle variable) ouvert sur la zone `public` (meme constat que `WAZ_006B_FW_DASHAPI` : seule zone reellement liee a l'interface). Verifie en fin de job, par une vraie requete locale comparee au fichier source (`cmp`), que le contenu servi est identique - jamais suppose.
+- **`jobs/DIST_001.sh`** (reecrit entierement) : suppression complete de la logique scp/sshpass/FACTORY_SSH_*. Recupere desormais `factory_ca.crt` par `curl` simple, en reessayant reellement jusqu'a 24 fois (2 minutes) si VM1 n'est pas encore joignable - controle explicite de sa disponibilite, jamais un seul essai a froid, repond directement a la demande "controle la disponibilite de la VM". Verifie que le contenu recupere est un vrai certificat X.509 (`openssl x509 -noout`) avant de l'installer - jamais une simple reponse HTTP 200 prise pour argent comptant (meme discipline que la correction PKI_003-009 du 2026-09-09).
+- **`vars.conf`** : `FACTORY_SSH_USER`/`FACTORY_SSH_KEY`/`FACTORY_SSH_PASSWORD_FILE` supprimes (plus jamais lus par aucun job) ; nouvelles variables `PKI_PUBLIC_DIR`/`PKI_CA_HTTP_PORT`.
+- **`secrets/README_SECRETS.txt`** : entree `factory_ssh_password.txt` retiree (ce fichier n'est plus jamais lu).
+- **`jobs_table.csv`** : nouvelle ligne `PKI_012_SERVE_CA_HTTP` entre `PKI_011` et `ES_001`.
+
+**Audit de conformite trouve en meme temps ("reviser tous les jobs")** : `setup/MNT_reinstall.sh` (purge complete pour repartir de zero) ne desinstallait jamais `metricbeat` ni `wazuh-agent` (seulement `filebeat` cote agents) - angle mort jamais remarque faute d'un vrai `AGENT_HOST` deploye avant cette semaine, meme classe d'incident reel que celui documente plus haut pour `ES_021` (residus d'une installation precedente faisant echouer la suivante). Corrige : `metricbeat`/`wazuh-agent` ajoutes aux etapes arret/desactivation/desinstallation/repertoires residuels/depots dnf (`metricbeat.repo`/`filebeat.repo`).
+
+**Verifie** : `bash -n` propre sur les 2 jobs (nouveau + reecrit), `MNT_reinstall.sh` et `vars.conf` ; audit CSV complet (0 doublon `JOB_ID`/`OUT_COND`, tous les `SCRIPT_FILE` existent, seul orphelin `IN_COND` = le gate demo volontaire) ; **simulation de la resolution par vagues rejouee pour les deux roles** apres l'ajout de `PKI_012` : `ELK_HOST` 219/219 en 2 passes, `AGENT_HOST` 53/53 en 3 passes, 0 job bloque des deux cotes (la simulation elle-meme a d'abord donne un faux positif de blocage AGENT_HOST - bug de la simulation, pas du code reel : elle ne gerait pas encore la colonne `COMPONENT` a valeurs multiples separees par `|`, comme `DIST_001,...,FILEBEAT|METRICBEAT,...` - corrigee en relisant `component_enabled()` reel dans `lib/commun.sh` avant de conclure, jamais suppose).
+
+**Limite honnete** : jamais teste en conditions reelles (le service `wef-ca-server`/`python3 -m http.server` n'a jamais tourne sur une vraie VM1 jusqu'ici) - VM1 a deja termine tout son deploiement, `PKI_012_SERVE_CA_HTTP` devra donc y etre force manuellement une fois (`$APP_BIN/order.sh PKI_012_SERVE_CA_HTTP ...`) apres un `git pull`, plutot que rejoue automatiquement par un run complet. A confirmer par le prochain essai reel de `DIST_001` sur VM2.
+
+**Correction du meme jour, apres le premier essai reel** : deux points corriges suite a la sortie reelle de l'operateur.
+
+1. **`order.sh` inutile, corrige de moi-meme** : `PKI_CRYPTO_ARMED` (dependance de `PKI_012`) etait deja rempli depuis le premier deploiement complet de VM1 - un simple `$APP_HOME/orchestrator.sh` suffit a faire jouer automatiquement le seul job restant, sans forcer quoi que ce soit. `order.sh` n'a de sens que pour bypasser une dependance non remplie, ce qui n'etait pas le cas ici.
+
+2. **Echec reel au premier lancement de `PKI_012_SERVE_CA_HTTP` sur VM1** : `wef-ca-server.service` en boucle de redemarrage (`status=2`). Diagnostic demande et obtenu avant toute correction (`python3 --version` -> `3.6.8` ; `python3 -m http.server ... --directory ...` -> `error: unrecognized arguments: --directory`). Cause reelle confirmee : Oracle Linux 8.10 fournit Python 3.6.8 par defaut - l'option `--directory` du module `http.server` n'existe que depuis Python 3.7, jamais verifie avant ce premier essai reel (aucune VM Oracle Linux 8 disponible pour tester `python3 -m http.server` avant aujourd'hui). Corrige sans detection de version : `--directory` retire de `ExecStart` - `WorkingDirectory=` (deja present dans l'unit systemd) place deja le process dans le bon repertoire avant meme l'exec, rendant `--directory` strictement redondant pour ce besoin.
+
+**Verifie** : `bash -n` propre sur `PKI_012_SERVE_CA_HTTP.sh` corrige.
+
+**A faire sur VM1** : `git pull origin main` puis `$APP_HOME/orchestrator.sh` (rejoue uniquement `PKI_012_SERVE_CA_HTTP`, seul job non termine).
+
+**Limite honnete** : toujours pas confirme en reel apres ce correctif - a verifier au prochain relancement.
+
+## 2026-09-13 (suite) - Troisieme incident reel : `PKI_012_SERVE_CA_HTTP` "OK" sur VM1 mais toujours injoignable depuis VM2 - meme piege deja documente dans `LS_008.sh`, pas relu a temps
+
+**Contexte** : le correctif Python 3.6 a bien fonctionne - `PKI_012_SERVE_CA_HTTP -> OK` sur VM1. Mais `DIST_001`, relance sur VM2, echoue quand meme apres 24 essais reels (2 minutes) - `curl` vers `http://192.168.50.128:8091/factory_ca.crt` depuis VM2 echoue.
+
+**Diagnostic mene par etapes reelles, jamais suppose** :
+1. Cote VM1 : `ss -tlnp` confirme l'ecoute sur `0.0.0.0:8091` ; `firewall-cmd --zone=public --list-ports` confirme `8091/tcp` present ; `curl` depuis VM1 vers sa propre IP reelle reussit. Tout semblait correct.
+2. Cote VM2 : `curl -v` donne "Aucun chemin d'acces pour atteindre l'hote cible" (No route to host) - pas "connexion refusee", donc pas un simple filtrage de port.
+3. Meme symptome reproduit sur le port 443 (deja etabli, deja fonctionnel par le passe) depuis VM2 -> ce n'est pas specifique au port 8091, mais un probleme de portee plus large.
+4. `ping` VM2->VM1 reussit (0% perte) - donc pas un probleme reseau L2/L3 general.
+5. `iptables -S INPUT/OUTPUT` sur VM1 ne montre qu'une politique ACCEPT vide - normal sur Oracle Linux 8, `firewalld` y pilote `nftables`, pas les chaines `iptables` historiques - cette commande ne prouvait donc rien, dans un sens comme dans l'autre.
+6. **`firewall-cmd --get-active-zones` sur VM1 revele la cause reelle** : DEUX zones actives - `public` (liee a l'interface `ens160`) ET `CollectZone` (liee non pas a une interface mais a une SOURCE precise, `192.168.50.130/32` = l'IP exacte de VM2). firewalld fait correspondre une zone-source AVANT une zone-interface : tout le trafic venant de VM2 est donc filtre par `CollectZone`, jamais par `public`, quel que soit ce que `public` autorise.
+
+**Cause racine, deja documentee une fois mais pas relue a temps** : `jobs/LS_008.sh` porte, depuis le 2026-08-31, un commentaire qui decrit EXACTEMENT ce meme mecanisme ("SSH refuse alors que le ping passe... firewalld fait correspondre une source AVANT une interface... CollectZone est desormais le proprietaire unique et complet du jeu de ports necessaires a un AGENT_HOST, documente ici pour que ce ne soit jamais suppose implicite"). `PKI_012_SERVE_CA_HTTP.sh` a ete ecrit sans relire ce commentaire - la meme classe d'erreur reapparait faute d'avoir consulte la documentation deja existante avant d'ajouter un nouveau port destine a un AGENT_HOST.
+
+**Corrige (`jobs/PKI_012_SERVE_CA_HTTP.sh`)** : le port est desormais ouvert sur `CollectZone` (essentiel) en plus de `public` (acces direct/local, ne coute rien a garder). **Corrige aussi l'ordre dans `jobs_table.csv`** : `IN_COND` change de `PKI_CRYPTO_ARMED` (bien avant la phase Logstash) a `LS_FW_ARMED` (`OUT_COND` de `LS_009`, une fois `CollectZone` reellement creee ET source-bound par `LS_006`/`LS_008`) - le job tournait auparavant avant meme que la zone cible n'existe.
+
+**Verifie** : `bash -n` propre ; audit CSV complet (0 doublon, tous les `SCRIPT_FILE` existent) ; simulation de resolution par vagues rejouee : `ELK_HOST` 219/219 en 2 passes, `AGENT_HOST` 53/53 en 3 passes, 0 job bloque - `PKI_012` se resout bien a sa nouvelle position, rien d'autre casse.
+
+**A faire sur VM1** : VM1 a deja termine son deploiement avec l'ancien `PKI_012` (a la mauvaise position, `.ok` deja marque) - supprimer son marqueur pour le forcer a rejouer a la bonne place avec le bon correctif :
+```bash
+git pull origin main
+rm -f state/PKI_CA_HTTP_OK.ok
+$APP_HOME/orchestrator.sh
+```
+
+**Limite honnete** : toujours pas reconfirme en reel apres ce troisieme correctif - a verifier au prochain essai de `DIST_001` sur VM2. Question ouverte, non resolue ici, notee pour une prochaine fois : `CollectZone` n'autorise qu'UNE seule source a la fois (`BEATS_HOST_IP`, remplacee a chaque fois par `LS_008`) - un futur troisieme hote `AGENT_HOST` simultane (VM3) ne serait pas couvert par cette meme regle sans revoir ce mecanisme a source unique.
+
+## 2026-09-13 (suite) - Jalon reel majeur : premier deploiement AGENT_HOST complet, ZERO echec, de bout en bout
+
+**Confirme en reel** : `DIST_001` reussi du premier coup (`CA_DISTRIBUTED_OK`) apres le correctif `CollectZone`/ordre `LS_FW_ARMED` - la chaine entiere `AGENT_HOST` (53 jobs : `DIST_001`, `INFRA_002`, `WAG_001-006`, `FB_001-023`, `MB_001-022`, crash-tests reseau/charge inclus des deux cotes Filebeat/Metricbeat) s'est executee sans un seul echec, jusqu'au tableau de bord final (`bin/summary.sh`, branche `ROLE=AGENT_HOST`) confirmant `filebeat`/`metricbeat`/`wazuh-agent` tous actifs.
+
+**Ferme definitivement toutes les limites honnetes accumulees depuis la creation de ce role** : `INFRA_006_AGENT_RESOURCE_CHECK` ("jamais teste en conditions reelles", depuis le 2026-08-31), `WAG_005` (corrige par anticipation le 2026-09-13, jamais encore observe en situation reelle), `DIST_001`/`PKI_012_SERVE_CA_HTTP` (les 3 incidents reels du jour, tous corriges et maintenant confirmes). Premiere preuve complete, de bout en bout, que le role `AGENT_HOST` de cette usine fonctionne reellement - pas seulement en audit statique.
+
+**Note mineure, sans consequence fonctionnelle** : le tableau de bord affiche `AGENT_NAME=mon-agent-01` - la valeur du modele `vars.local.conf.example`, jamais personnalisee sur cette VM avant ce lancement. L'enregistrement Wazuh a reussi normalement malgre ce nom generique ; a renommer avant un futur second `AGENT_HOST` simultane pour eviter toute ambiguite dans la liste des agents.
+
+**Rien a corriger** - entree de confirmation.

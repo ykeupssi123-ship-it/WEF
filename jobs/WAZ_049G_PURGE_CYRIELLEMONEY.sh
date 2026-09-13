@@ -1,9 +1,14 @@
 #!/bin/bash
 # WAZ_049G_PURGE_CYRIELLEMONEY - WEF_WAZ_RUN_PURGECYRIELLE
-# Nettoyage complet du scenario CyrielleMoney : vide l'index
-# "${CYRIELLEMONEY_INDEX_PREFIX}-*" dans Elasticsearch ET vide
-# CYRIELLEMONEY_LOG_FILE. DESTRUCTEUR ET IRREVERSIBLE - jamais dans la
-# chaine automatique.
+# Nettoyage : vide l'index "${CYRIELLEMONEY_INDEX_PREFIX}-*" dans
+# Elasticsearch. DESTRUCTEUR ET IRREVERSIBLE - jamais dans la chaine
+# automatique.
+#
+# JOUE SUR ELK_HOST (contrairement a BEAC_002_SEED_CYRIELLEMONEY_LIVE,
+# qui joue sur AGENT_HOST - le fichier de log source vit sur VM2, jamais
+# ici). Pour repartir d'un fichier source vide sur VM2, videz-le
+# manuellement la-bas :
+#   : > /var/log/cyriellemoney_transfers.log
 #
 # AJOUTE LE 2026-09-13 (demande explicite utilisateur, meme mecanique
 # que WAZ_046/WAZ_047/WAZ_049C/WAZ_049E). IN_COND=WAZ_PURGE_MANUAL_GATE
@@ -30,11 +35,6 @@ if [ $PURGE_EXIT -ne 0 ]; then
   exit 1
 fi
 rm -f "$PURGE_LOG"
-
-if [ -f "$CYRIELLEMONEY_LOG_FILE" ]; then
-  echo "[WAZ_049G_PURGE_CYRIELLEMONEY] Vidage de ${CYRIELLEMONEY_LOG_FILE}..."
-  : > "$CYRIELLEMONEY_LOG_FILE"
-fi
 
 echo "[WAZ_049G_PURGE_CYRIELLEMONEY] OK."
 exit 0

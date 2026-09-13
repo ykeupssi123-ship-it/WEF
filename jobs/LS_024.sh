@@ -145,23 +145,27 @@ if [ -z "$BLOCKS" ]; then
   echo "[LS_024] AVERTISSEMENT : aucune sortie activee, un bloc output vide sera ecrit."
 fi
 
-# AJOUTE LE 2026-09-13 (scenario metier BEAC) : les evenements LCB-FT et
-# CyrielleMoney (types poses par les entrees "file" de LS_020.sh) sont
-# routes vers LEUR PROPRE index dedie, jamais vers "${ES_IDX_PREFIX}-*"
-# ni les autres sorties - le "else" ci-dessous garantit l'exclusivite
-# mutuelle (un evenement ne part JAMAIS vers deux sorties a la fois).
-# Uniquement si la sortie ES est activee : sans elle, ce routage n'a pas
-# de sens (memes coordonnees de connexion que le bloc generique).
+# AJOUTE LE 2026-09-13 (scenario metier BEAC) - CORRIGE LE MEME JOUR
+# (remarque explicite : les fichiers naissent sur AGENT_HOST et
+# remontent via Filebeat, jamais un "type" pose localement sur ELK_HOST)
+# : les evenements LCB-FT et CyrielleMoney sont reconnus par leur champ
+# ECS "[log][file][path]" (ajoute par Filebeat lui-meme, voir
+# LS_023B_BEAC_FILTER.sh) et routes vers LEUR PROPRE index dedie, jamais
+# vers "${ES_IDX_PREFIX}-*" ni les autres sorties - le "else" ci-dessous
+# garantit l'exclusivite mutuelle (un evenement ne part JAMAIS vers deux
+# sorties a la fois). Uniquement si la sortie ES est activee : sans
+# elle, ce routage n'a pas de sens (memes coordonnees de connexion que
+# le bloc generique).
 if [ "${LS_OUTPUT_ES_ENABLED:-true}" = "true" ]; then
   FINAL_OUTPUT="
-  if [type] == \"lcbft_detection\" {
+  if [log][file][path] =~ \"lcbft_detections\.log\$\" {
     elasticsearch {
       hosts => [\"https://127.0.0.1:${ES_PORT}\"]
 ${ES_AUTH_LINES}
       ssl_certificate_authorities => [\"/etc/logstash/certs/factory_ca.crt\"]
       index => \"${LCBFT_INDEX_PREFIX}-%{+YYYY.MM.dd}\"
     }
-  } else if [type] == \"cyriellemoney_transfer\" {
+  } else if [log][file][path] =~ \"cyriellemoney_transfers\.log\$\" {
     elasticsearch {
       hosts => [\"https://127.0.0.1:${ES_PORT}\"]
 ${ES_AUTH_LINES}

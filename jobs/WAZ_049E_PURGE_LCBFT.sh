@@ -1,10 +1,13 @@
 #!/bin/bash
 # WAZ_049E_PURGE_LCBFT - WEF_WAZ_RUN_PURGELCBFT
-# Nettoyage complet du scenario LCB-FT : vide l'index
-# "${LCBFT_INDEX_PREFIX}-*" dans Elasticsearch ET vide LCBFT_LOG_FILE
-# (repart d'un fichier vide - Logstash detecte la troncature et relit
-# depuis le debut au prochain ajout). DESTRUCTEUR ET IRREVERSIBLE -
-# jamais dans la chaine automatique.
+# Nettoyage : vide l'index "${LCBFT_INDEX_PREFIX}-*" dans Elasticsearch.
+# DESTRUCTEUR ET IRREVERSIBLE - jamais dans la chaine automatique.
+#
+# JOUE SUR ELK_HOST (contrairement a BEAC_001_SEED_LCBFT_LIVE, qui joue
+# sur AGENT_HOST - le fichier de log source vit sur VM2, jamais ici :
+# rien a vider de ce cote, seulement l'index Elasticsearch). Pour repartir
+# d'un fichier source vide sur VM2, videz-le manuellement la-bas :
+#   : > /var/log/lcbft_detections.log
 #
 # AJOUTE LE 2026-09-13 (demande explicite utilisateur, meme mecanique
 # que WAZ_046/WAZ_047/WAZ_049C). IN_COND=WAZ_PURGE_MANUAL_GATE (jamais
@@ -31,11 +34,6 @@ if [ $PURGE_EXIT -ne 0 ]; then
   exit 1
 fi
 rm -f "$PURGE_LOG"
-
-if [ -f "$LCBFT_LOG_FILE" ]; then
-  echo "[WAZ_049E_PURGE_LCBFT] Vidage de ${LCBFT_LOG_FILE}..."
-  : > "$LCBFT_LOG_FILE"
-fi
 
 echo "[WAZ_049E_PURGE_LCBFT] OK."
 exit 0

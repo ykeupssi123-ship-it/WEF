@@ -31,6 +31,12 @@ fi
 
 echo "Cette machine porte des traces d'une installation anterieure."
 read -r -p "Confirmer la purge COMPLETE et DEFINITIVE (paquets + donnees) ? [oui/NON] " CONFIRM
+# CORRIGE LE 2026-09-13 (incident reel : "oui" tape puis refuse quand
+# meme par ce test) - un retour chariot invisible (\r, frequent via
+# certains clients terminal/copier-coller) rendait "$CONFIRM" different
+# de "oui" a l'octet pres, sans que rien ne le laisse voir a l'ecran.
+# Nettoye avant comparaison, jamais suppose propre.
+CONFIRM="${CONFIRM%$'\r'}"
 if [ "$CONFIRM" != "oui" ]; then
   echo "Annule - rien n'a ete supprime."
   exit 1

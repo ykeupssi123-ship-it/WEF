@@ -32,14 +32,6 @@ meme regle que smtp_password.txt :
     WAZ_API_USER). Secret INTERNE a l'usine, meme regle que ci-dessus :
     absent -> genere automatiquement au bon moment de la chaine.
 
-  secrets/factory_ssh_password.txt
-    Mot de passe SSH de secours pour DIST_001.sh (distribution de la CA
-    vers BEATS_HOST, VM2 uniquement). Secret EXTERNE au sens ou il
-    identifie un compte SSH deja existant sur une autre machine : PAS
-    genere automatiquement. A deposer vous-meme, UNIQUEMENT sur VM2,
-    UNIQUEMENT si vous n'utilisez pas FACTORY_SSH_KEY (une cle SSH reste
-    preferable). Ne remplissez jamais ce fichier sur VM1 (ELK_HOST).
-
   secrets/ldap_bind_password.txt
     Mot de passe du compte de service Active Directory (LDAP_BIND_PASSWORD_FILE,
     utilise uniquement si KIBANA_AUTH_MODE=ldap). Secret EXTERNE (compte

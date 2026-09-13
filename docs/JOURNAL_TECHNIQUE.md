@@ -2590,3 +2590,15 @@ Sur toute future VM neuve, ce job s'executera automatiquement dans la chaine nor
 **Verifie** : `bash -n` propre sur les 2 jobs (nouveau + reecrit), `MNT_reinstall.sh` et `vars.conf` ; audit CSV complet (0 doublon `JOB_ID`/`OUT_COND`, tous les `SCRIPT_FILE` existent, seul orphelin `IN_COND` = le gate demo volontaire) ; **simulation de la resolution par vagues rejouee pour les deux roles** apres l'ajout de `PKI_012` : `ELK_HOST` 219/219 en 2 passes, `AGENT_HOST` 53/53 en 3 passes, 0 job bloque des deux cotes (la simulation elle-meme a d'abord donne un faux positif de blocage AGENT_HOST - bug de la simulation, pas du code reel : elle ne gerait pas encore la colonne `COMPONENT` a valeurs multiples separees par `|`, comme `DIST_001,...,FILEBEAT|METRICBEAT,...` - corrigee en relisant `component_enabled()` reel dans `lib/commun.sh` avant de conclure, jamais suppose).
 
 **Limite honnete** : jamais teste en conditions reelles (le service `wef-ca-server`/`python3 -m http.server` n'a jamais tourne sur une vraie VM1 jusqu'ici) - VM1 a deja termine tout son deploiement, `PKI_012_SERVE_CA_HTTP` devra donc y etre force manuellement une fois (`$APP_BIN/order.sh PKI_012_SERVE_CA_HTTP ...`) apres un `git pull`, plutot que rejoue automatiquement par un run complet. A confirmer par le prochain essai reel de `DIST_001` sur VM2.
+
+**Correction du meme jour, apres le premier essai reel** : deux points corriges suite a la sortie reelle de l'operateur.
+
+1. **`order.sh` inutile, corrige de moi-meme** : `PKI_CRYPTO_ARMED` (dependance de `PKI_012`) etait deja rempli depuis le premier deploiement complet de VM1 - un simple `$APP_HOME/orchestrator.sh` suffit a faire jouer automatiquement le seul job restant, sans forcer quoi que ce soit. `order.sh` n'a de sens que pour bypasser une dependance non remplie, ce qui n'etait pas le cas ici.
+
+2. **Echec reel au premier lancement de `PKI_012_SERVE_CA_HTTP` sur VM1** : `wef-ca-server.service` en boucle de redemarrage (`status=2`). Diagnostic demande et obtenu avant toute correction (`python3 --version` -> `3.6.8` ; `python3 -m http.server ... --directory ...` -> `error: unrecognized arguments: --directory`). Cause reelle confirmee : Oracle Linux 8.10 fournit Python 3.6.8 par defaut - l'option `--directory` du module `http.server` n'existe que depuis Python 3.7, jamais verifie avant ce premier essai reel (aucune VM Oracle Linux 8 disponible pour tester `python3 -m http.server` avant aujourd'hui). Corrige sans detection de version : `--directory` retire de `ExecStart` - `WorkingDirectory=` (deja present dans l'unit systemd) place deja le process dans le bon repertoire avant meme l'exec, rendant `--directory` strictement redondant pour ce besoin.
+
+**Verifie** : `bash -n` propre sur `PKI_012_SERVE_CA_HTTP.sh` corrige.
+
+**A faire sur VM1** : `git pull origin main` puis `$APP_HOME/orchestrator.sh` (rejoue uniquement `PKI_012_SERVE_CA_HTTP`, seul job non termine).
+
+**Limite honnete** : toujours pas confirme en reel apres ce correctif - a verifier au prochain relancement.

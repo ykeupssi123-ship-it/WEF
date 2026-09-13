@@ -21,6 +21,15 @@
 # contient la cle privee de la CA et les cles serveur). Verifie
 # explicitement ci-dessous qu'aucun autre fichier n'y a jamais ete
 # depose avant de (re)demarrer le service.
+#
+# CORRIGE LE 2026-09-13 (incident reel, premier lancement sur VM1) :
+# "python3 -m http.server ... --directory ..." echoue avec
+# "unrecognized arguments: --directory" - confirme en reel : Oracle
+# Linux 8.10 fournit Python 3.6.8 par defaut, "--directory" n'existe
+# que depuis Python 3.7. Corrige sans detecter de version : le service
+# demarre deja dans le bon repertoire via "WorkingDirectory=" (unit
+# systemd ci-dessous) - "--directory" etait redondant, jamais
+# necessaire pour ce besoin precis.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -53,7 +62,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${PKI_PUBLIC_DIR}
-ExecStart=/usr/bin/python3 -m http.server ${PKI_CA_HTTP_PORT} --bind 0.0.0.0 --directory ${PKI_PUBLIC_DIR}
+ExecStart=/usr/bin/python3 -m http.server ${PKI_CA_HTTP_PORT} --bind 0.0.0.0
 Restart=on-failure
 RestartSec=5
 User=root

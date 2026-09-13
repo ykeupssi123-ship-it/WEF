@@ -104,6 +104,12 @@ else
 fi
 echo ""
 read -r -p "Tapez exactement '$JOB_ID' pour confirmer le forcage : " CONFIRM
+# CORRIGE LE 2026-09-13 (incident reel : JOB_ID retape a l'identique,
+# refuse quand meme) - meme cause reelle que setup/MNT_reinstall.sh, un
+# retour chariot invisible (\r, frequent via certains clients terminal)
+# rendait "$CONFIRM" different du JOB_ID a l'octet pres, sans que rien
+# ne le laisse voir a l'ecran. Nettoye avant comparaison.
+CONFIRM="${CONFIRM%$'\r'}"
 if [ "$CONFIRM" != "$JOB_ID" ]; then
   echo "Confirmation incorrecte. Forcage annule, rien n'a ete execute."
   exit 1

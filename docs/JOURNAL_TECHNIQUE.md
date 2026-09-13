@@ -2639,3 +2639,17 @@ $APP_HOME/orchestrator.sh
 **Note mineure, sans consequence fonctionnelle** : le tableau de bord affiche `AGENT_NAME=mon-agent-01` - la valeur du modele `vars.local.conf.example`, jamais personnalisee sur cette VM avant ce lancement. L'enregistrement Wazuh a reussi normalement malgre ce nom generique ; a renommer avant un futur second `AGENT_HOST` simultane pour eviter toute ambiguite dans la liste des agents.
 
 **Rien a corriger** - entree de confirmation.
+
+## 2026-09-13 (suite) - `bin/order.sh` refuse une confirmation retapee a l'identique : meme bug de \r invisible que MNT_reinstall.sh, corrige plus largement
+
+**Echec reel** : en testant le scenario BEAC sur VM1, `$APP_BIN/order.sh LS_024 "..."` a demande de retaper `LS_024` pour confirmer - fait, a l'identique - et a quand meme repondu "Confirmation incorrecte. Forcage annule, rien n'a ete execute." Exactement le meme symptome que l'incident deja corrige sur `setup/MNT_reinstall.sh` (confirmation "oui" refusee malgre une saisie correcte).
+
+**Cause reelle, deja identifiee une fois** : un retour chariot invisible (`\r`, introduit par certains clients terminal) peut se glisser dans la valeur lue par `read`, rendant la comparaison stricte `[ "$CONFIRM" != "$JOB_ID" ]` fausse a l'octet pres sans que rien ne le laisse voir a l'ecran.
+
+**Corrige plus largement que le seul point d'echec observe** : recherche systematique de tout le meme motif (`read -r -p ... CONFIRM`) dans `bin/` et `setup/` plutot que de ne corriger que `order.sh` - trouve aussi dans `bin/confirm.sh` (jamais rencontre en echec reel a ce jour, mais strictement le meme code, donc la meme vulnerabilite latente). Les deux nettoient desormais `$CONFIRM` (`"${CONFIRM%$'\r'}"`) avant comparaison, meme correctif que `MNT_reinstall.sh`.
+
+**Verifie** : `bash -n` propre sur les 2 fichiers.
+
+**A faire sur VM1** : `git pull origin main` (ce correctif vit sur `main`, independant de la branche `demo-donnees-realistes` en cours de test), puis reessayer `$APP_BIN/order.sh LS_024 "..."`.
+
+**Limite honnete** : cause exacte du `\r` (client PuTTY ? copier-coller ? terminal specifique ?) jamais formellement identifiee - le correctif protege contre le symptome de facon robuste quelle que soit la cause exacte, sans la diagnostiquer plus avant.

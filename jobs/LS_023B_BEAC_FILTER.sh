@@ -26,6 +26,9 @@ fi
 cat > "$FILTER_FILE" << CONFEOF
 filter {
   if [log][file][path] =~ "lcbft_detections\.log\$" or [log][file][path] =~ "cyriellemoney_transfers\.log\$" {
+    mutate {
+      add_tag => [ "beac_path_matched" ]
+    }
     json {
       source => "message"
     }

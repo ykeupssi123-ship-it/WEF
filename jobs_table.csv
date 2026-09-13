@@ -88,6 +88,7 @@ LS_005,WEF_LS_BLD_DIROWNER,ELK_HOST,ALWAYS,LS_005.sh,Droits : Alignement des per
 LS_006,WEF_LS_BLD_FWZONE,ELK_HOST,ALWAYS,LS_006.sh,Châssis Réseau : Déclaration de la zone étanche CollectZone,LS_OWNER_OK,LS_FW_ZONE_OK
 LS_007,WEF_LS_BLD_FWPORT514,ELK_HOST,ALWAYS,LS_007.sh,Désoperculage Fiche : Ouverture du port Syslog standard local 514,LS_FW_ZONE_OK,LS_FW_514_OK
 LS_008,WEF_LS_BLD_FWPORTUNVRSL,ELK_HOST,ALWAYS,LS_008.sh,Désoperculage Fiche : Ouverture du port de collecte sécurisé local 5044,LS_FW_514_OK,LS_FW_5044_OK
+INFRA_007_NTP_SERVER,WEF_INFRA_BLD_NTPSRV,ELK_HOST,ALWAYS,INFRA_007_NTP_SERVER.sh,Horloge de reference chrony pour VM2 et tout futur AGENT_HOST evite un decalage silencieux avec les timestamps Kibana,LS_FW_5044_OK,NTP_SERVER_OK
 LS_009,WEF_LS_BLD_FWAPPLY,ELK_HOST,ALWAYS,LS_009.sh,Mise en ligne Barrière : Fixation persistante des règles,LS_FW_5044_OK,LS_FW_ARMED
 PKI_012_SERVE_CA_HTTP,WEF_PKI_RUN_CAHTTPSRV,ELK_HOST,ALWAYS,PKI_012_SERVE_CA_HTTP.sh,Distribution : sert factory_ca.crt (certificat public) en HTTP permanent sur CollectZone pour que tout AGENT_HOST le recupere sans identifiant,LS_FW_ARMED,PKI_CA_HTTP_OK
 LS_010,WEF_LS_BLD_REPOSET,ELK_HOST,ALWAYS,LS_010.sh,Acheminement : Configuration du dépôt officiel de confiance,LS_FW_ARMED,LS_REPO_OK
@@ -149,6 +150,7 @@ LS_036_FINAL,WEF_LS_BLD_IMMTBLRULES,ELK_HOST,ALWAYS,LS_036_FINAL.sh,Sûreté Log
 KB_028_FINAL,WEF_KB_BLD_LOCKCONF,ELK_HOST,ALWAYS,KB_028_FINAL.sh,Sûreté Kibana : Scellage complet de la matrice et de ses structures de rendu,LS_RULES_LOCKED,KB_CONF_LOCKED
 KB_029,WEF_KB_RUN_GTEOPEN,ELK_HOST,ALWAYS,KB_029.sh,Vanne Maîtresse : Émission du signal de disponibilité du Hub,KB_CONF_LOCKED,KIBANA_HUB_ONLINE
 INFRA_006_AGENT_RESOURCE_CHECK,WEF_INFRA_BLD_MINRESVERIFY,AGENT_HOST,ALWAYS,INFRA_006_AGENT_RESOURCE_CHECK.sh,Contrôle Capacitaire : Vérification des ressources minimales avant toute installation (VM2/agents),NONE,AGENT_RESOURCES_OK
+INFRA_008_NTP_CLIENT,WEF_INFRA_BLD_NTPCLI,AGENT_HOST,ALWAYS,INFRA_008_NTP_CLIENT.sh,Synchronisation chrony sur VM1 evite un decalage silencieux avec les timestamps Kibana,AGENT_RESOURCES_OK,NTP_CLIENT_OK
 FB_001,WEF_FB_BLD_OSPREP,AGENT_HOST,FILEBEAT,FB_001.sh,Terrassement : Alignement OS Oracle Linux 8.10 pour Filebeat,AGENT_RESOURCES_OK,FB_OS_READY
 FB_002,WEF_FB_BLD_DIRINIT,AGENT_HOST,FILEBEAT,FB_002.sh,Structures : Initialisation des répertoires de transit et de registres,FB_OS_READY,FB_DIRS_OK
 FB_003,WEF_FB_BLD_REPOSET,AGENT_HOST,FILEBEAT,FB_003.sh,Acheminement : Configuration du dépôt officiel certifié,FB_DIRS_OK,FB_REPO_OK

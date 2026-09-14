@@ -28,20 +28,21 @@
 #   ./bin/order.sh <JOB_ID> "<raison>"
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
-source "$VARS_FILE"
-source "$HERE/lib/commun.sh"
 
 # AJOUTE LE 2026-09-14 (demande explicite : "je souhaiterais qu'a la
 # longue on ne soit plus a taper ce genre de chose (sync_branch.sh)") -
 # synchronise automatiquement la branche courante avec origin AVANT de
-# lire jobs_table.csv, pour eliminer la classe de bug la plus frequente
-# de cette soiree (code perime, job absent du CSV local alors que deja
-# pousse sur GitHub). Best-effort : l'absence de reseau ne bloque jamais
-# un run local (avertissement, puis poursuite avec le code existant) -
-# seul un VRAI conflit de fusion non resolu arrete le script, car
-# jobs_table.csv pourrait sinon contenir des marqueurs de conflit et
-# casser silencieusement toute la resolution de dependances.
+# LIRE VARS_FILE/jobs_table.csv (deliberement place avant le "source"
+# ci-dessous - CORRIGE LE 2026-09-14, incident reel : place initialement
+# APRES "source $VARS_FILE", REPEATABLE_JOBS restait donc celui d'AVANT
+# la synchronisation au tout premier lancement suivant une mise a jour,
+# le rendant inoperant sans qu'aucune erreur ne le signale - jamais un
+# second essai ne devrait etre necessaire). Best-effort : l'absence de
+# reseau ne bloque jamais un run local (avertissement, puis poursuite
+# avec le code existant) - seul un VRAI conflit de fusion non resolu
+# arrete le script, car jobs_table.csv pourrait sinon contenir des
+# marqueurs de conflit et casser silencieusement toute la resolution de
+# dependances.
 if [ -d "$HERE/.git" ] && [ -x "$HERE/bin/sync_branch.sh" ]; then
   echo "[auto-sync] Synchronisation de la branche courante avec origin..."
   if ! "$HERE/bin/sync_branch.sh"; then
@@ -52,6 +53,10 @@ if [ -d "$HERE/.git" ] && [ -x "$HERE/bin/sync_branch.sh" ]; then
     echo "[auto-sync] ATTENTION : synchronisation impossible (reseau absent ?) - poursuite avec le code local existant." >&2
   fi
 fi
+
+export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
+source "$VARS_FILE"
+source "$HERE/lib/commun.sh"
 
 JOB_ID="${1:-}"
 RAISON="${2:-}"

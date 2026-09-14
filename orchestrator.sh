@@ -33,13 +33,15 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export VARS_FILE="$SCRIPT_DIR/vars.conf"
-source "$VARS_FILE"
-source "$SCRIPT_DIR/lib/commun.sh"
 
 # AJOUTE LE 2026-09-14 (meme correctif que bin/order.sh, voir ce fichier
 # pour le detail du raisonnement) - synchronise automatiquement la
-# branche courante avec origin avant de lire jobs_table.csv.
+# branche courante avec origin AVANT de lire VARS_FILE/jobs_table.csv.
+# CORRIGE LE 2026-09-14 (meme jour) : deliberement place AVANT le
+# "source $VARS_FILE" ci-dessous - place initialement apres, un vars.conf
+# fraichement modifie par ce meme "git pull" n'etait pris en compte
+# qu'au lancement SUIVANT, jamais celui-ci (incident reel constate sur
+# REPEATABLE_JOBS, voir docs/JOURNAL_TECHNIQUE.md).
 if [ -d "$SCRIPT_DIR/.git" ] && [ -x "$SCRIPT_DIR/bin/sync_branch.sh" ]; then
   echo "[auto-sync] Synchronisation de la branche courante avec origin..."
   if ! "$SCRIPT_DIR/bin/sync_branch.sh"; then
@@ -50,6 +52,10 @@ if [ -d "$SCRIPT_DIR/.git" ] && [ -x "$SCRIPT_DIR/bin/sync_branch.sh" ]; then
     echo "[auto-sync] ATTENTION : synchronisation impossible (reseau absent ?) - poursuite avec le code local existant." >&2
   fi
 fi
+
+export VARS_FILE="$SCRIPT_DIR/vars.conf"
+source "$VARS_FILE"
+source "$SCRIPT_DIR/lib/commun.sh"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR" "$WORK_TMP_DIR"
 TS=$(date +%Y%m%d_%H%M%S)

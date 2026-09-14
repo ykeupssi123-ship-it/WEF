@@ -28,20 +28,21 @@
 #   ./bin/order.sh <JOB_ID> "<raison>"
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
-source "$VARS_FILE"
-source "$HERE/lib/commun.sh"
 
 # AJOUTE LE 2026-09-14 (demande explicite : "je souhaiterais qu'a la
 # longue on ne soit plus a taper ce genre de chose (sync_branch.sh)") -
 # synchronise automatiquement la branche courante avec origin AVANT de
-# lire jobs_table.csv, pour eliminer la classe de bug la plus frequente
-# de cette soiree (code perime, job absent du CSV local alors que deja
-# pousse sur GitHub). Best-effort : l'absence de reseau ne bloque jamais
-# un run local (avertissement, puis poursuite avec le code existant) -
-# seul un VRAI conflit de fusion non resolu arrete le script, car
-# jobs_table.csv pourrait sinon contenir des marqueurs de conflit et
-# casser silencieusement toute la resolution de dependances.
+# LIRE VARS_FILE/jobs_table.csv (deliberement place avant le "source"
+# ci-dessous - CORRIGE LE 2026-09-14, incident reel : place initialement
+# APRES "source $VARS_FILE", REPEATABLE_JOBS restait donc celui d'AVANT
+# la synchronisation au tout premier lancement suivant une mise a jour,
+# le rendant inoperant sans qu'aucune erreur ne le signale - jamais un
+# second essai ne devrait etre necessaire). Best-effort : l'absence de
+# reseau ne bloque jamais un run local (avertissement, puis poursuite
+# avec le code existant) - seul un VRAI conflit de fusion non resolu
+# arrete le script, car jobs_table.csv pourrait sinon contenir des
+# marqueurs de conflit et casser silencieusement toute la resolution de
+# dependances.
 if [ -d "$HERE/.git" ] && [ -x "$HERE/bin/sync_branch.sh" ]; then
   echo "[auto-sync] Synchronisation de la branche courante avec origin..."
   if ! "$HERE/bin/sync_branch.sh"; then
@@ -52,6 +53,10 @@ if [ -d "$HERE/.git" ] && [ -x "$HERE/bin/sync_branch.sh" ]; then
     echo "[auto-sync] ATTENTION : synchronisation impossible (reseau absent ?) - poursuite avec le code local existant." >&2
   fi
 fi
+
+export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
+source "$VARS_FILE"
+source "$HERE/lib/commun.sh"
 
 JOB_ID="${1:-}"
 RAISON="${2:-}"
@@ -77,7 +82,33 @@ while IFS=',' read -r C_JOB_ID C_JOB_NAME C_JOB_ROLE C_COMPONENT C_SCRIPT_FILE C
 done < "$JOBS_CSV"
 
 if [ -z "$LINE" ]; then
-  echo "ERREUR : $JOB_ID introuvable dans jobs_table.csv."
+  CURRENT_BRANCH="$(git -C "$HERE" branch --show-current 2>/dev/null || echo inconnue)"
+  echo "ERREUR : $JOB_ID introuvable dans jobs_table.csv (branche actuelle : $CURRENT_BRANCH)."
+  # AJOUTE LE 2026-09-14 (demande explicite : "plus jamais des soucis
+  # avec ca, qu'on n'en parle plus jamais") - incident reel recurrent
+  # ce soir : un job existe bien, mais sur une AUTRE branche que celle
+  # actuellement extraite (ex: BEAC_003 existe sur demo-donnees-realistes,
+  # jamais sur main) - le message "introuvable" seul ne dit jamais
+  # POURQUOI, ni quoi faire. Cherche le job sur toutes les branches
+  # locales et distantes connues et l'indique explicitement.
+  if [ -d "$HERE/.git" ]; then
+    FOUND_ON=""
+    for b in $(git -C "$HERE" for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/origin/ 2>/dev/null | sed 's#^origin/##' | sort -u); do
+      [ "$b" = "HEAD" ] && continue
+      if git -C "$HERE" show "$b:jobs_table.csv" 2>/dev/null | grep -q "^${JOB_ID},"; then
+        FOUND_ON="${FOUND_ON}${FOUND_ON:+ }$b"
+      fi
+    done
+    if [ -n "$FOUND_ON" ]; then
+      echo "Ce job existe sur : ${FOUND_ON} - pas sur '${CURRENT_BRANCH}'."
+      echo "Basculez dessus puis reessayez :"
+      for b in $FOUND_ON; do
+        [ "$b" != "$CURRENT_BRANCH" ] && echo "  git checkout $b && ./bin/sync_branch.sh $b"
+      done
+    else
+      echo "Introuvable sur aucune branche connue (locale ou distante) - verifiez l'orthographe exacte du JOB_ID."
+    fi
+  fi
   exit 1
 fi
 

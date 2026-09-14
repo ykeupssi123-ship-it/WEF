@@ -97,6 +97,11 @@ echo "satisfaite (autrement que par ce job), et que tout ce qui en"
 echo "depend peut continuer en toute securite sans que ce script tourne."
 echo ""
 read -r -p "Tapez exactement '$JOB_ID' pour confirmer le marquage : " CONFIRM
+# CORRIGE LE 2026-09-13 (meme incident reel que bin/order.sh/setup/
+# MNT_reinstall.sh) : un retour chariot invisible (\r) peut rendre
+# "$CONFIRM" different du JOB_ID a l'octet pres, sans rien laisser voir
+# a l'ecran. Nettoye avant comparaison.
+CONFIRM="${CONFIRM%$'\r'}"
 if [ "$CONFIRM" != "$JOB_ID" ]; then
   echo "Confirmation incorrecte. Marquage annule, rien n'a ete modifie."
   exit 1

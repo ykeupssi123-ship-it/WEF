@@ -32,6 +32,27 @@ export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
 source "$VARS_FILE"
 source "$HERE/lib/commun.sh"
 
+# AJOUTE LE 2026-09-14 (demande explicite : "je souhaiterais qu'a la
+# longue on ne soit plus a taper ce genre de chose (sync_branch.sh)") -
+# synchronise automatiquement la branche courante avec origin AVANT de
+# lire jobs_table.csv, pour eliminer la classe de bug la plus frequente
+# de cette soiree (code perime, job absent du CSV local alors que deja
+# pousse sur GitHub). Best-effort : l'absence de reseau ne bloque jamais
+# un run local (avertissement, puis poursuite avec le code existant) -
+# seul un VRAI conflit de fusion non resolu arrete le script, car
+# jobs_table.csv pourrait sinon contenir des marqueurs de conflit et
+# casser silencieusement toute la resolution de dependances.
+if [ -d "$HERE/.git" ] && [ -x "$HERE/bin/sync_branch.sh" ]; then
+  echo "[auto-sync] Synchronisation de la branche courante avec origin..."
+  if ! "$HERE/bin/sync_branch.sh"; then
+    if git -C "$HERE" status --porcelain 2>/dev/null | grep -q '^UU'; then
+      echo "[auto-sync] ERREUR : conflit de fusion non resolu (fichier(s) en UU) - jobs_table.csv ou un job pourrait etre corrompu. Resolvez manuellement (git status) avant de relancer." >&2
+      exit 1
+    fi
+    echo "[auto-sync] ATTENTION : synchronisation impossible (reseau absent ?) - poursuite avec le code local existant." >&2
+  fi
+fi
+
 JOB_ID="${1:-}"
 RAISON="${2:-}"
 if [ -z "$JOB_ID" ] || [ -z "$RAISON" ]; then
@@ -104,6 +125,12 @@ else
 fi
 echo ""
 read -r -p "Tapez exactement '$JOB_ID' pour confirmer le forcage : " CONFIRM
+# CORRIGE LE 2026-09-13 (incident reel : JOB_ID retape a l'identique,
+# refuse quand meme) - meme cause reelle que setup/MNT_reinstall.sh, un
+# retour chariot invisible (\r, frequent via certains clients terminal)
+# rendait "$CONFIRM" different du JOB_ID a l'octet pres, sans que rien
+# ne le laisse voir a l'ecran. Nettoye avant comparaison.
+CONFIRM="${CONFIRM%$'\r'}"
 if [ "$CONFIRM" != "$JOB_ID" ]; then
   echo "Confirmation incorrecte. Forcage annule, rien n'a ete execute."
   exit 1

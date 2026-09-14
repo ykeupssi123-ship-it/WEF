@@ -2817,3 +2817,16 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **Verifie** : `bash -n` propre ; bit executable corrige ; audit CSV complet (287 lignes, 0 doublon d'ID, 0 doublon d'OUT_COND, 0 dependance introuvable) ; simulation de resolution `ELK_HOST` : le nouveau job tombe bien derriere `WAZ_PURGE_MANUAL_GATE`, aux cotes des 4 autres purges deja connues (jamais un nouveau blocage inattendu ailleurs dans la chaine).
 
 **Limite honnete** : jamais execute en conditions reelles a l'instant de cette entree (nouveau job) - a tester avec au moins un index hors-wazuh reellement present, en verifiant `_cat/indices` avant/apres pour confirmer que seule la famille `wazuh-*` survit.
+## 2026-09-13 (suite) - `bin/order.sh` refuse une confirmation retapee a l'identique : meme bug de \r invisible que MNT_reinstall.sh, corrige plus largement
+
+**Echec reel** : en testant le scenario BEAC sur VM1, `$APP_BIN/order.sh LS_024 "..."` a demande de retaper `LS_024` pour confirmer - fait, a l'identique - et a quand meme repondu "Confirmation incorrecte. Forcage annule, rien n'a ete execute." Exactement le meme symptome que l'incident deja corrige sur `setup/MNT_reinstall.sh` (confirmation "oui" refusee malgre une saisie correcte).
+
+**Cause reelle, deja identifiee une fois** : un retour chariot invisible (`\r`, introduit par certains clients terminal) peut se glisser dans la valeur lue par `read`, rendant la comparaison stricte `[ "$CONFIRM" != "$JOB_ID" ]` fausse a l'octet pres sans que rien ne le laisse voir a l'ecran.
+
+**Corrige plus largement que le seul point d'echec observe** : recherche systematique de tout le meme motif (`read -r -p ... CONFIRM`) dans `bin/` et `setup/` plutot que de ne corriger que `order.sh` - trouve aussi dans `bin/confirm.sh` (jamais rencontre en echec reel a ce jour, mais strictement le meme code, donc la meme vulnerabilite latente). Les deux nettoient desormais `$CONFIRM` (`"${CONFIRM%$'\r'}"`) avant comparaison, meme correctif que `MNT_reinstall.sh`.
+
+**Verifie** : `bash -n` propre sur les 2 fichiers.
+
+**A faire sur VM1** : `git pull origin main` (ce correctif vit sur `main`, independant de la branche `demo-donnees-realistes` en cours de test), puis reessayer `$APP_BIN/order.sh LS_024 "..."`.
+
+**Limite honnete** : cause exacte du `\r` (client PuTTY ? copier-coller ? terminal specifique ?) jamais formellement identifiee - le correctif protege contre le symptome de facon robuste quelle que soit la cause exacte, sans la diagnostiquer plus avant.

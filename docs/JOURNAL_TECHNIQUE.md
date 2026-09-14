@@ -2830,3 +2830,19 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **A faire sur VM1** : `git pull origin main` (ce correctif vit sur `main`, independant de la branche `demo-donnees-realistes` en cours de test), puis reessayer `$APP_BIN/order.sh LS_024 "..."`.
 
 **Limite honnete** : cause exacte du `\r` (client PuTTY ? copier-coller ? terminal specifique ?) jamais formellement identifiee - le correctif protege contre le symptome de facon robuste quelle que soit la cause exacte, sans la diagnostiquer plus avant.
+
+## 2026-09-14 (suite) - REPEATABLE_JOBS inoperant au premier essai : ordre auto-sync/source corrige
+
+**Constat reel** : `REPEATABLE_JOBS` ajoute plus tot ce soir (voir entree precedente) ne fonctionnait pas pour `BEAC_002`/`BEAC_003` - `order.sh` continuait d'afficher "deja fait, rien a forcer" malgre le nouveau `vars.conf` deja pousse sur GitHub. `BEAC_001` avait fonctionne, mais par coincidence : il n'avait jamais tourne avant sur cette VM (aucun marqueur `.ok` preexistant a effacer), donc son succes ne prouvait rien sur le mecanisme lui-meme.
+
+**Cause reelle** : le bloc de synchronisation automatique (ajoute juste avant, meme soiree) avait ete place APRES `source "$VARS_FILE"` dans `bin/order.sh` ET `orchestrator.sh`. Au tout premier lancement suivant une mise a jour, le script chargeait donc encore l'ANCIEN `vars.conf` (sans `REPEATABLE_JOBS`) en memoire, PUIS synchronisait le depot (mettant a jour `vars.conf` sur disque pour le lancement SUIVANT, jamais celui-ci) - aucune erreur ne le signalait, le symptome ressemblait a un simple oubli de synchronisation.
+
+**Corrige** : bloc de synchronisation deplace AVANT tout `source`, dans les deux fichiers - `vars.conf` fraichement recupere est desormais TOUJOURS celui reellement charge par l'execution qui vient de le recuperer, plus jamais un second essai necessaire.
+
+**Verifie** : `bash -n` propre sur les 2 fichiers ; simulation reelle (job factice, marqueur preexistant) confirmant l'effacement automatique du `.ok` avant relance.
+
+## 2026-09-14 (suite) - Volume aligne a 100 enregistrements par index
+
+**Demande explicite** : "les jobs doivent remplir 100 enregistrement par index". `BEAC_002` (CyrielleMoney) etait deja a 100 par defaut (`WAZ_DEMO_SEED_COUNT:-100`, jamais modifie). `LCBFT_DEMO_BULK_COUNT` (`BEAC_003`, demo publique LCB-FT) passe de 50 a 100 pour le meme volume des deux cotes - `BEAC_001` (scenario "realiste", 1 a 5 enregistrements aleatoires) volontairement INCHANGE, sa variabilite etant le but explicite de sa creation ("montrer qu'on peut detecter 1 enregistrement et a certains moments voir meme 5 d'un coup") - a confirmer aupres de l'operateur si ce n'est pas ce qui etait vise.
+
+**Consequence honnete** : `BEAC_003` dure desormais environ 3min20 (100 x 2s) au lieu d'1min40.

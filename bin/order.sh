@@ -91,6 +91,27 @@ if job_held "$JOB_ID"; then
   exit 1
 fi
 
+# AJOUTE LE 2026-09-14 (demande explicite : des jobs qu'on rejoue
+# souvent en demo - ecriture de fichiers repris par Filebeat - ne
+# doivent jamais obliger a supprimer state/<OUT_COND>.ok a la main
+# avant chaque nouveau lancement). REPEATABLE_JOBS (vars.conf, liste
+# separee par des virgules, meme principe que SKIP_JOBS/
+# ES_DEMO_INDEX_PREFIXES) : si JOB_ID y figure, son marqueur est efface
+# automatiquement ici, AVANT le controle "deja fait" ci-dessous - jamais
+# silencieux, toujours annonce. Vide par defaut = comportement inchange
+# pour tout le reste du projet.
+if [ -n "${REPEATABLE_JOBS:-}" ]; then
+  IFS=',' read -ra REPEATABLE_LIST <<< "$REPEATABLE_JOBS"
+  for rj in "${REPEATABLE_LIST[@]}"; do
+    rj="$(echo "$rj" | xargs)"
+    if [ "$rj" = "$JOB_ID" ] && [ -f "$STATE_DIR/$C_OUT_COND.ok" ]; then
+      echo "[order.sh] $JOB_ID est dans REPEATABLE_JOBS (vars.conf) - marqueur $C_OUT_COND.ok efface automatiquement pour permettre ce nouveau lancement."
+      rm -f "$STATE_DIR/$C_OUT_COND.ok"
+      break
+    fi
+  done
+fi
+
 if job_done "$C_OUT_COND"; then
   echo "$JOB_ID a deja ete execute avec succes (condition $C_OUT_COND deja remplie)."
   echo "Rien a forcer. Pour le rejouer quand meme, supprimez d'abord state/$C_OUT_COND.ok"

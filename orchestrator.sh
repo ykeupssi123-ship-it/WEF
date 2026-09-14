@@ -37,6 +37,20 @@ export VARS_FILE="$SCRIPT_DIR/vars.conf"
 source "$VARS_FILE"
 source "$SCRIPT_DIR/lib/commun.sh"
 
+# AJOUTE LE 2026-09-14 (meme correctif que bin/order.sh, voir ce fichier
+# pour le detail du raisonnement) - synchronise automatiquement la
+# branche courante avec origin avant de lire jobs_table.csv.
+if [ -d "$SCRIPT_DIR/.git" ] && [ -x "$SCRIPT_DIR/bin/sync_branch.sh" ]; then
+  echo "[auto-sync] Synchronisation de la branche courante avec origin..."
+  if ! "$SCRIPT_DIR/bin/sync_branch.sh"; then
+    if git -C "$SCRIPT_DIR" status --porcelain 2>/dev/null | grep -q '^UU'; then
+      echo "[auto-sync] ERREUR : conflit de fusion non resolu (fichier(s) en UU) - jobs_table.csv ou un job pourrait etre corrompu. Resolvez manuellement (git status) avant de relancer." >&2
+      exit 1
+    fi
+    echo "[auto-sync] ATTENTION : synchronisation impossible (reseau absent ?) - poursuite avec le code local existant." >&2
+  fi
+fi
+
 mkdir -p "$STATE_DIR" "$LOG_DIR" "$WORK_TMP_DIR"
 TS=$(date +%Y%m%d_%H%M%S)
 RUN_LOG="$LOG_DIR/orchestrator_${TS}.log"

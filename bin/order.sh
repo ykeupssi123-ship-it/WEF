@@ -77,7 +77,33 @@ while IFS=',' read -r C_JOB_ID C_JOB_NAME C_JOB_ROLE C_COMPONENT C_SCRIPT_FILE C
 done < "$JOBS_CSV"
 
 if [ -z "$LINE" ]; then
-  echo "ERREUR : $JOB_ID introuvable dans jobs_table.csv."
+  CURRENT_BRANCH="$(git -C "$HERE" branch --show-current 2>/dev/null || echo inconnue)"
+  echo "ERREUR : $JOB_ID introuvable dans jobs_table.csv (branche actuelle : $CURRENT_BRANCH)."
+  # AJOUTE LE 2026-09-14 (demande explicite : "plus jamais des soucis
+  # avec ca, qu'on n'en parle plus jamais") - incident reel recurrent
+  # ce soir : un job existe bien, mais sur une AUTRE branche que celle
+  # actuellement extraite (ex: BEAC_003 existe sur demo-donnees-realistes,
+  # jamais sur main) - le message "introuvable" seul ne dit jamais
+  # POURQUOI, ni quoi faire. Cherche le job sur toutes les branches
+  # locales et distantes connues et l'indique explicitement.
+  if [ -d "$HERE/.git" ]; then
+    FOUND_ON=""
+    for b in $(git -C "$HERE" for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/origin/ 2>/dev/null | sed 's#^origin/##' | sort -u); do
+      [ "$b" = "HEAD" ] && continue
+      if git -C "$HERE" show "$b:jobs_table.csv" 2>/dev/null | grep -q "^${JOB_ID},"; then
+        FOUND_ON="${FOUND_ON}${FOUND_ON:+ }$b"
+      fi
+    done
+    if [ -n "$FOUND_ON" ]; then
+      echo "Ce job existe sur : ${FOUND_ON} - pas sur '${CURRENT_BRANCH}'."
+      echo "Basculez dessus puis reessayez :"
+      for b in $FOUND_ON; do
+        [ "$b" != "$CURRENT_BRANCH" ] && echo "  git checkout $b && ./bin/sync_branch.sh $b"
+      done
+    else
+      echo "Introuvable sur aucune branche connue (locale ou distante) - verifiez l'orthographe exacte du JOB_ID."
+    fi
+  fi
   exit 1
 fi
 

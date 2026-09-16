@@ -9,6 +9,13 @@
 # GRATUITE, creee par l'operateur lui-meme sur virustotal.com - jamais
 # generee ni devinee ici (voir vars.conf, VIRUSTOTAL_API_KEY_FILE, meme
 # principe que SMTP_PASS_FILE).
+#
+# CORRIGE LE 2026-09-16 (incident reel, wef-elk-core, diagnostique via
+# le JSON brut d'une alerte reelle) : filtre par rule_id (100100 - la
+# regle generique preexistante de WAZ_025.sh - plus 550/553/554, les
+# regles FIM standard), jamais par <group>syscheck</group> - ce groupe
+# n'apparait jamais sur les alertes de ce type dans cet environnement,
+# rendant l'integration invisible (aucune erreur, juste jamais declenchee).
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -68,14 +75,25 @@ if grep -qF "$MARKER_VT" "$OSSEC_CONF"; then
   echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Bloc integration deja pose, retrait avant reecriture..."
   sed -i "\|^${MARKER_VT//\//\\/}\$|,\|^<!-- WEF_VT_INTEGRATION_CONFIG_END -->\$|d" "$OSSEC_CONF"
 fi
-echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de l'integration VirusTotal (groupe syscheck)..."
+# CORRIGE LE 2026-09-16 (incident reel, wef-elk-core) : le filtre
+# <group>syscheck</group> ne se declenche JAMAIS ici - une regle
+# preexistante du projet (WAZ_025.sh, id 100100, "Modification detectee
+# sur un fichier surveille de la Forge") intercepte tout evenement FIM
+# generique et n'expose QUE ses propres groupes ("local,syslog,sshd"),
+# jamais "syscheck", confirme par l'alerte JSON reelle
+# (/var/ossec/logs/alerts/alerts.json). Corrige : filtre par rule_id
+# explicite plutot que par groupe - la regle 100100 (celle qui se
+# declenche reellement dans cet environnement) plus les regles FIM
+# standard (550/553/554) pour rester correct meme sur un chemin qui ne
+# serait pas intercepte par la regle 100100.
+echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de l'integration VirusTotal (rule_id 100100,550,553,554)..."
 {
   echo "$MARKER_VT"
   echo "<ossec_config>"
   echo "  <integration>"
   echo "    <name>virustotal</name>"
   echo "    <api_key>${VT_API_KEY}</api_key>"
-  echo "    <group>syscheck</group>"
+  echo "    <rule_id>100100,550,553,554</rule_id>"
   echo "    <alert_format>json</alert_format>"
   echo "  </integration>"
   echo "</ossec_config>"

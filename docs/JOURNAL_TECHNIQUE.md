@@ -2862,3 +2862,19 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **Verifie** : `bash -n` propre sur les 4 jobs + `vars.conf` ; bits executables corriges ; audit CSV complet (291 lignes, 0 doublon, 0 ligne malformee, 0 dependance introuvable) ; simulation de resolution par vagues : `ELK_HOST` 220/232 (nouveau bloque = uniquement `WAZ_050`, attendu puisque manuel ; aucun autre nouveau blocage), `AGENT_HOST` 53/56 (aucun nouveau blocage, les 3 bloques restants sont les `BEAC_00x` deja connus) ; `WAG_ROOTCHECK_OK`/`WAG_AUDITD_OK`/`WAZ_IOC_LIST_OK` se resolvent tous automatiquement.
 
 **Limite honnete** : aucun des 4 jobs n'a ete teste en conditions reelles a l'instant de cette entree (nouveaux jobs, jamais executes sur les VMs). Pour `WAZ_050`/VirusTotal specifiquement, la cle API doit etre creee et deposee manuellement avant le premier essai - sans elle, le job refuse proprement plutot que d'echouer de facon confuse plus loin.
+
+## 2026-09-16 (suite) - Teste en reel : succes chez l'etudiante, 3 causes reelles trouvees et corrigees chez l'operateur
+
+**Confirme en reel, cote etudiante** : chaine complete PB-007 fonctionnelle de bout en bout du premier coup - depot du fichier EICAR dans `VT_WATCH_DIR` -> alerte FIM -> soumission VirusTotal -> alerte enrichie reelle visible dans Wazuh Dashboard/Threat Hunting : `"VirusTotal: Alert - /root/wef_vt_watch/eicar.txt - 66 engines detected this file"` (rule.id 87105, niveau 12).
+
+**Cote operateur, meme test, echec silencieux - diagnostic mene entierement par elimination sur preuve reelle (jamais une supposition acceptee sans verification) :**
+1. `integrations.log` vide (0 octet, date anterieure au test) -> le processus `wazuh-integratord` n'a jamais ete declenche.
+2. `ps aux` + `journalctl` : `wazuh-integratord` tourne bien, `Enabling integration for: 'virustotal'` confirme - l'integration EST chargee.
+3. `alerts.log` : les evenements FIM (`File '...' added`) existent bien - le FIM fonctionne.
+4. **Cause reelle trouvee dans le JSON brut de l'alerte** (`alerts.json`) : l'evenement passe par la regle **preexistante `id="100100"`** (`jobs/WAZ_025.sh`, "Modification detectee sur un fichier surveille de la Forge" - regle generique deja en place, ajoutee bien avant ce soir pour un autre usage, jamais con,cue pour prevoir un futur filtre par groupe). Cette regle n'expose que `"groups":["local","syslog","sshd"]` (heritage du bloc generique de `local_rules.xml`), JAMAIS `"syscheck"` - le filtre `<group>syscheck</group>` de `WAZ_050` ne matchait donc jamais, sans la moindre erreur visible nulle part (integratord n'a meme pas de raison de se plaindre : il ne voit simplement jamais l'alerte).
+
+**Corrige (`jobs/WAZ_050_VIRUSTOTAL_INTEGRATION.sh`)** : filtre desormais par `<rule_id>100100,550,553,554</rule_id>` (la regle qui se declenche reellement ici, plus les regles FIM standard pour rester correct sur un futur chemin non intercepte par la regle 100100) - jamais par `<group>`, trop fragile en presence d'une regle locale plus specifique qui absorbe l'evenement en premier. Jamais touche `WAZ_025.sh` lui-meme (regle utile ailleurs, hors de portee de ce correctif).
+
+**Incident de securite mineur, traite en direct** : une cle API VirusTotal reelle a ete collee en clair dans la conversation par erreur - traitee immediatement comme compromise (consigne de la regenerer sur virustotal.com), jamais reutilisee dans un correctif ni stockee par l'assistant.
+
+**Verifie** : `bash -n` propre. Test reel complet a refaire cote operateur avec la regle corrigee + la cle regeneree (non encore confirme a l'instant de cette entree).

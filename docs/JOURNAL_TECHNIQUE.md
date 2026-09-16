@@ -2878,3 +2878,11 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **Incident de securite mineur, traite en direct** : une cle API VirusTotal reelle a ete collee en clair dans la conversation par erreur - traitee immediatement comme compromise (consigne de la regenerer sur virustotal.com), jamais reutilisee dans un correctif ni stockee par l'assistant.
 
 **Verifie** : `bash -n` propre. Test reel complet a refaire cote operateur avec la regle corrigee + la cle regeneree (non encore confirme a l'instant de cette entree).
+
+## 2026-09-16 (suite) - Confirme en reel des les deux cotes + correctif applique par anticipation sur WAZ_051
+
+**Confirme en reel, cote operateur cette fois** : `rule_id` fonctionne - alerte VirusTotal reelle obtenue (`"VirusTotal: Alert - .../eicar_test4.txt - 65 engines detected this file"`, rule.id 87105, level 12, 65/67 moteurs positifs) en ~3s apres l'alerte FIM. PB-007 valide des les deux VMs desormais (etudiante + operateur), avec la meme regle 87105 des deux cotes.
+
+**Correctif applique PAR ANTICIPATION sur `jobs/WAZ_051_IOC_CDB_LIST.sh`** (demande explicite : "mettez a niveau tout sur github pour qu'on n'ait plus jamais ce souci") : la regle 100200 (liste IOC) utilisait le meme `<if_group>syscheck</if_group>` qui venait de se reveler defaillant sur WAZ_050 - jamais teste en reel a ce jour, mais la cause racine etant desormais confirmee (regle preexistante `WAZ_025`/id 100100 capte tout evenement FIM en premier, n'expose jamais le groupe "syscheck"), corrige AVANT qu'elle ne soit decouverte une seconde fois de la meme facon. Chaine desormais sur `<if_sid>100100,550,553,554</if_sid>` - meme principe que le correctif de `WAZ_050`.
+
+**Verifie** : `bash -n` propre. Non encore reteste en conditions reelles a l'instant de cette entree (la config precedente de `WAZ_051` avait pourtant reussi a s'appliquer sans erreur - seule la regle interne change, un simple rejeu du job suffit).

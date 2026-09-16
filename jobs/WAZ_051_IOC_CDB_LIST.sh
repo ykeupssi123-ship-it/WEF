@@ -10,6 +10,13 @@
 # fichier dont le hash correspond a la liste declenche une alerte
 # "IOC connu detecte", independamment de VirusTotal (WAZ_050) - les
 # deux peuvent tourner ensemble ou separement.
+#
+# CORRIGE LE 2026-09-16 (par anticipation, meme cause reelle diagnostiquee
+# et corrigee sur WAZ_050 le meme soir - voir ce fichier pour le detail
+# complet) : la regle 100200 chaine sur <if_sid>100100,550,553,554</if_sid>,
+# jamais sur <if_group>syscheck</if_group>, qui ne se declenche jamais
+# dans cet environnement (regle preexistante WAZ_025/100100 capte
+# l'evenement en premier, sans exposer le groupe syscheck).
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -75,12 +82,22 @@ if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   echo "[WAZ_051_IOC_CDB_LIST] Regle IOC deja posee, retrait avant reecriture..."
   sed -i "\|^${MARKER_RULE//\//\\/}\$|,\|^<!-- WEF_IOC_RULE_END -->\$|d" "$RULES_FILE"
 fi
+# CORRIGE LE 2026-09-16 (meme cause reelle que WAZ_050, trouvee et
+# confirmee sur wef-elk-core : la regle preexistante WAZ_025/id 100100
+# ("Modification detectee sur un fichier surveille de la Forge") capte
+# TOUT evenement FIM en premier et n'expose que ses propres groupes
+# (local,syslog,sshd), jamais "syscheck" - un <if_group>syscheck</if_group>
+# ici ne se declencherait donc jamais, silencieusement, exactement comme
+# WAZ_050 avant son correctif. Chaine directement sur la regle 100100
+# elle-meme (celle qui se declenche reellement) via <if_sid>, plus les
+# regles FIM standard (550/553/554) pour rester correct sur un futur
+# environnement qui n'aurait pas cette regle 100100.
 echo "[WAZ_051_IOC_CDB_LIST] Ajout de la regle de correlation IOC (id 100200)..."
 {
   echo "$MARKER_RULE"
   echo "<group name=\"syscheck,ioc,\">"
   echo "  <rule id=\"100200\" level=\"12\">"
-  echo "    <if_group>syscheck</if_group>"
+  echo "    <if_sid>100100,550,553,554</if_sid>"
   echo "    <list field=\"md5\" lookup=\"match_key\">etc/lists/blacklist-md5</list>"
   echo "    <description>IOC connu detecte : fichier correspondant a un hash MD5 de la liste de menace WEF</description>"
   echo "    <group>ioc_match,</group>"

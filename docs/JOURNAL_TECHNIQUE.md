@@ -2886,3 +2886,15 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **Correctif applique PAR ANTICIPATION sur `jobs/WAZ_051_IOC_CDB_LIST.sh`** (demande explicite : "mettez a niveau tout sur github pour qu'on n'ait plus jamais ce souci") : la regle 100200 (liste IOC) utilisait le meme `<if_group>syscheck</if_group>` qui venait de se reveler defaillant sur WAZ_050 - jamais teste en reel a ce jour, mais la cause racine etant desormais confirmee (regle preexistante `WAZ_025`/id 100100 capte tout evenement FIM en premier, n'expose jamais le groupe "syscheck"), corrige AVANT qu'elle ne soit decouverte une seconde fois de la meme facon. Chaine desormais sur `<if_sid>100100,550,553,554</if_sid>` - meme principe que le correctif de `WAZ_050`.
 
 **Verifie** : `bash -n` propre. Non encore reteste en conditions reelles a l'instant de cette entree (la config precedente de `WAZ_051` avait pourtant reussi a s'appliquer sans erreur - seule la regle interne change, un simple rejeu du job suffit).
+
+## 2026-09-16 (suite) - Confirme en reel : VirusTotal se declenche via les regles standard (550/554), pas seulement 100100
+
+**Confirme en reel** : test live (`eicar_live.txt`) - 2 evenements FIM distincts sur le meme fichier ("File added" -> rule 554, puis "Integrity checksum changed" -> rule 550, ~4 minutes plus tard), CHACUN a correctement declenche une alerte VirusTotal distincte (49 puis 64 moteurs positifs). Confirme que le filtre combine `rule_id=100100,550,553,554` (WAZ_050) etait le bon choix : selon l'evenement, c'est tantot la regle locale 100100, tantot une regle standard qui "gagne" - jamais un comportement garanti a l'avance, la couverture des deux etait necessaire.
+
+## 2026-09-16 (suite) - Nouveau job : surveillance whodata de /etc/ssh/sshd_config
+
+**Demande explicite** : "modifions le fichier de config du SSH... je veux qu'on dise qu'on a modifie ce fichier et par qui" - surveillance FIM avec attribution d'auteur (utilisateur/PID/processus reel), pas seulement "quelque chose a change".
+
+**Corrige (`jobs/WAZ_052_SSHD_CONFIG_WHODATA.sh`, `ELK_HOST`, `ALWAYS`, `IN_COND=WAZ_MANAGER_UP`, `OUT_COND=WAZ_SSHD_WHODATA_OK`)** : installe `auditd` (requis par le mode `whodata` de Wazuh sous Linux - Wazuh gere lui-meme les regles audit necessaires une fois whodata active, aucune regle manuelle a poser), ajoute `<directories whodata="yes" check_all="yes">/etc/ssh/sshd_config</directories>` - portee volontairement etroite (ce seul fichier, jamais tout `/etc/ssh/`). Meme motif chattr deja etabli (WAZ_050/051) pour `ossec.conf` deja verrouille par `WAZ_032`.
+
+**Verifie** : `bash -n` propre ; bit executable corrige ; audit CSV complet (292 lignes, 0 doublon). Jamais teste en conditions reelles a l'instant de cette entree.

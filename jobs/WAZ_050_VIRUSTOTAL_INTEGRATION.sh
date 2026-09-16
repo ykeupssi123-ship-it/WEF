@@ -31,6 +31,17 @@ chmod 700 "$WATCH_DIR"
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
 [ -f "$OSSEC_CONF" ] || { echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] ERREUR : ${OSSEC_CONF} introuvable." >&2; exit 1; }
 
+# CORRIGE LE 2026-09-16 (incident reel, wef-elk-core : "Operation non
+# permise" sur ossec.conf) : deja verrouille immuable par WAZ_032
+# (chattr +i) - meme motif deja etabli ailleurs dans ce projet
+# (WAZ_014E_INDEXER_CONNECTOR.sh/WAZ_019_FLOOD.sh) : deverrouiller
+# temporairement, reecrire, puis TOUJOURS reverrouiller (droits root:wazuh
+# 640 restaures avant le chattr +i final, jamais suppose deja corrects).
+if lsattr "$OSSEC_CONF" 2>/dev/null | grep -q '^....i'; then
+  echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] ${OSSEC_CONF} est immuable (deja verrouille par WAZ_032) - deverrouillage temporaire avant reecriture."
+  chattr -i "$OSSEC_CONF"
+fi
+
 MARKER_FIM="<!-- WEF_VT_FIM_CONFIG (WAZ_050, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER_FIM" "$OSSEC_CONF"; then
   echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Bloc FIM deja pose, retrait avant reecriture..."
@@ -46,6 +57,7 @@ echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de la surveillance FIM temps reel d
   echo "</ossec_config>"
   echo "<!-- WEF_VT_FIM_CONFIG_END -->"
 } >> "$OSSEC_CONF"
+grep -qF "$MARKER_FIM" "$OSSEC_CONF" || { echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] ERREUR : bloc FIM absent apres ecriture (fichier verrouille ? voir chattr/lsattr)." >&2; exit 1; }
 
 # Jamais le contenu de la cle API n'est ecrit dans un echo/log - seul le
 # bloc XML genere ci-dessous la contient, dans ossec.conf lui-meme
@@ -69,6 +81,12 @@ echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de l'integration VirusTotal (groupe
   echo "</ossec_config>"
   echo "<!-- WEF_VT_INTEGRATION_CONFIG_END -->"
 } >> "$OSSEC_CONF"
+grep -qF "$MARKER_VT" "$OSSEC_CONF" || { echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] ERREUR : bloc integration absent apres ecriture (fichier verrouille ? voir chattr/lsattr)." >&2; exit 1; }
+
+echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Reverrouillage de ${OSSEC_CONF} (droits + chattr +i)..."
+chown root:wazuh "$OSSEC_CONF"
+chmod 640 "$OSSEC_CONF"
+chattr +i "$OSSEC_CONF"
 
 echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

@@ -36,6 +36,16 @@ fi
 
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
 [ -f "$OSSEC_CONF" ] || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : ${OSSEC_CONF} introuvable." >&2; exit 1; }
+
+# CORRIGE LE 2026-09-16 (incident reel, wef-elk-core : "Operation non
+# permise" sur ossec.conf) : deja verrouille immuable par WAZ_032
+# (chattr +i) - meme motif deja etabli ailleurs dans ce projet
+# (WAZ_014E_INDEXER_CONNECTOR.sh/WAZ_019_FLOOD.sh).
+if lsattr "$OSSEC_CONF" 2>/dev/null | grep -q '^....i'; then
+  echo "[WAZ_051_IOC_CDB_LIST] ${OSSEC_CONF} est immuable (deja verrouille par WAZ_032) - deverrouillage temporaire avant reecriture."
+  chattr -i "$OSSEC_CONF"
+fi
+
 MARKER="<!-- WEF_IOC_LIST_CONFIG (WAZ_051, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER" "$OSSEC_CONF"; then
   echo "[WAZ_051_IOC_CDB_LIST] Bloc deja pose dans ossec.conf, retrait avant reecriture..."
@@ -51,6 +61,12 @@ echo "[WAZ_051_IOC_CDB_LIST] Declaration de la liste CDB dans ossec.conf..."
   echo "</ossec_config>"
   echo "<!-- WEF_IOC_LIST_CONFIG_END -->"
 } >> "$OSSEC_CONF"
+grep -qF "$MARKER" "$OSSEC_CONF" || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : bloc absent apres ecriture dans ossec.conf (fichier verrouille ? voir chattr/lsattr)." >&2; exit 1; }
+
+echo "[WAZ_051_IOC_CDB_LIST] Reverrouillage de ${OSSEC_CONF} (droits + chattr +i)..."
+chown root:wazuh "$OSSEC_CONF"
+chmod 640 "$OSSEC_CONF"
+chattr +i "$OSSEC_CONF"
 
 RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
 [ -f "$RULES_FILE" ] || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : ${RULES_FILE} introuvable (deja inclus par defaut dans ossec.conf vendor)." >&2; exit 1; }
@@ -72,6 +88,7 @@ echo "[WAZ_051_IOC_CDB_LIST] Ajout de la regle de correlation IOC (id 100200)...
   echo "</group>"
   echo "<!-- WEF_IOC_RULE_END -->"
 } >> "$RULES_FILE"
+grep -qF "$MARKER_RULE" "$RULES_FILE" || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : regle IOC absente apres ecriture dans ${RULES_FILE}." >&2; exit 1; }
 
 echo "[WAZ_051_IOC_CDB_LIST] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

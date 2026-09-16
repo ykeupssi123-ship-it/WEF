@@ -27,8 +27,16 @@ install_if_missing(){
 install_if_missing audit || exit 1
 
 echo "[WAG_008_AUDITD_INTEGRATION] Activation et demarrage de auditd..."
-systemctl enable auditd
-systemctl restart auditd
+# CORRIGE LE 2026-09-16 (meme incident reel que WAZ_052, meme soir) :
+# "systemctl restart auditd" est refuse par systemd sur cet OS
+# (protection deliberee contre un redemarrage manuel) - sans consequence
+# si deja actif, jamais force dans ce cas.
+systemctl enable auditd 2>/dev/null || true
+if systemctl is-active --quiet auditd; then
+  echo "[WAG_008_AUDITD_INTEGRATION] auditd deja actif, pas de redemarrage force (evite le refus systemd connu sur ce service)."
+else
+  systemctl start auditd || true
+fi
 for i in $(seq 1 30); do
   systemctl is-active --quiet auditd && break
   sleep 2

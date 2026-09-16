@@ -33,8 +33,19 @@ install_if_missing(){
   rpm -q "$pkg" &>/dev/null || { echo "[WAZ_052_SSHD_CONFIG_WHODATA] ERREUR : ${pkg} toujours absent apres dnf install." >&2; return 1; }
 }
 install_if_missing audit || exit 1
-systemctl enable auditd
-systemctl restart auditd
+# CORRIGE LE 2026-09-16 (incident reel, wef-elk-core) : "systemctl
+# restart auditd" est refuse par systemd sur cet OS ("Operation refused,
+# unit auditd.service may be requested by dependency only... configured
+# to refuse manual start/stop") - protection deliberee du sous-systeme
+# d'audit contre un redemarrage manuel accidentel. Sans consequence si
+# le service est deja actif (cas le plus frequent) - jamais force dans
+# ce cas, uniquement demarre s'il ne l'etait pas deja.
+systemctl enable auditd 2>/dev/null || true
+if systemctl is-active --quiet auditd; then
+  echo "[WAZ_052_SSHD_CONFIG_WHODATA] auditd deja actif, pas de redemarrage force (evite le refus systemd connu sur ce service)."
+else
+  systemctl start auditd || true
+fi
 for i in $(seq 1 30); do
   systemctl is-active --quiet auditd && break
   sleep 2

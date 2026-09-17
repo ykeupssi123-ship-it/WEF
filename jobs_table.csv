@@ -291,3 +291,4 @@ WAG_005,WEF_WAG_BLD_SVCSTART,AGENT_HOST,WAZUH_AGENT,WAG_005.sh,Activation et dem
 WAG_006,WEF_WAG_RUN_VERIFY,AGENT_HOST,WAZUH_AGENT,WAG_006.sh,Verification enregistrement et rapport final,WAG_SVC_UP,WAG_READY
 WAG_007_ROOTCHECK,WEF_WAG_RUN_ROOTCHECK,AGENT_HOST,WAZUH_AGENT,WAG_007_ROOTCHECK.sh,Playbook PB-005 : active et resserre la frequence du module Rootcheck (detection de rootkits/malwares),WAG_READY,WAG_ROOTCHECK_OK
 WAG_008_AUDITD_INTEGRATION,WEF_WAG_RUN_AUDITD,AGENT_HOST,WAZUH_AGENT,WAG_008_AUDITD_INTEGRATION.sh,Playbook PB-006 : installe auditd et fait lire le journal d'audit des commandes systeme par l'agent,WAG_READY,WAG_AUDITD_OK
+WAG_009_VT_WATCH_DIR,WEF_WAG_RUN_VTWATCHDIR,AGENT_HOST,WAZUH_AGENT,WAG_009_VT_WATCH_DIR.sh,Illustration menace venant de VM2 : ouvre le meme dossier surveille VT_WATCH_DIR cote agent - reutilise l'integration VirusTotal existante sans aucune modification cote ELK_HOST,WAG_READY,WAG_VT_WATCH_OK

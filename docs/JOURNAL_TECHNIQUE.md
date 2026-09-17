@@ -2898,3 +2898,13 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **Corrige (`jobs/WAZ_052_SSHD_CONFIG_WHODATA.sh`, `ELK_HOST`, `ALWAYS`, `IN_COND=WAZ_MANAGER_UP`, `OUT_COND=WAZ_SSHD_WHODATA_OK`)** : installe `auditd` (requis par le mode `whodata` de Wazuh sous Linux - Wazuh gere lui-meme les regles audit necessaires une fois whodata active, aucune regle manuelle a poser), ajoute `<directories whodata="yes" check_all="yes">/etc/ssh/sshd_config</directories>` - portee volontairement etroite (ce seul fichier, jamais tout `/etc/ssh/`). Meme motif chattr deja etabli (WAZ_050/051) pour `ossec.conf` deja verrouille par `WAZ_032`.
 
 **Verifie** : `bash -n` propre ; bit executable corrige ; audit CSV complet (292 lignes, 0 doublon). Jamais teste en conditions reelles a l'instant de cette entree.
+
+## 2026-09-17 - Nouveau job : illustrer une menace venant de VM2 (pas seulement d'ELK_HOST)
+
+**Demande explicite** : "maintenant si la menace vient de VM2 ? illustrons" - jusqu'ici, tous les tests VirusTotal/IOC (EICAR, curl, fichier jamais-vu) avaient ete deposes directement sur `ELK_HOST`, surveilles par l'agent integre du manager lui-meme (`wef-elk-core`, id 000) - jamais depuis un vrai `AGENT_HOST` distant.
+
+**Ajoute (`jobs/WAG_009_VT_WATCH_DIR.sh`, `AGENT_HOST`, `WAZUH_AGENT`, `IN_COND=WAG_READY`, `OUT_COND=WAG_VT_WATCH_OK`)** : ouvre le meme dossier surveille `VT_WATCH_DIR` (vars.conf), mais cote agent - dans le propre `ossec.conf` de VM2, jamais celui du manager. Verifie avant ecriture que le verrou `chattr +i` de `WAZ_032` ne s'applique jamais aux agents (job `ELK_HOST` uniquement, `jobs_table.csv:242`) - pas de deverrouillage/reverrouillage necessaire ici, contrairement a `WAZ_050`/`WAZ_051`/`WAZ_052`.
+
+**Aucune modification cote `ELK_HOST`** : l'integration VirusTotal de `WAZ_050` filtre par `rule_id` (100100,550,553,554), jamais par agent - un evenement FIM remonte par N'IMPORTE QUEL agent enregistre declenche la meme regle, donc la meme soumission automatique a VirusTotal. La preuve attendue en conditions reelles : l'alerte generee portera le nom de l'agent VM2 (`AGENT_NAME`, vars.conf : `vm2-beats-wazuh-agent`) au lieu de `wef-elk-core`, visible immediatement dans le donut "Top 5 agents" du Dashboard filtre `rule.groups: virustotal`.
+
+**Verifie** : `bash -n` propre ; audit CSV complet (294 lignes, 0 doublon `OUT_COND`, 0 colonne malformee). Jamais teste en conditions reelles a l'instant de cette entree - a confirmer via `bin/order.sh` sur VM2 (WAG_009_VT_WATCH_DIR) puis depot d'un fichier EICAR dans le dossier surveille.

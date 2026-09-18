@@ -19,16 +19,36 @@
 # ossec.conf d'un AGENT_HOST n'est PAS verrouille par chattr (WAZ_032
 # est un job ELK_HOST uniquement, jamais applique ici) - pas de
 # deverrouillage/reverrouillage necessaire, contrairement a WAZ_050/051/052.
+#
+# ELARGI LE 2026-09-18 (demande explicite, meme soir que WAZ_050 :
+# "je veux que virustotal detecte seul des fichiers sans qu'un humain
+# lui fournisse le fichier" -> "faisons comme vous percevez"). Meme
+# logique appliquee ici cote VM2 que cote ELK_HOST (WAZ_050) : jamais
+# "/" entier en temps reel (limites inotify + volume de bruit systeme +
+# quota API VirusTotal - voir le commentaire detaille dans WAZ_050), mais
+# toutes les zones ou un fichier peut legitimement apparaitre sur CETTE
+# machine (home reels, /tmp, points de montage USB, le dossier de demo).
 set -uo pipefail
 source "$VARS_FILE"
 
 WATCH_DIR="${VT_WATCH_DIR:-/root/wef_vt_watch}"
-echo "[WAG_009_VT_WATCH_DIR] Preparation du dossier surveille ${WATCH_DIR} sur cet agent..."
+echo "[WAG_009_VT_WATCH_DIR] Preparation du dossier de demo surveille ${WATCH_DIR} sur cet agent..."
 mkdir -p "$WATCH_DIR"
 chmod 700 "$WATCH_DIR"
 
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
 [ -f "$OSSEC_CONF" ] || { echo "[WAG_009_VT_WATCH_DIR] ERREUR : ${OSSEC_CONF} introuvable (WAG_003/WAG_004 doivent avoir tourne)." >&2; exit 1; }
+
+WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR")
+for MOUNT_POINT in /media /mnt; do
+  mkdir -p "$MOUNT_POINT" 2>/dev/null || true
+  WATCH_DIRS_LIST+=("$MOUNT_POINT")
+done
+for HOME_DIR in /home/*/; do
+  [ -d "$HOME_DIR" ] && WATCH_DIRS_LIST+=("${HOME_DIR%/}")
+done
+FIM_DIRECTORIES="$(printf '%s\n' "${WATCH_DIRS_LIST[@]}" | sort -u | paste -sd, -)"
+echo "[WAG_009_VT_WATCH_DIR] Dossiers reellement surveilles sur cet agent (decouverts a l'instant) : ${FIM_DIRECTORIES}"
 
 MARKER="<!-- WEF_AGENT_VT_WATCH_CONFIG (WAG_009, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER" "$OSSEC_CONF"; then
@@ -36,12 +56,12 @@ if grep -qF "$MARKER" "$OSSEC_CONF"; then
   sed -i "\|^${MARKER//\//\\/}\$|,\|^<!-- WEF_AGENT_VT_WATCH_CONFIG_END -->\$|d" "$OSSEC_CONF"
 fi
 
-echo "[WAG_009_VT_WATCH_DIR] Ajout de la surveillance FIM temps reel de ${WATCH_DIR}..."
+echo "[WAG_009_VT_WATCH_DIR] Ajout de la surveillance FIM temps reel de : ${FIM_DIRECTORIES}..."
 {
   echo "$MARKER"
   echo "<ossec_config>"
   echo "  <syscheck>"
-  echo "    <directories realtime=\"yes\" report_changes=\"yes\">${WATCH_DIR}</directories>"
+  echo "    <directories realtime=\"yes\" report_changes=\"yes\">${FIM_DIRECTORIES}</directories>"
   echo "  </syscheck>"
   echo "</ossec_config>"
   echo "<!-- WEF_AGENT_VT_WATCH_CONFIG_END -->"
@@ -52,7 +72,7 @@ echo "[WAG_009_VT_WATCH_DIR] Redemarrage de wazuh-agent pour appliquer..."
 systemctl restart wazuh-agent
 
 for i in $(seq 1 30); do
-  systemctl is-active --quiet wazuh-agent && { echo "[WAG_009_VT_WATCH_DIR] wazuh-agent actif."; echo "[WAG_009_VT_WATCH_DIR] OK. Deposez un fichier dans ${WATCH_DIR} sur CETTE machine (VM2) pour simuler une menace venant de VM2."; exit 0; }
+  systemctl is-active --quiet wazuh-agent && { echo "[WAG_009_VT_WATCH_DIR] wazuh-agent actif."; echo "[WAG_009_VT_WATCH_DIR] OK. Tout fichier depose dans l'une de ces zones (${FIM_DIRECTORIES}) sur CETTE machine (VM2) - par un humain, un navigateur, une cle USB ou un script - declenche desormais automatiquement une soumission a VirusTotal."; exit 0; }
   sleep 2
 done
 

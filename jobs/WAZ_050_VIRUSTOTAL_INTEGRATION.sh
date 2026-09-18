@@ -31,12 +31,46 @@ fi
 VT_API_KEY="$(cat "$VIRUSTOTAL_API_KEY_FILE")"
 
 WATCH_DIR="${VT_WATCH_DIR:-/root/wef_vt_watch}"
-echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Preparation du dossier surveille ${WATCH_DIR}..."
+echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Preparation du dossier de demo surveille ${WATCH_DIR}..."
 mkdir -p "$WATCH_DIR"
 chmod 700 "$WATCH_DIR"
 
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
 [ -f "$OSSEC_CONF" ] || { echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] ERREUR : ${OSSEC_CONF} introuvable." >&2; exit 1; }
+
+# ELARGI LE 2026-09-18 (demande explicite : "je veux que virustotal detecte
+# seul des fichiers sans qu'un humain lui fournisse le fichier" -> puis,
+# apres explication des limites reelles, "faisons comme vous percevez").
+# Surveiller "/" entier en temps reel est un anti-pattern reel, jamais
+# fait en production, pour 3 raisons verifiables :
+#   1. Le noyau limite le nombre de "watches" inotify (quelques centaines
+#      de milliers) - depasse en quelques secondes sur "/", au-dela Wazuh
+#      arrete silencieusement de surveiller, sans erreur visible.
+#   2. Le volume d'ecritures purement internes au systeme (logs, cache du
+#      gestionnaire de paquets, fichiers temporaires) genererait des
+#      milliers de fausses alertes FIM/heure, saturant instantanement
+#      l'API VirusTotal gratuite (4 requetes/minute) - l'inverse de l'
+#      objectif ("les vrais problemes", pas du bruit).
+#   3. Un attaquant reel depose rarement un fichier dans /usr/lib ou
+#      /var/cache - il ecrit la ou un humain peut ecrire.
+# Compromis retenu : surveiller TOUTES les zones ou un fichier peut
+# legitimement apparaitre (home reels de la machine, /tmp, points de
+# montage USB, le dossier de demo) - jamais les dossiers de tenue interne
+# du systeme qui changent tout seuls (/proc, /sys, /dev, /var/log,
+# /var/cache, /var/lib, /var/ossec lui-meme pour eviter qu'il ne
+# s'auto-declenche). Liste construite dynamiquement a chaque execution
+# (jamais devinee) : seuls les dossiers reellement presents sur CETTE
+# machine sont inclus.
+WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR")
+for MOUNT_POINT in /media /mnt; do
+  mkdir -p "$MOUNT_POINT" 2>/dev/null || true
+  WATCH_DIRS_LIST+=("$MOUNT_POINT")
+done
+for HOME_DIR in /home/*/; do
+  [ -d "$HOME_DIR" ] && WATCH_DIRS_LIST+=("${HOME_DIR%/}")
+done
+FIM_DIRECTORIES="$(printf '%s\n' "${WATCH_DIRS_LIST[@]}" | sort -u | paste -sd, -)"
+echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Dossiers reellement surveilles (decouverts sur cette machine) : ${FIM_DIRECTORIES}"
 
 # CORRIGE LE 2026-09-16 (incident reel, wef-elk-core : "Operation non
 # permise" sur ossec.conf) : deja verrouille immuable par WAZ_032
@@ -54,12 +88,12 @@ if grep -qF "$MARKER_FIM" "$OSSEC_CONF"; then
   echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Bloc FIM deja pose, retrait avant reecriture..."
   sed -i "\|^${MARKER_FIM//\//\\/}\$|,\|^<!-- WEF_VT_FIM_CONFIG_END -->\$|d" "$OSSEC_CONF"
 fi
-echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de la surveillance FIM temps reel de ${WATCH_DIR}..."
+echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de la surveillance FIM temps reel de : ${FIM_DIRECTORIES}..."
 {
   echo "$MARKER_FIM"
   echo "<ossec_config>"
   echo "  <syscheck>"
-  echo "    <directories realtime=\"yes\" report_changes=\"yes\">${WATCH_DIR}</directories>"
+  echo "    <directories realtime=\"yes\" report_changes=\"yes\">${FIM_DIRECTORIES}</directories>"
   echo "  </syscheck>"
   echo "</ossec_config>"
   echo "<!-- WEF_VT_FIM_CONFIG_END -->"
@@ -114,5 +148,5 @@ if ! wait_for_service_active wazuh-manager 180 5; then
   exit 1
 fi
 
-echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] OK. Deposez un fichier dans ${WATCH_DIR} pour declencher une soumission a VirusTotal."
+echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] OK. Tout fichier depose dans l'une de ces zones (${FIM_DIRECTORIES}) - par un humain, un navigateur, une cle USB ou un script - declenche desormais automatiquement une soumission a VirusTotal, sans aucune autre intervention."
 exit 0

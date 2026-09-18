@@ -124,31 +124,21 @@ if job_held "$JOB_ID"; then
   exit 1
 fi
 
-# AJOUTE LE 2026-09-14 (demande explicite : des jobs qu'on rejoue
-# souvent en demo - ecriture de fichiers repris par Filebeat - ne
-# doivent jamais obliger a supprimer state/<OUT_COND>.ok a la main
-# avant chaque nouveau lancement). REPEATABLE_JOBS (vars.conf, liste
-# separee par des virgules, meme principe que SKIP_JOBS/
-# ES_DEMO_INDEX_PREFIXES) : si JOB_ID y figure, son marqueur est efface
-# automatiquement ici, AVANT le controle "deja fait" ci-dessous - jamais
-# silencieux, toujours annonce. Vide par defaut = comportement inchange
-# pour tout le reste du projet.
-if [ -n "${REPEATABLE_JOBS:-}" ]; then
-  IFS=',' read -ra REPEATABLE_LIST <<< "$REPEATABLE_JOBS"
-  for rj in "${REPEATABLE_LIST[@]}"; do
-    rj="$(echo "$rj" | xargs)"
-    if [ "$rj" = "$JOB_ID" ] && [ -f "$STATE_DIR/$C_OUT_COND.ok" ]; then
-      echo "[order.sh] $JOB_ID est dans REPEATABLE_JOBS (vars.conf) - marqueur $C_OUT_COND.ok efface automatiquement pour permettre ce nouveau lancement."
-      rm -f "$STATE_DIR/$C_OUT_COND.ok"
-      break
-    fi
-  done
-fi
-
-if job_done "$C_OUT_COND"; then
-  echo "$JOB_ID a deja ete execute avec succes (condition $C_OUT_COND deja remplie)."
-  echo "Rien a forcer. Pour le rejouer quand meme, supprimez d'abord state/$C_OUT_COND.ok"
-  exit 0
+# Rejeu standard pour tout job (jamais de suppression manuelle de .ok) :
+# le rayon d'impact reel est calcule et affiche plus bas, la confirmation
+# tapee existante fait office de validation.
+ALREADY_DONE=0
+ALREADY_DONE_DATE=""
+IMPACT=""
+if [ "$C_OUT_COND" != "NONE" ] && job_done "$C_OUT_COND"; then
+  ALREADY_DONE=1
+  ALREADY_DONE_DATE="$(cat "$STATE_DIR/$C_OUT_COND.ok" 2>/dev/null || echo inconnue)"
+  IMPACT="$(awk -F',' -v cond="$C_OUT_COND" -v self="$JOB_ID" '
+    $1 != self && $1 != "JOB_ID" {
+      n = split($7, deps, "|")
+      for (i=1;i<=n;i++) if (deps[i] == cond) { print $1 }
+    }
+  ' "$JOBS_CSV" | paste -sd, -)"
 fi
 
 MISSING=""
@@ -177,7 +167,20 @@ else
   echo "toute facon ete joue au prochain ./orchestrator.sh. Forcage sans risque"
   echo "particulier lie aux dependances.)"
 fi
+if [ "$ALREADY_DONE" -eq 1 ]; then
+  echo ""
+  echo "ATTENTION : ce job a deja reussi le ${ALREADY_DONE_DATE} ($C_OUT_COND deja remplie). Vous allez le REJOUER."
+  if [ -n "$IMPACT" ]; then
+    echo "Job(s) qui en dependent : $IMPACT - un rejeu de ceux-la aussi peut etre necessaire."
+  else
+    echo "Aucun autre job n'en depend - rejeu sans impact ailleurs dans la chaine."
+  fi
+fi
 echo ""
+if [ ! -t 0 ]; then
+  echo "ERREUR : confirmation interactive requise (pas de terminal attache)." >&2
+  exit 1
+fi
 read -r -p "Tapez exactement '$JOB_ID' pour confirmer le forcage : " CONFIRM
 # CORRIGE LE 2026-09-13 (incident reel : JOB_ID retape a l'identique,
 # refuse quand meme) - meme cause reelle que setup/MNT_reinstall.sh, un
@@ -200,6 +203,10 @@ if ! acquire_run_lock "order.sh:$JOB_ID (FORCE) par $OPERATEUR" 5; then
 fi
 trap release_run_lock EXIT
 
+if [ "$ALREADY_DONE" -eq 1 ]; then
+  rm -f "$STATE_DIR/$C_OUT_COND.ok"
+fi
+
 SCRIPT_PATH="$HERE/jobs/$C_SCRIPT_FILE"
 if [ ! -f "$SCRIPT_PATH" ]; then
   echo "ERREUR : script $SCRIPT_PATH introuvable."
@@ -219,6 +226,7 @@ JOB_LOG="$HISTORY_DIR/$JOB_ID/${JOB_TS}.log"
   echo "Date/heure  : $(date -Iseconds)"
   echo "Raison      : $RAISON_SAFE"
   echo "Dependance(s) non satisfaite(s) au moment du forcage : ${MISSING:-aucune}"
+  [ "$ALREADY_DONE" -eq 1 ] && echo "Rejeu d'un job deja reussi le ${ALREADY_DONE_DATE} ($C_OUT_COND)."
   echo "=== Sortie reelle du job ==="
 } > "$JOB_LOG"
 
@@ -245,7 +253,11 @@ if [ $JOB_EXIT -eq 0 ]; then
 else
   echo "$JOB_ID -> FORCE_ECHEC. Voir $JOB_LOG."
   if [ -x "$HERE/bin/notify.sh" ]; then
-    "$HERE/bin/notify.sh" "$JOB_ID" "$C_JOB_NAME (FORCAGE MANUEL)" "FORCE_ECHEC" "$JOB_LOG" || true
+    if [ "$ALREADY_DONE" -eq 1 ]; then
+      "$HERE/bin/notify.sh" "$JOB_ID" "$C_JOB_NAME (FORCAGE MANUEL - REGRESSION, etait deja reussi)" "FORCE_ECHEC" "$JOB_LOG" || true
+    else
+      "$HERE/bin/notify.sh" "$JOB_ID" "$C_JOB_NAME (FORCAGE MANUEL)" "FORCE_ECHEC" "$JOB_LOG" || true
+    fi
   fi
   exit 1
 fi

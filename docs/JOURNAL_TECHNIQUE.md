@@ -2995,3 +2995,11 @@ echo "BEAC_004_CREATE_KIBANA_DATAVIEWS" | $APP_BIN/order.sh BEAC_004_CREATE_KIBA
 **Lecon retenue** : la reclassification n'est correcte que si elle est **exhaustive et verifiee ligne par ligne**, jamais limitee aux cas les plus visibles d'une session. Le meme audit (mots-cles + lecture du script reel avant toute conclusion) reste reproductible pour toute future extension de `jobs_table.csv`.
 
 **Verifie** : `bash -n vars.conf` propre. Grep de controle : aucun des 5 nouveaux `JOB_ID` n'etait deja present. Jamais teste en conditions reelles a l'instant de cette entree - a confirmer en rejouant `WAZ_035_KIBANA_TRIGGER` deux fois de suite via `bin/order.sh` (le vrai scenario du bug latent).
+
+## 2026-09-19 - `bin/order.sh` : rejeu par confirmation pour tout job, `REPEATABLE_JOBS` retiree
+
+Control-M ne bloque jamais un job sur sa propre condition de sortie - seule une confirmation d'operateur est requise pour un rejeu. `bin/order.sh` fait desormais pareil pour les 297 jobs : plus de blocage dur, plus de liste `REPEATABLE_JOBS` a maintenir. A la place, `order.sh` calcule le vrai rayon d'impact (awk sur `jobs_table.csv`) et l'affiche avant la confirmation deja existante (taper le `JOB_ID`).
+
+Deux bugs evites, trouves par un second agent en revue avant le code : (1) `lib/run_job.sh` ne marque `.ok` qu'en succes mais ne l'effacait jamais en echec - un rejeu qui echoue sur un job deja vert aurait laisse l'ancien marqueur en place, systeme faussement marque bon ; corrige (le marqueur est efface AVANT le rejeu, apres prise du verrou). (2) `OUT_COND=NONE` (jobs planifies) exclu explicitement, sinon faux-declenche "deja reussi" pour tout job.
+
+Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur rafraichi), rejeu qui echoue sur un job deja vert (marqueur bien absent apres), rayon d'impact correct (0, 1, N dependants), garde `OUT_COND=NONE` confirmee, garde `[ -t 0 ]` (refuse un appel non-interactif). Jamais teste sur VM1/VM2 a l'instant de cette entree.

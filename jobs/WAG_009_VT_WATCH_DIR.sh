@@ -16,9 +16,16 @@
 # automatiquement. Preuve attendue : l'alerte generee portera le nom de
 # CET agent (AGENT_NAME, vars.conf) au lieu de "wef-elk-core".
 #
-# ossec.conf d'un AGENT_HOST n'est PAS verrouille par chattr (WAZ_032
-# est un job ELK_HOST uniquement, jamais applique ici) - pas de
-# deverrouillage/reverrouillage necessaire, contrairement a WAZ_050/051/052.
+# CORRIGE LE 2026-09-18 (incident reel, wef-beats-sensor : "Operation non
+# permise" sur ossec.conf au premier vrai test de ce job) : l'hypothese
+# initiale ("l'agent n'est jamais verrouille par chattr, WAZ_032 est
+# ELK_HOST uniquement") etait une supposition, jamais verifiee sur cette
+# VM precise - l'evidence reelle la contredit. Cause exacte non confirmee
+# a ce jour (a diagnostiquer : lsattr, ROLE effectif de cette VM,
+# historique WAZ_032 sur cette machine) - en attendant, meme motif
+# defensif deja etabli ailleurs (WAZ_050/051/052) : deverrouiller si
+# immuable, ecrire, TOUJOURS reverrouiller - jamais suppose deja
+# correct dans un sens ou dans l'autre.
 #
 # ELARGI LE 2026-09-18 (demande explicite, meme soir que WAZ_050 :
 # "je veux que virustotal detecte seul des fichiers sans qu'un humain
@@ -50,6 +57,13 @@ done
 FIM_DIRECTORIES="$(printf '%s\n' "${WATCH_DIRS_LIST[@]}" | sort -u | paste -sd, -)"
 echo "[WAG_009_VT_WATCH_DIR] Dossiers reellement surveilles sur cet agent (decouverts a l'instant) : ${FIM_DIRECTORIES}"
 
+WAS_IMMUTABLE=0
+if lsattr "$OSSEC_CONF" 2>/dev/null | grep -q '^....i'; then
+  echo "[WAG_009_VT_WATCH_DIR] ${OSSEC_CONF} est immuable sur cet agent (cause non confirmee - voir commentaire d'en-tete) - deverrouillage temporaire avant reecriture."
+  chattr -i "$OSSEC_CONF"
+  WAS_IMMUTABLE=1
+fi
+
 MARKER="<!-- WEF_AGENT_VT_WATCH_CONFIG (WAG_009, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER" "$OSSEC_CONF"; then
   echo "[WAG_009_VT_WATCH_DIR] Bloc deja pose, retrait avant reecriture (evite les doublons a chaque rejeu)..."
@@ -66,7 +80,14 @@ echo "[WAG_009_VT_WATCH_DIR] Ajout de la surveillance FIM temps reel de : ${FIM_
   echo "</ossec_config>"
   echo "<!-- WEF_AGENT_VT_WATCH_CONFIG_END -->"
 } >> "$OSSEC_CONF"
-grep -qF "$MARKER" "$OSSEC_CONF" || { echo "[WAG_009_VT_WATCH_DIR] ERREUR : bloc absent apres ecriture." >&2; exit 1; }
+grep -qF "$MARKER" "$OSSEC_CONF" || { echo "[WAG_009_VT_WATCH_DIR] ERREUR : bloc absent apres ecriture (fichier verrouille ? voir chattr/lsattr)." >&2; exit 1; }
+
+if [ "$WAS_IMMUTABLE" -eq 1 ]; then
+  echo "[WAG_009_VT_WATCH_DIR] Reverrouillage de ${OSSEC_CONF} (droits + chattr +i)..."
+  chown root:wazuh "$OSSEC_CONF"
+  chmod 640 "$OSSEC_CONF"
+  chattr +i "$OSSEC_CONF"
+fi
 
 echo "[WAG_009_VT_WATCH_DIR] Redemarrage de wazuh-agent pour appliquer..."
 systemctl restart wazuh-agent

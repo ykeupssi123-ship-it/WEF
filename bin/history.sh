@@ -60,9 +60,12 @@ if [ "$SEL" = "stats" ]; then
   # restent affiches tels quels (jamais renommes en simple OK/ECHEC)
   # dans le detail liste plus bas, pour qu'un forcage manuel ne soit
   # jamais confondu avec une execution normale de l'orchestrateur.
-  OK_COUNT=$(echo "$MATCHES" | awk -F',' '$4=="OK" || $4=="FORCE_OK"' | wc -l)
-  KO_COUNT=$(echo "$MATCHES" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC"' | wc -l)
+  # AJOUTE LE 2026-09-18 (systeme de calendrier) : SCHEDULED_OK/
+  # SCHEDULED_ECHEC (bin/scheduler.sh) suivent le meme principe.
+  OK_COUNT=$(echo "$MATCHES" | awk -F',' '$4=="OK" || $4=="FORCE_OK" || $4=="SCHEDULED_OK"' | wc -l)
+  KO_COUNT=$(echo "$MATCHES" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC" || $4=="SCHEDULED_ECHEC"' | wc -l)
   FORCE_COUNT=$(echo "$MATCHES" | awk -F',' '$4=="FORCE_OK" || $4=="FORCE_ECHEC"' | wc -l)
+  SCHEDULED_COUNT=$(echo "$MATCHES" | awk -F',' '$4=="SCHEDULED_OK" || $4=="SCHEDULED_ECHEC"' | wc -l)
   FIRST=$(echo "$MATCHES" | head -1 | awk -F',' '{print $1}')
   LAST=$(echo "$MATCHES" | tail -1 | awk -F',' '{print $1}')
   RATE=$(awk -v o="$OK_COUNT" -v t="$TOTAL" 'BEGIN{printf "%.0f", (o/t)*100}')
@@ -75,6 +78,7 @@ if [ "$SEL" = "stats" ]; then
   echo "Premiere execution  : $FIRST"
   echo "Derniere execution  : $LAST"
   [ "$FORCE_COUNT" -gt 0 ] && echo "dont FORCEES manuellement (./bin/order.sh) : $FORCE_COUNT"
+  [ "$SCHEDULED_COUNT" -gt 0 ] && echo "dont declenchees par le calendrier (./bin/scheduler.sh) : $SCHEDULED_COUNT"
 
   if [ "$TOTAL" -lt 2 ]; then
     echo ""

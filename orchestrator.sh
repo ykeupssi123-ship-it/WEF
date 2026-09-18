@@ -56,8 +56,21 @@ fi
 export VARS_FILE="$SCRIPT_DIR/vars.conf"
 source "$VARS_FILE"
 source "$SCRIPT_DIR/lib/commun.sh"
+source "$SCRIPT_DIR/lib/run_job.sh"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR" "$WORK_TMP_DIR"
+
+source "$SCRIPT_DIR/lib/lock.sh"
+# AJOUTE LE 2026-09-18 (systeme de calendrier) : jusqu'ici, un operateur ne
+# lancait jamais deux executions en meme temps sur la meme machine - avec
+# bin/scheduler.sh (declencheur autonome, sans supervision humaine), cette
+# collision devient possible pour la premiere fois. Attente courte (10s) :
+# une vraie collision reste rare, jamais une attente indefinie.
+if ! acquire_run_lock "orchestrator.sh (pid $$)" 10; then
+  echo "ERREUR : une autre execution WEF est en cours sur cette machine (voir $STATE_DIR/.wef_run.owner). Reessayez dans quelques instants." >&2
+  exit 1
+fi
+trap release_run_lock EXIT
 TS=$(date +%Y%m%d_%H%M%S)
 RUN_LOG="$LOG_DIR/orchestrator_${TS}.log"
 JOBS_CSV="$SCRIPT_DIR/jobs_table.csv"
@@ -300,29 +313,19 @@ for pass in $(seq 1 $MAX_PASSES); do
     # ne serait-ce qu'un octet sur stdin, cet octet est vole directement
     # dans le flux du CSV en cours de lecture, decalant silencieusement
     # la position de lecture pour toutes les lignes suivantes.
-    JOB_START_EPOCH=$(date +%s)
-    bash "$SCRIPT_PATH" > "$JOB_LOG" 2>&1 < /dev/null &
-    JOB_PID=$!
-    CURRENT_JOB_MARK="$RUNNING_DIR/${JOB_ID}.running"
-    echo "$(date -Iseconds),$JOB_PID,$JOB_NAME" > "$CURRENT_JOB_MARK"
-    wait "$JOB_PID"
+    # AJOUTE LE 2026-09-18 : le lancement/l'attente/le marqueur .ok/la
+    # ligne d'historique vivent desormais dans lib/run_job.sh (partages
+    # avec bin/order.sh et bin/scheduler.sh) - voir son en-tete. Le
+    # comportement (PID capture, "< /dev/null", DUREE_SEC, ligne
+    # HISTORY_LEDGER) est inchange, juste extrait d'ici.
+    : > "$JOB_LOG"
+    run_job "$JOB_ID" "$JOB_NAME" "$SCRIPT_PATH" "$JOB_LOG" "$OUT_COND" "OK" "ECHEC"
     JOB_EXIT=$?
-    rm -f "$CURRENT_JOB_MARK"
-    CURRENT_JOB_MARK=""
-    # DUREE_SEC (ajoute le 2026-08-12) : necessaire a bin/monitor.sh
-    # pour detecter un job EN COURS anormalement long par rapport a sa
-    # moyenne historique (SLA/retard) - directement motive par
-    # l'incident reel ES_027 (timeout de 5 min decouvert seulement une
-    # fois termine, aucune alerte pendant qu'il tournait).
-    JOB_DURATION_SEC=$(( $(date +%s) - JOB_START_EPOCH ))
     cat "$JOB_LOG" >> "$RUN_LOG"
     if [ $JOB_EXIT -eq 0 ]; then
-      mark_done "$OUT_COND"
-      echo "$(date -Iseconds),$JOB_ID,$JOB_NAME,OK,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
       log "$JOB_ID -> OK ($OUT_COND) [historique: ./bin/history.sh $JOB_ID]"
       progressed=1
     else
-      echo "$(date -Iseconds),$JOB_ID,$JOB_NAME,ECHEC,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
       log "$JOB_ID -> ECHEC. Voir $JOB_LOG (ou $RUN_LOG). Arret orchestrateur."
       FAILED_JOB_ID="$JOB_ID"
       FAILED_JOB_NAME="$JOB_NAME"

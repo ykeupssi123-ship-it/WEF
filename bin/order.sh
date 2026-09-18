@@ -57,6 +57,8 @@ fi
 export VARS_FILE="${VARS_FILE:-$HERE/vars.conf}"
 source "$VARS_FILE"
 source "$HERE/lib/commun.sh"
+source "$HERE/lib/run_job.sh"
+source "$HERE/lib/lock.sh"
 
 JOB_ID="${1:-}"
 RAISON="${2:-}"
@@ -188,6 +190,16 @@ if [ "$CONFIRM" != "$JOB_ID" ]; then
   exit 1
 fi
 
+# AJOUTE LE 2026-09-18 (systeme de calendrier) : le verrou est pris APRES
+# la confirmation tapee, jamais avant - l'attente d'un humain au prompt
+# ne doit jamais retenir le verrou (bin/scheduler.sh pourrait sinon
+# rester bloque tout un tick a cause d'un operateur qui reflechit).
+if ! acquire_run_lock "order.sh:$JOB_ID (FORCE) par $OPERATEUR" 5; then
+  echo "ERREUR : une autre execution WEF est en cours sur cette machine (voir $STATE_DIR/.wef_run.owner). Reessayez dans quelques instants." >&2
+  exit 1
+fi
+trap release_run_lock EXIT
+
 SCRIPT_PATH="$HERE/jobs/$C_SCRIPT_FILE"
 if [ ! -f "$SCRIPT_PATH" ]; then
   echo "ERREUR : script $SCRIPT_PATH introuvable."
@@ -210,28 +222,27 @@ JOB_LOG="$HISTORY_DIR/$JOB_ID/${JOB_TS}.log"
   echo "=== Sortie reelle du job ==="
 } > "$JOB_LOG"
 
-JOB_START_EPOCH=$(date +%s)
-# < /dev/null : meme correctif que orchestrator.sh (voir docs/JOURNAL_TECHNIQUE.md, 2026-09-01)
-bash "$SCRIPT_PATH" >> "$JOB_LOG" 2>&1 < /dev/null &
-JOB_PID=$!
-echo "$(date -Iseconds),$JOB_PID,$C_JOB_NAME (FORCE)" > "$RUNNING_DIR/${JOB_ID}.running"
-wait "$JOB_PID"
+# AJOUTE LE 2026-09-18 : le lancement/l'attente/le marqueur .ok/la ligne
+# d'historique vivent desormais dans lib/run_job.sh (partages avec
+# orchestrator.sh et bin/scheduler.sh) - comportement inchange (PID
+# capture, "< /dev/null", DUREE_SEC). Seul detail cosmetique deliberement
+# simplifie : le marqueur EN_COURS portait auparavant le suffixe
+# " (FORCE)" alors que la ligne d'historique restait sans suffixe - les
+# deux portent desormais le meme nom (le label FORCE_OK/FORCE_ECHEC,
+# inchange, reste la VRAIE preuve d'audit d'un forcage, jamais ce
+# suffixe cosmetique).
+run_job "$JOB_ID" "$C_JOB_NAME (FORCE)" "$SCRIPT_PATH" "$JOB_LOG" "$C_OUT_COND" "FORCE_OK" "FORCE_ECHEC"
 JOB_EXIT=$?
-rm -f "$RUNNING_DIR/${JOB_ID}.running"
-JOB_DURATION_SEC=$(( $(date +%s) - JOB_START_EPOCH ))
 
 echo "--- Sortie de $JOB_ID ---"
 cat "$JOB_LOG"
 echo "--- Fin de sortie ---"
 
 if [ $JOB_EXIT -eq 0 ]; then
-  mark_done "$C_OUT_COND"
-  echo "$(date -Iseconds),$JOB_ID,$C_JOB_NAME,FORCE_OK,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
   echo "$JOB_ID -> FORCE_OK ($C_OUT_COND). Marque distinctement dans l'historique"
   echo "(jamais confondu avec une execution normale) : ./bin/history.sh $JOB_ID"
   exit 0
 else
-  echo "$(date -Iseconds),$JOB_ID,$C_JOB_NAME,FORCE_ECHEC,$JOB_LOG,$JOB_DURATION_SEC" >> "$HISTORY_LEDGER"
   echo "$JOB_ID -> FORCE_ECHEC. Voir $JOB_LOG."
   if [ -x "$HERE/bin/notify.sh" ]; then
     "$HERE/bin/notify.sh" "$JOB_ID" "$C_JOB_NAME (FORCAGE MANUEL)" "FORCE_ECHEC" "$JOB_LOG" || true

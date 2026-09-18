@@ -4,6 +4,7 @@ INFRA_001,WEF_INFRA_BLD_RENAMEELK,ELK_HOST,ALWAYS,INFRA_001.sh,[PROJET-SPECIFIQU
 INFRA_003_DEVNULL_GUARDIAN,WEF_INFRA_BLD_DEVNULLGRD,ALL,ALWAYS,INFRA_003_DEVNULL_GUARDIAN.sh,Résilience : gardes permanentes contre la corruption récurrente de /dev/null (timer 3s) et le remplissage disque du cache CVE Vulnerability Detector (timer 60s),NONE,DEVNULL_GUARDIAN_OK
 INFRA_004_HEALTH_GUARDIAN,WEF_INFRA_RUN_HEALTHGRD,ALL,ALWAYS,INFRA_004_HEALTH_GUARDIAN.sh,Exploitation continue : contrôle de santé fonctionnelle toutes les 5 min (services/DNS/certificat PKI/disque),NONE,HEALTH_GUARDIAN_OK
 INFRA_005_DISK_HYGIENE,WEF_INFRA_RUN_DISKHYG,ALL,ALWAYS,INFRA_005_DISK_HYGIENE.sh,Exploitation continue : désactivation de PCP (inutilisé) et purge cache dnf - entretien hebdomadaire permanent,NONE,DISK_HYGIENE_OK
+INFRA_010_SCHEDULER_INSTALL,WEF_INFRA_RUN_SCHEDINSTALL,ALL,ALWAYS,INFRA_010_SCHEDULER_INSTALL.sh,Calendrier natif : installe le timer systemd unique qui declenche bin/scheduler.sh toutes les 60s selon schedules.csv,NONE,SCHEDULER_INSTALLED_OK
 PKI_001,WEF_PKI_BLD_GRPNEW,ELK_HOST,ALWAYS,PKI_001.sh,Raccordement : Création du groupe de confiance partagé de l'usine,NONE,PKI_GROUP_OK
 PKI_002,WEF_PKI_BLD_DIRNEW,ELK_HOST,ALWAYS,PKI_002.sh,Structures : Création du coffre-fort neutre d'ancrage des clés de l'usine,PKI_GROUP_OK,PKI_DIR_OK
 PKI_003,WEF_PKI_BLD_CAKEYGEN,ELK_HOST,ALWAYS,PKI_003.sh,Génération d'Ancre : Création de la clé privée de la CA racine globale,PKI_DIR_OK,PKI_CA_KEY_OK

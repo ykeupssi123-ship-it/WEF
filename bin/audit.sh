@@ -27,13 +27,20 @@ TOTAL_RUNS=$(tail -n +2 "$LEDGER" | wc -l)
 TOTAL_JOBS=$(tail -n +2 "$LEDGER" | awk -F',' '{print $2}' | sort -u | wc -l)
 # FORCE_OK/FORCE_ECHEC (bin/order.sh) comptent comme succes/echec dans
 # les totaux, mais restent visibles tels quels (colonne DERNIER) -
-# jamais confondus avec une execution automatique normale.
-TOTAL_OK=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="OK" || $4=="FORCE_OK"' | wc -l)
-TOTAL_KO=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC"' | wc -l)
+# jamais confondus avec une execution automatique normale. AJOUTE LE
+# 2026-09-18 (systeme de calendrier) : SCHEDULED_OK/SCHEDULED_ECHEC
+# (bin/scheduler.sh) suivent exactement le meme principe - sans cet
+# ajout, une execution planifiee aurait ete invisible des deux totaux
+# (ni succes ni echec compte), faussant silencieusement les stats des
+# la premiere execution planifiee.
+TOTAL_OK=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="OK" || $4=="FORCE_OK" || $4=="SCHEDULED_OK"' | wc -l)
+TOTAL_KO=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC" || $4=="SCHEDULED_ECHEC"' | wc -l)
 TOTAL_FORCE=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="FORCE_OK" || $4=="FORCE_ECHEC"' | wc -l)
+TOTAL_SCHEDULED=$(tail -n +2 "$LEDGER" | awk -F',' '$4=="SCHEDULED_OK" || $4=="SCHEDULED_ECHEC"' | wc -l)
 echo "Jobs distincts avec historique : $TOTAL_JOBS"
 echo "Executions totales enregistrees : $TOTAL_RUNS (OK: $TOTAL_OK / ECHEC: $TOTAL_KO)"
 [ "$TOTAL_FORCE" -gt 0 ] && echo "dont forcees manuellement (./bin/order.sh) : $TOTAL_FORCE"
+[ "$TOTAL_SCHEDULED" -gt 0 ] && echo "dont declenchees par le calendrier (./bin/scheduler.sh) : $TOTAL_SCHEDULED"
 echo ""
 
 printf "%-30s %6s %6s %6s %-8s %s\n" "JOB_ID" "EXECS" "OK" "ECHEC" "DERNIER" "DERNIERE_EXECUTION"
@@ -42,8 +49,8 @@ printf "%-30s %6s %6s %6s %-8s %s\n" "------" "-----" "--" "-----" "-------" "--
 tail -n +2 "$LEDGER" | awk -F',' '{print $2}' | sort -u | while IFS= read -r JID; do
   ROWS=$(awk -F',' -v id="$JID" 'NR>1 && $2==id' "$LEDGER")
   NB=$(echo "$ROWS" | wc -l)
-  OK=$(echo "$ROWS" | awk -F',' '$4=="OK" || $4=="FORCE_OK"' | wc -l)
-  KO=$(echo "$ROWS" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC"' | wc -l)
+  OK=$(echo "$ROWS" | awk -F',' '$4=="OK" || $4=="FORCE_OK" || $4=="SCHEDULED_OK"' | wc -l)
+  KO=$(echo "$ROWS" | awk -F',' '$4=="ECHEC" || $4=="FORCE_ECHEC" || $4=="SCHEDULED_ECHEC"' | wc -l)
   LAST_LINE=$(echo "$ROWS" | tail -1)
   LAST_STATUS=$(echo "$LAST_LINE" | awk -F',' '{print $4}')
   LAST_TS=$(echo "$LAST_LINE" | awk -F',' '{print $1}')

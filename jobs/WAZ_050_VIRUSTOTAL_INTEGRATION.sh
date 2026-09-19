@@ -88,12 +88,27 @@ if grep -qF "$MARKER_FIM" "$OSSEC_CONF"; then
   echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Bloc FIM deja pose, retrait avant reecriture..."
   sed -i "\|^${MARKER_FIM//\//\\/}\$|,\|^<!-- WEF_VT_FIM_CONFIG_END -->\$|d" "$OSSEC_CONF"
 fi
+# CORRIGE LE 2026-09-19 (incident reel, wef-elk-core, diagnostique via
+# alerts.json en direct avec l'operateur) : l'integration VirusTotal
+# ecrit SES PROPRES fichiers de travail temporaires dans /tmp
+# (/tmp/virustotal-<epoch>-<random>.alert, crees puis supprimes en
+# ~1s). Comme /tmp fait partie du perimetre surveille (ligne
+# ci-dessous), CHAQUE fichier temporaire de l'integration declenche
+# lui-meme une alerte FIM (rule 554/553) qui matche a nouveau le
+# rule_id filtre par l'integration - boucle d'auto-declenchement
+# infinie, ~1 appel API/seconde, qui epuise le quota gratuit (4/min)
+# en continu depuis le tout premier demarrage. Constate en reel :
+# AUCUNE soumission n'a jamais abouti (uniquement rule_id 87101,
+# "Public API request rate limit reached", en boucle). Corrige par
+# une exclusion FIM explicite de ses propres fichiers de travail -
+# la seule source reelle du bruit, jamais les vrais fichiers utilisateur.
 echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de la surveillance FIM temps reel de : ${FIM_DIRECTORIES}..."
 {
   echo "$MARKER_FIM"
   echo "<ossec_config>"
   echo "  <syscheck>"
   echo "    <directories realtime=\"yes\" report_changes=\"yes\">${FIM_DIRECTORIES}</directories>"
+  echo "    <ignore type=\"sregex\">^/tmp/virustotal-</ignore>"
   echo "  </syscheck>"
   echo "</ossec_config>"
   echo "<!-- WEF_VT_FIM_CONFIG_END -->"

@@ -32,6 +32,34 @@ fi
 command -v systemctl &>/dev/null || { echo "[INFRA_010_SCHEDULER_INSTALL] ERREUR : systemctl introuvable." >&2; exit 1; }
 [ -x "${PROJECT_ROOT}/bin/scheduler.sh" ] || { echo "[INFRA_010_SCHEDULER_INSTALL] ERREUR : ${PROJECT_ROOT}/bin/scheduler.sh introuvable ou non executable." >&2; exit 1; }
 
+# CORRIGE LE 2026-09-19 (incident reel, wef-elk-core, trouve en marge
+# du diagnostic VirusTotal - "avc: denied { execute } ... comm=
+# scheduler.sh ... tcontext=...admin_home_t" en boucle toutes les 60s
+# dans /var/ossec/logs/alerts/alerts.json) : MEME cause exacte deja
+# documentee et corrigee dans setup/svc_orch.sh pour wef.service,
+# jamais appliquee ici pour wef-scheduler.timer - ce projet clone sous
+# /root herite du contexte SELinux "admin_home_t", qu'un service
+# systemd (domaine "init_t") n'a pas le droit d'executer. Consequence
+# reelle : bin/scheduler.sh echouait SILENCIEUSEMENT a chaque tick
+# depuis son installation (aucune erreur visible sans creuser
+# alerts.json/ausearch). Meme correctif, copie a l'identique.
+if command -v getenforce &>/dev/null && [ "$(getenforce 2>/dev/null)" = "Enforcing" ]; then
+  CURRENT_CTX="$(stat -c '%C' "${PROJECT_ROOT}/bin/scheduler.sh" 2>/dev/null | cut -d: -f3)"
+  if [ "$CURRENT_CTX" != "bin_t" ] && [ "$CURRENT_CTX" != "usr_t" ]; then
+    echo "[INFRA_010_SCHEDULER_INSTALL] SELinux Enforcing detecte, contexte actuel '${CURRENT_CTX:-inconnu}' non executable par un service - application du contexte 'bin_t' sur ${PROJECT_ROOT}..."
+    if ! command -v semanage &>/dev/null; then
+      dnf install -y policycoreutils-python-utils >/dev/null 2>&1 || yum install -y policycoreutils-python-utils >/dev/null 2>&1 || true
+    fi
+    if command -v semanage &>/dev/null && command -v restorecon &>/dev/null; then
+      semanage fcontext -a -t bin_t "${PROJECT_ROOT}(/.*)?" 2>/dev/null || true
+      restorecon -Rv "${PROJECT_ROOT}" >/dev/null
+      echo "[INFRA_010_SCHEDULER_INSTALL] Contexte SELinux corrige."
+    else
+      echo "[INFRA_010_SCHEDULER_INSTALL] ATTENTION : semanage+restorecon indisponibles - si le timer echoue silencieusement, voir ausearch -m avc -ts recent." >&2
+    fi
+  fi
+fi
+
 SERVICE_PATH="/etc/systemd/system/wef-scheduler.service"
 TIMER_PATH="/etc/systemd/system/wef-scheduler.timer"
 

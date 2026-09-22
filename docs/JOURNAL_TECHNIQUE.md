@@ -3003,3 +3003,19 @@ Control-M ne bloque jamais un job sur sa propre condition de sortie - seule une 
 Deux bugs evites, trouves par un second agent en revue avant le code : (1) `lib/run_job.sh` ne marque `.ok` qu'en succes mais ne l'effacait jamais en echec - un rejeu qui echoue sur un job deja vert aurait laisse l'ancien marqueur en place, systeme faussement marque bon ; corrige (le marqueur est efface AVANT le rejeu, apres prise du verrou). (2) `OUT_COND=NONE` (jobs planifies) exclu explicitement, sinon faux-declenche "deja reussi" pour tout job.
 
 Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur rafraichi), rejeu qui echoue sur un job deja vert (marqueur bien absent apres), rayon d'impact correct (0, 1, N dependants), garde `OUT_COND=NONE` confirmee, garde `[ -t 0 ]` (refuse un appel non-interactif). Jamais teste sur VM1/VM2 a l'instant de cette entree.
+
+## 2026-09-22 - PB-009 : integration nmap native a Wazuh (localfile+frequency)
+
+**Demande explicite** : "je veux qu'on ajoute nmap a wazuh" -> "scan periodique automatique" (choix confirme entre scan periodique / job a la demande / active response sur alerte).
+
+**Mecanisme retenu** : `<localfile><log_format>command</log_format><command>...</command><frequency>N</frequency></localfile>` - fonctionnalite native et documentee du logcollector Wazuh (execute une commande a intervalle regulier, ingere chaque ligne de sortie comme un evenement). Prefere au calendrier natif WEF (`bin/scheduler.sh`, construit le 2026-09-18 pour d'autres besoins) : deux mecanismes de periodicite concurrents pour la meme tache auraient ete une duplication sans gain reel.
+
+**Nouveau job** : `jobs/WAZ_055_NMAP_SCAN_INTEGRATION.sh` (`ROLE=ELK_HOST`, `IN_COND=WAZ_MANAGER_UP` - eligible automatiquement via `orchestrator.sh`, aucun secret humain requis contrairement a WAZ_050/VirusTotal). Installe `nmap` si absent, declare le `<localfile>` (cible `NMAP_SCAN_TARGET`, nouvelle variable `vars.conf`, derivee du sous-reseau reel du projet 192.168.50.0/24 - jamais devinee), et ajoute une regle dediee `local_rules.xml` (id **100300**, prochain ID libre confirme par grep avant ecriture - 100100/100101/100102/100200 deja pris).
+
+**Regle** : `<match>Ports: .*open</match>` sur le format grepable natif de nmap (`-oG -`) - jamais un rule_id/decoder Wazuh par defaut suppose, meme discipline que WAZ_040/041 (regle 100101, `<match>` texte direct sur `WEF_CANARY_TEST`). Volontairement pas de regle separee sur "Status: Up" (hote decouvert) : bruit systematique a chaque tick pour une valeur de securite limitee - seul un port ouvert est retenu comme signal utile.
+
+**`WAZ_054` deliberement saute** : reserve a une migration deja documentee dans le plan de session (`WAZ_054_VT_WATCH_REFRESH`, jamais construite a ce jour) - evite une collision future si ce chantier reprend.
+
+**Explicitement pas construit** : detection de derive (nouveau port ouvert vs baseline connue) - necessiterait un etat de reference persistant, hors perimetre de cette demande precise ("ajouter nmap", pas "detecter les changements de surface"). Piste future a documenter si demandee.
+
+**Verifie** : `bash -n jobs/WAZ_055_NMAP_SCAN_INTEGRATION.sh`. Grep de controle avant ecriture : aucun rule id 100300 deja utilise, aucun JOB_ID `WAZ_055` deja present dans `jobs_table.csv`. Jamais teste en conditions reelles a l'instant de cette entree - a confirmer via `bin/order.sh WAZ_055_NMAP_SCAN_INTEGRATION` sur VM1, puis recherche `rule.id : 100300` dans le tableau de bord apres au moins un tick (frequence par defaut 3600s, reduire temporairement `NMAP_SCAN_INTERVAL_SEC` pour un test rapide).

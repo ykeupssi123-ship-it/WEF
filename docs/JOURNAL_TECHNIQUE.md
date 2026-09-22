@@ -3047,3 +3047,13 @@ Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur raf
 **Vars.conf** : `NMAP_SCAN_INTERVAL_SEC` retire (devenu inutile, la cadence vit desormais dans `schedules.csv`). `NMAP_SCAN_TARGET` conserve (toujours utilise par `WAZ_056`).
 
 **Verifie** : `bash -n` propre sur les 2 scripts + `vars.conf`. Audit colonnes `jobs_table.csv` (8/8 apres correction) et `schedules.csv` (3/3). Jamais encore confirme en conditions reelles sur wef-elk-core a l'instant de cette entree (rejeu de `WAZ_055` + `WAZ_056` a faire).
+
+## 2026-09-22 (suite) - PB-009, 3e refonte : `logger` au lieu d'un `<localfile>` custom
+
+**Constate en reel**, via `wazuh-logtest` EN VRAI MODE INTERACTIF cette fois (le mode pipe s'arretait systematiquement avant la Phase 3, non concluant - voir entree precedente) : une ligne brute de sortie nmap ("Host: ... Ports: ...") ne passe jamais la Phase 2 ("No decoder matched") quand surveillee via `<localfile><log_format>syslog</log_format>` sur un fichier custom - elle n'a pas l'entete syslog standard (horodatage/hote/processus) que ce format attend, donc rejetee au pre-decodage avant meme d'atteindre l'evaluation des regles.
+
+**Fix** : abandon complet du `<localfile>` custom. `WAZ_056_NMAP_SCAN_RUN.sh` envoie desormais chaque ligne de resultat via `logger -t wef-nmap-scan "<ligne>"` - reutilise a l'identique le mecanisme deja PROUVE fiable toute la soiree par le canari (`regle 100101`, `WAZ_041_ALERT_CANARY.sh`) : `logger` ecrit dans le vrai syslog systeme, avec un entete correct que Wazuh decode deja par defaut, sans aucune config `<localfile>` supplementaire. `WAZ_055_NMAP_SCAN_INTEGRATION.sh` se limite desormais a poser la regle 100300 (et nettoie idempotemment les blocs `<localfile>` des 2 versions precedentes abandonnees si presents).
+
+**Lecon retenue** (troisieme fois ce soir sur ce meme sujet) : ne jamais faire confiance a un mecanisme Wazuh non deja verifie dans CET environnement precis, meme documente comme standard - toujours preferer un mecanisme deja PROUVE fonctionner ici (canari/logger) plutot qu'une nouvelle construction, meme plausible sur le papier.
+
+**Verifie** : `bash -n` propre sur les 2 scripts. Audit colonnes `jobs_table.csv` (8/8, 2 virgules non echappees dans les DESC trouvees et corrigees avant commit - meme classe de bug que l'entree precedente). Jamais encore confirme en conditions reelles a l'instant de cette entree - a confirmer par rejeu de WAZ_055 + WAZ_056 sur wef-elk-core.

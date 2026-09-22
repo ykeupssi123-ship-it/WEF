@@ -67,7 +67,17 @@ if ! grep -q 'id="100101"' "$RULES_FILE" 2>/dev/null; then
   # Insere juste avant </group> final (meme structure que WAZ_025.sh :
   # un seul <group> englobant dans ce fichier) - jamais un deuxieme
   # <group> racine, pour rester lisible et coherent avec l'existant.
-  sed -i 's#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  # CORRIGE LE 2026-09-22 (incident reel, wef-elk-core, trouve en
+  # diagnostiquant pourquoi WAZ_055/regle 100300 ne se chargeait jamais) :
+  # meme bug deja documente et corrige dans WAZ_025.sh le 2026-09-03
+  # ("sed 's#</group>#...#' sans ancrage remplace la PREMIERE ligne
+  # correspondante, pas la fermeture du groupe englobant en fin de
+  # fichier") - jamais reporte ici. Consequence reelle constatee :
+  # la regle 100101 s'est retrouvee inseree AU MILIEU du champ <group>
+  # de la regle d'exemple vendor 100001, corrompant la structure XML de
+  # tout ce qui suit pour analysisd. Corrige avec '$s#...#' (adresse "$"
+  # = derniere ligne uniquement), identique au correctif de WAZ_025.sh.
+  sed -i '$s#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
   systemctl restart wazuh-manager 2>/dev/null || true
   if ! wait_for_service_active wazuh-manager 120 5; then
     echo "[WAZ_041] ERREUR : wazuh-manager n'a pas redemarre proprement apres la pose de la regle du canari." >&2

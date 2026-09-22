@@ -3019,3 +3019,17 @@ Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur raf
 **Explicitement pas construit** : detection de derive (nouveau port ouvert vs baseline connue) - necessiterait un etat de reference persistant, hors perimetre de cette demande precise ("ajouter nmap", pas "detecter les changements de surface"). Piste future a documenter si demandee.
 
 **Verifie** : `bash -n jobs/WAZ_055_NMAP_SCAN_INTEGRATION.sh`. Grep de controle avant ecriture : aucun rule id 100300 deja utilise, aucun JOB_ID `WAZ_055` deja present dans `jobs_table.csv`. Jamais teste en conditions reelles a l'instant de cette entree - a confirmer via `bin/order.sh WAZ_055_NMAP_SCAN_INTEGRATION` sur VM1, puis recherche `rule.id : 100300` dans le tableau de bord apres au moins un tick (frequence par defaut 3600s, reduire temporairement `NMAP_SCAN_INTERVAL_SEC` pour un test rapide).
+
+## 2026-09-22 (suite) - Bug reel : `local_rules.xml` corrompu par un sed non ancre (3 jobs)
+
+**Trouve en diagnostiquant** pourquoi la regle 100300 (WAZ_055/nmap) ne se chargeait jamais dans `analysisd`, malgre un texte confirme present sur le disque (`grep -c 'id="100300"'` -> 1) et aucune erreur/warning associee. Lecture directe du fichier reel (`cat /var/ossec/etc/rules/local_rules.xml` sur wef-elk-core) : la regle 100101 (canari) se trouvait inseree **au milieu du champ `<group>` de la regle d'exemple vendor 100001**, en double, corrompant la structure XML de tout ce qui suit pour `analysisd` - explique a la fois l'absence d'erreur (le parseur XML "tolerant" de Wazuh ne rejette pas bruyamment, il degrade silencieusement) et l'absence de chargement de 100300.
+
+**Cause exacte** : `WAZ_037_CONVERGENT_TEST.sh`, `WAZ_040_KIBANA_SILENT.sh`, `WAZ_041_ALERT_CANARY.sh` utilisaient chacun `sed -i 's#</group>#...#'` **sans ancrage** - remplace le PREMIER `</group>` du fichier (celui de la regle vendor 100001), jamais le dernier. **Exactement le meme bug deja trouve et corrige dans `WAZ_025.sh` le 2026-09-03** (`'$s#...#'`), mais jamais reporte sur ces 3 fichiers, restes vulnerables depuis leur creation (2026-08-31).
+
+**Corrige** (3 fichiers) : `sed -i 's#...'` -> `sed -i '$s#...'`, identique au motif deja prouve de `WAZ_025.sh`/`WAZ_019_FLOOD.sh`/`WAZ_051_IOC_CDB_LIST.sh`.
+
+**Reparation du fichier deja corrompu sur wef-elk-core** : reconstruction manuelle du contenu (jamais un sed de plus sur un fichier deja casse - trop risque) a partir de la structure connue et verifiee (regle vendor 100001 intacte + 100100/101/102 dans le meme groupe englobant + 100200/100300 dans leurs groupes propres, exactement ce que les 6 jobs auraient du produire avec le sed corrige).
+
+**Lecon** : un correctif trouve et documente dans UN job (WAZ_025, 2026-09-03) doit etre systematiquement recherche dans tout job partageant le meme motif de code (`grep` du motif exact avant de considerer un bug "isole") - meme lecon deja tiree le 2026-09-18 pour l'audit `REPEATABLE_JOBS` (une correction limitee aux cas evidents reste incomplete).
+
+**Verifie** : `bash -n` propre sur les 3 fichiers. `wazuh-analysisd -t` (execute depuis `/var/ossec`) confirme la regle 100300 chargee sans warning apres reparation manuelle du fichier + redemarrage. Jamais teste en rejouant les 3 jobs corriges eux-memes sur une VM fraiche a l'instant de cette entree (le fichier corrompu a ete repare directement plutot que par rejeu, pour eviter d'ajouter une 3e corruption avant meme d'avoir le correctif).

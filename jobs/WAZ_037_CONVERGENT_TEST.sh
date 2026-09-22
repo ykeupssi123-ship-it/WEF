@@ -25,7 +25,12 @@ source "$PROJECT_ROOT/jobs/lib/es_admin_curl.sh"
 RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
 if ! grep -q 'id="100101"' "$RULES_FILE" 2>/dev/null; then
   echo "[WAZ_037_CONVERGENT_TEST] Pose de la regle dediee au canari (id 100101, niveau 3, absente a ce stade de la chaine)..."
-  sed -i 's#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  # CORRIGE LE 2026-09-22 (incident reel, wef-elk-core - voir
+  # WAZ_041_ALERT_CANARY.sh pour le detail complet du meme bug) : sed
+  # sans ancrage remplace le PREMIER </group> du fichier (celui de la
+  # regle vendor 100001), corrompant la structure XML. '$s#...#' =
+  # derniere ligne uniquement, identique au correctif de WAZ_025.sh.
+  sed -i '$s#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
   systemctl restart wazuh-manager 2>/dev/null || true
   if ! wait_for_service_active wazuh-manager 120 5; then
     echo "[WAZ_037_CONVERGENT_TEST] ERREUR : wazuh-manager n'a pas redemarre proprement apres la pose de la regle du canari." >&2

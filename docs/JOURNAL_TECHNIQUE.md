@@ -3088,3 +3088,19 @@ Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur raf
 **Lecon retenue, definitive sur ce sujet** : avant de soupçonner un mecanisme complexe (chainage de regles, timing, decodeurs), toujours verifier d'abord les exclusions/filtres les plus simples et les plus proches de la source (ici, une seule ligne `<ignore>` vendor, presente depuis l'installation initiale, jamais relue avant ce soir). Cinq refontes completes auraient pu etre evitees avec cette seule verification faite en premier.
 
 **Verifie** : `bash -n` propre sur les 2 scripts. Audit colonnes `jobs_table.csv` (8/8). Confirme en conditions reelles sur wef-elk-core via un test manuel identique avant meme de modifier le code (methode etablie toute la soiree : jamais corriger a l'aveugle).
+
+## 2026-09-23 (suite, conclusion) - PB-009 : abandon de la regle custom, usage direct de la regle vendor 550/554
+
+**Verification poussee, decisive** : meme un `<match>` trivial sur un substring garanti present dans `full_log` (le nom du fichier lui-meme) ne declenchait jamais la regle 100300, chainee via `if_sid=100100,550,553,554`. Investigation elargie : `grep '"id":"100200"'` (regle IOC, WAZ_051, MEME technique de chainage, en place depuis le 2026-09-16) et `grep '"id":"100100"'` (la toute premiere regle custom du projet, WAZ_025, creee le 2026-09-03) - **tous deux a 0, jamais declenches historiquement**. Le chainage `if_sid` sur des evenements FIM ne fonctionne pas de maniere fiable sur cette installation Wazuh 4.14.7 precise - cause exacte non identifiee avec certitude malgre un diagnostic exhaustif (config verifiee correcte a chaque etape, fichier de regles propre, demons tous actifs).
+
+**Decision finale, pragmatique** : abandon complet de toute regle Wazuh custom pour ce besoin. La regle VENDOR standard (550 "modified"/554 "added", deja fiable a 100% toute la soiree, confirmee des dizaines de fois avec le contenu exact attendu dans `syscheck.diff`) porte deja toute l'information necessaire. Filtrage direct dans le dashboard :
+```
+syscheck.path : "/tmp/wef-nmap-scan-result.txt"
+```
+(retirer tout filtre `rule.level` restrictif qui exclurait le niveau 7 de la regle 550).
+
+**`WAZ_055_NMAP_SCAN_INTEGRATION.sh` reduit a l'essentiel** : installe `nmap` si absent, nettoie idempotemment la regle 100300 de la v4 (jamais fonctionnelle) si presente sur une machine qui l'aurait deja jouee. Plus aucune configuration `ossec.conf`/`local_rules.xml` necessaire pour ce playbook - la surveillance existante (`WAZ_050`) suffit entierement.
+
+**Piste ouverte, honnete, pas fermee** : la cause racine du chainage `if_sid`-sur-FIM qui ne fonctionne jamais (`100100`/`100200`/`100300`, trois regles independantes, meme symptome) reste a investiguer un autre jour - possiblement une limite reelle de cette version Wazuh, ou une configuration globale non encore identifiee. Ne bloque plus ce playbook, mais reste une dette technique documentee pour le projet (les regles 100100/100200 restent en place, inoffensives mais silencieuses).
+
+**Verifie** : `bash -n` propre. Confirme en conditions reelles sur wef-elk-core : filtre dashboard `syscheck.path` retourne bien les alertes attendues avec le contenu complet du scan.

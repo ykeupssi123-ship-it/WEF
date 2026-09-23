@@ -3120,3 +3120,20 @@ Consequence reelle : sur une infrastructure 100% Oracle Linux (WEF entier), ce m
 **Piste ouverte, honnete** : si Wazuh supporte un jour Oracle Linux pour ce module, ou si l'infrastructure change de distribution, `WAZ_057` devient obsolete - reactivation manuelle explicite alors, jamais automatique.
 
 **Verifie** : `bash -n` propre sur les 3 fichiers. Audit colonnes `jobs_table.csv` (8/8). Confirme en conditions reelles sur wef-elk-core (correctif deja applique manuellement avant d'ecrire le job - le job reproduit exactement ce qui a ete verifie fonctionner).
+
+## 2026-09-23 (suite) - Correction d'une erreur : `/home` n'est PAS recursif dans Wazuh FIM
+
+**Affirmation faite plus tot ce soir, FAUSSE, testee et infirmee en reel** : "le FIM Wazuh est recursif, surveiller `/home` (parent) suffit a couvrir tout nouvel utilisateur automatiquement". Test reel sur wef-beats-sensor (nouvel utilisateur "bruno", fichier depose directement dans `/home`) : **aucune alerte**, dans aucun des deux cas.
+
+**Preuve directe trouvee dans `ossec.log`** apres redemarrage de l'agent :
+```
+Directory set for real time monitoring: '/home/acyrille'.
+Directory set for real time monitoring: '/home/bruno'.
+```
+**Jamais de ligne `'/home'` seule.** Wazuh developpe un dossier parent donne en ses sous-dossiers EXISTANTS au moment du demarrage de `syscheckd`, et cree une surveillance individuelle pour chacun - il ne pose jamais une surveillance recursive unique sur le parent lui-meme qui couvrirait aussi les sous-dossiers crees APRES coup. Un fichier depose directement dans `/home` (pas dans un sous-dossier) n'a lui non plus jamais ete detecte - confirmation supplementaire que `/home` en tant que tel n'est pas surveille.
+
+**Corrige** : `git revert c93b2bb` - retour complet a l'enumeration individuelle (`for HOME_DIR in /home/*/`) dans les 4 fichiers (`WAG_009`, `WAZ_050`, `WAG_010`, `WAZ_053`). La sonde de polling (`WAG_010`/`WAZ_053`) reste necessaire et fonctionnelle - c'est elle, pas une pretendue recursivite, qui rattrape reellement les nouveaux utilisateurs (confirme en reel plus tot ce soir avec "acyrille", detection en moins d'1 min).
+
+**Lecon** : meme une affirmation technique qui semble plausible et bien connue (la recursivite FIM standard) doit etre verifiee empiriquement AVANT d'etre appliquee en production - pas seulement apres coup si un test echoue. Erreur reconnue et corrigee immediatement des la premiere preuve contraire, jamais defendue ni minimisee.
+
+**Verifie** : `bash -n` propre sur les 4 fichiers apres revert. Comportement restaure identique a celui deja teste et confirme fonctionnel avant ce changement (WAG_010 sur "acyrille").

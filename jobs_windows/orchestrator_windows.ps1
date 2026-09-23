@@ -26,6 +26,23 @@ $RunLog = Join-Path $LOG_DIR "orchestrator_windows_$ts.log"
 $JobsCsv = Join-Path $ScriptDir "jobs_table_windows.csv"
 $ReportFile = Join-Path $STATE_DIR "RAPPORT_EXECUTION.txt"
 
+# CORRIGE LE 2026-09-23 (demande explicite : "je veux ... les sysout on
+# doit les avoir", meme convention que lib/run_job.sh cote Linux) :
+# avant, la sortie de CHAQUE job etait noyee dans le seul $RunLog
+# combine - un diagnostic reel (WAW_003) a exige d'aller fouiller ce
+# fichier a la main. Desormais : un fichier sysout DEDIE par execution
+# de job (state\history\<JOB_ID>\<horodatage>.log, structure identique
+# a state/history/<JOB_ID>/*.log cote Linux) + un ledger CSV
+# (state\JOBS_HISTORY.csv, memes colonnes que JOBS_HISTORY.csv cote
+# Linux) - le $RunLog combine reste EN PLUS (narratif de l'orchestrateur
+# lui-meme), jamais retire.
+$HistoryRoot = Join-Path $STATE_DIR "history"
+$HistoryLedger = Join-Path $STATE_DIR "JOBS_HISTORY.csv"
+New-Item -ItemType Directory -Force -Path $HistoryRoot | Out-Null
+if (-not (Test-Path $HistoryLedger)) {
+    "TIMESTAMP,JOB_ID,JOB_NAME,RESULT,LOG_FILE,DURATION_SEC" | Set-Content -Path $HistoryLedger
+}
+
 $Script:FailedJobId = $null
 $Script:FailedJobName = $null
 
@@ -118,15 +135,32 @@ try {
 
             Write-Log "--- $($job.JOB_ID) ($($job.JOB_NAME)) : $($job.DESCRIPTION) ---"
             $scriptPath = Join-Path $ScriptDir $job.SCRIPT_FILE
+
+            $JobHistoryDir = Join-Path $HistoryRoot $job.JOB_ID
+            New-Item -ItemType Directory -Force -Path $JobHistoryDir | Out-Null
+            $jobTs = Get-Date -Format "yyyyMMdd_HHmmss"
+            $JobLog = Join-Path $JobHistoryDir "$jobTs.log"
+            "=== Sortie reelle de $($job.JOB_ID) ($($job.JOB_NAME)) - $(Get-Date -Format o) ===" | Set-Content -Path $JobLog
+            Write-Log "$($job.JOB_ID) -> sysout : $JobLog"
+
+            $jobStart = Get-Date
             try {
-                & $scriptPath *>> $RunLog
-                if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { throw "Exit code $LASTEXITCODE" }
+                & $scriptPath *>> $JobLog
+                $jobExit = $LASTEXITCODE
+                if ($null -eq $jobExit) { $jobExit = 0 }
+                $jobDurationSec = [int]((Get-Date) - $jobStart).TotalSeconds
+                if ($jobExit -ne 0) { throw "Exit code $jobExit" }
                 Mark-Done $job.OUT_CONDITION
                 Write-Log "$($job.JOB_ID) -> OK ($($job.OUT_CONDITION))"
+                "$(Get-Date -Format o),$($job.JOB_ID),$($job.JOB_NAME),OK,$JobLog,$jobDurationSec" | Add-Content -Path $HistoryLedger
                 $progressed = $true
             } catch {
+                $jobDurationSec = [int]((Get-Date) - $jobStart).TotalSeconds
                 Write-Log "$($job.JOB_ID) -> ECHEC : $_"
+                Write-Log "Sortie reelle du job (sysout complet) :"
+                Get-Content $JobLog | ForEach-Object { Write-Log "    $_" }
                 Write-Log "Arret orchestrateur."
+                "$(Get-Date -Format o),$($job.JOB_ID),$($job.JOB_NAME),ECHEC,$JobLog,$jobDurationSec" | Add-Content -Path $HistoryLedger
                 $Script:FailedJobId = $job.JOB_ID
                 $Script:FailedJobName = $job.JOB_NAME
                 $Script:ExitCode = 1

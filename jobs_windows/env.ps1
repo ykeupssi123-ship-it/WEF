@@ -58,14 +58,54 @@ function Set-PersistentVar($name, $value) {
 $okHome = Set-PersistentVar "APP_HOME" $ScriptDir
 $okBin  = Set-PersistentVar "APP_BIN"  $BinDir
 
-if ($okHome -and $okBin) {
-    Write-Host "APP_HOME = $ScriptDir"
-    Write-Host "APP_BIN  = $BinDir"
-    Write-Host ""
-    Write-Host "Variables ecrites et verifiees (portee utilisateur courant). Ouvrez une"
-    Write-Host "NOUVELLE session PowerShell pour qu'elles soient actives (`$env:APP_HOME, `$env:APP_BIN)."
-} else {
+if (-not ($okHome -and $okBin)) {
     Write-Host ""
     Write-Host "[env.ps1] ECHEC : au moins une variable n'a pas ete ecrite - voir l'erreur ci-dessus." -ForegroundColor Red
     exit 1
 }
+
+# AJOUTE LE 2026-09-23 (demande explicite : "commandes simples et
+# courtes" - meme reflexe que $APP_BIN/order.sh cote Linux). Installe un
+# bloc MARQUE (idempotent, jamais duplique a chaque relance) dans le
+# VRAI profil PowerShell de l'operateur ($PROFILE), qui se contente de
+# charger jobs_windows\wef_profile_functions.ps1 (source de verite
+# unique, versionnee dans le depot - voir son en-tete). Jamais le
+# profil entier ecrase : $PROFILE est un fichier personnel qui peut deja
+# contenir d'autres personnalisations de l'operateur, hors de portee de
+# ce projet.
+$FunctionsFile = Join-Path $ScriptDir "wef_profile_functions.ps1"
+$ProfileDir = Split-Path -Parent $PROFILE
+if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null }
+if (-not (Test-Path $PROFILE)) { New-Item -ItemType File -Force -Path $PROFILE | Out-Null }
+
+$Marker = "# WEF_PROFILE_FUNCTIONS (genere par env.ps1 - ne pas editer ce bloc a la main)"
+$MarkerEnd = "# WEF_PROFILE_FUNCTIONS_END"
+
+$profileContent = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
+if ($null -eq $profileContent) { $profileContent = "" }
+
+if ($profileContent -match [regex]::Escape($Marker)) {
+    Write-Host "[env.ps1] Bloc de fonctions deja pose dans `$PROFILE, retrait avant reecriture..."
+    $pattern = "(?s)" + [regex]::Escape($Marker) + ".*?" + [regex]::Escape($MarkerEnd) + "\r?\n?"
+    $profileContent = [regex]::Replace($profileContent, $pattern, "")
+}
+
+$block = "$Marker`n. `"$FunctionsFile`"`n$MarkerEnd`n"
+Set-Content -Path $PROFILE -Value ($profileContent.TrimEnd() + "`n`n" + $block)
+
+$reread = Get-Content $PROFILE -Raw
+if ($reread -notmatch [regex]::Escape($Marker)) {
+    Write-Host "[env.ps1] ERREUR : bloc de fonctions absent de `$PROFILE apres ecriture." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "APP_HOME = $ScriptDir"
+Write-Host "APP_BIN  = $BinDir"
+Write-Host "Fonctions courtes installees dans : $PROFILE"
+Write-Host "  (source de verite : $FunctionsFile)"
+Write-Host ""
+Write-Host "Variables et fonctions ecrites et verifiees. Ouvrez une NOUVELLE session"
+Write-Host "PowerShell pour qu'elles soient actives :"
+Write-Host "  wef            -> lance la chaine complete de jobs"
+Write-Host "  wef-monitor    -> etat des jobs (fait / en attente)"
+Write-Host "  wef-summary    -> tableau de bord final"

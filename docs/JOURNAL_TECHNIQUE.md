@@ -3137,3 +3137,15 @@ Directory set for real time monitoring: '/home/bruno'.
 **Lecon** : meme une affirmation technique qui semble plausible et bien connue (la recursivite FIM standard) doit etre verifiee empiriquement AVANT d'etre appliquee en production - pas seulement apres coup si un test echoue. Erreur reconnue et corrigee immediatement des la premiere preuve contraire, jamais defendue ni minimisee.
 
 **Verifie** : `bash -n` propre sur les 4 fichiers apres revert. Comportement restaure identique a celui deja teste et confirme fonctionnel avant ce changement (WAG_010 sur "acyrille").
+
+## 2026-09-23 (suite) - Kit Windows : sysout par job + commandes courtes
+
+**Constate en reel** (premier deploiement sur machine physique) : `orchestrator_windows.ps1` ecrivait toute la sortie des jobs dans un seul log combine - un diagnostic reel (`WAW_003` en echec) a exige de fouiller ce fichier a la main, alors que le cote Linux a deja `lib/run_job.sh` (sysout dedie par execution + `JOBS_HISTORY.csv`) depuis le 18 septembre.
+
+**Corrige, meme convention des deux cotes desormais** :
+- `orchestrator_windows.ps1` : chaque job ecrit son propre sysout (`state\history\<JOB_ID>\<horodatage>.log`), plus une ligne dans `state\JOBS_HISTORY.csv` (memes colonnes que le ledger Linux). En cas d'echec, le sysout complet est aussi imprime dans le log combine - jamais besoin d'aller le chercher a la main.
+- `WAW_003.ps1` : capture desormais le vrai code de sortie de `msiexec` (`-PassThru`, absent avant) + un journal MSI complet (`/l*v`) - avant, un echec d'installation ne laissait que "service introuvable", sans jamais dire pourquoi.
+
+**Commandes courtes** (demande explicite : retrouver le reflexe `$APP_BIN/order.sh` cote Linux) : nouveau `jobs_windows\wef_profile_functions.ps1` (source de verite unique, versionnee, 100% generique - lit `$env:APP_HOME`/`$env:APP_BIN` a l'appel, jamais un chemin fige) definissant `wef` (lance la chaine), `wef-monitor`, `wef-summary`. Installe par `env.ps1` via un bloc MARQUE idempotent dans le vrai `$PROFILE` de l'operateur (jamais le profil entier ecrase - c'est un fichier personnel qui peut deja contenir d'autres personnalisations).
+
+**Verifie** : parseur PowerShell (`[System.Management.Automation.Language.Parser]::ParseFile`) propre sur les 4 fichiers touches - aucune execution reelle a l'instant de cette entree, a confirmer par le prochain `wef` reel sur la machine physique.

@@ -96,5 +96,5 @@ if ! wait_for_service_active wazuh-manager 180 5; then
   exit 1
 fi
 
-echo "[WAZ_055_NMAP_SCAN_INTEGRATION] OK. WAZ_056_NMAP_SCAN_RUN (planifie via schedules.csv) ecrit dans /tmp/wef-nmap-scan.log (deja surveille par le FIM) ; tout port ouvert detecte declenche la regle 100300 (recherche : rule.id : 100300)."
+echo "[WAZ_055_NMAP_SCAN_INTEGRATION] OK. WAZ_056_NMAP_SCAN_RUN (planifie via schedules.csv) ecrit dans /tmp/wef-nmap-scan-result.txt (deja surveille par le FIM) ; tout port ouvert detecte declenche la regle 100300 (recherche : rule.id : 100300)."
 exit 0

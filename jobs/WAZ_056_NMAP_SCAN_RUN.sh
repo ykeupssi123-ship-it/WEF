@@ -27,11 +27,21 @@
 # Effet de bord neutre, attendu et sans consequence : ce fichier sera
 # aussi automatiquement soumis a VirusTotal par l'integration existante
 # (WAZ_050) - resultat "aucun positif" (texte brut), jamais un souci.
+#
+# CORRIGE LE 2026-09-23 (incident reel, cause FINALE et confirmee, apres
+# tout le reste ci-dessus) : le FIM ignore par defaut tout fichier se
+# terminant par ".log" - regle vendor deja presente dans ossec.conf
+# ("<ignore type=\"sregex\">.log$|.swp$</ignore>", jamais ajoutee par ce
+# projet). "wef-nmap-scan.log" matchait exactement cette exclusion -
+# aucun rapport avec nmap, le chainage de regle, ou les redemarrages :
+# juste un nom de fichier malheureux. Confirme en reel : un fichier
+# ".txt" identique, meme contenu, meme dossier, est detecte
+# INSTANTANEMENT (rule 554). Renomme en ".txt".
 set -uo pipefail
 source "$VARS_FILE"
 
 NMAP_TARGET="${NMAP_SCAN_TARGET:-192.168.50.0/24}"
-SCAN_LOG="/tmp/wef-nmap-scan.log"
+SCAN_LOG="/tmp/wef-nmap-scan-result.txt"
 
 if ! command -v nmap &>/dev/null; then
   echo "[WAZ_056_NMAP_SCAN_RUN] ERREUR : nmap absent (WAZ_055 doit avoir tourne)." >&2

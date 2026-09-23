@@ -3071,3 +3071,20 @@ Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur raf
 **Lecon retenue, la plus importante de cette session** : ne jamais faire confiance a un mecanisme Wazuh non deja verifie EMPIRIQUEMENT dans cet environnement precis, meme documente comme standard, meme deja present et suppose fonctionner ailleurs dans le projet depuis des semaines - toujours preferer un mecanisme deja PROUVE ici, par une vraie alerte deja vue dans le dashboard.
 
 **Verifie** : `bash -n` propre sur les 2 scripts. Audit colonnes `jobs_table.csv` (8/8). Jamais encore confirme en conditions reelles sur wef-elk-core a l'instant de cette entree - a confirmer par rejeu de WAZ_055 + WAZ_056.
+
+## 2026-09-23 (suite) - PB-009 : cause finale trouvee - le FIM ignore les fichiers `.log` par defaut
+
+**Cause reelle, enfin identifiee par inspection directe de la config** (pas par deduction) : `ossec.conf` contient un bloc vendor par defaut, jamais ajoute par ce projet -
+```
+<!-- File types to ignore -->
+<ignore type="sregex">.log$|.swp$</ignore>
+```
+`wef-nmap-scan.log` matchait exactement cette exclusion - aucun rapport avec nmap, le chainage de regle (`if_sid`), les redemarrages de `wazuh-manager`, ou une quelconque desynchronisation du FIM. Confirme en reel : un fichier identique, meme contenu, meme dossier (`/tmp`), renomme en `.txt`, est detecte **instantanement** (`rule 554`).
+
+**Piste explorees et ecartees avant de trouver la vraie cause** (dans l'ordre, chacune testee en reel, jamais supposee) : redemarrage `wazuh-manager` en cours (race de reinitialisation du scan de reference) - ecarte (le fichier de test manuel fonctionnait bien apres) ; fichier/inode desynchronise - ecarte (suppression + recreation du meme fichier `.log`, toujours rien) ; pattern d'ecriture de nmap (beaucoup d'ecritures rapides) - ecarte (un simple `echo >>` sur le meme fichier `.log` echouait aussi).
+
+**Correctif final** : `WAZ_056_NMAP_SCAN_RUN.sh` ecrit desormais dans `/tmp/wef-nmap-scan-result.txt` (extension `.txt`, hors du perimetre d'exclusion vendor). Aucun autre changement necessaire - le chainage `if_sid=100100,550,553,554` de `WAZ_055` (v4) etait deja correct.
+
+**Lecon retenue, definitive sur ce sujet** : avant de soupçonner un mecanisme complexe (chainage de regles, timing, decodeurs), toujours verifier d'abord les exclusions/filtres les plus simples et les plus proches de la source (ici, une seule ligne `<ignore>` vendor, presente depuis l'installation initiale, jamais relue avant ce soir). Cinq refontes completes auraient pu etre evitees avec cette seule verification faite en premier.
+
+**Verifie** : `bash -n` propre sur les 2 scripts. Audit colonnes `jobs_table.csv` (8/8). Confirme en conditions reelles sur wef-elk-core via un test manuel identique avant meme de modifier le code (methode etablie toute la soiree : jamais corriger a l'aveugle).

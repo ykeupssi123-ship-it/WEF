@@ -3149,3 +3149,19 @@ Directory set for real time monitoring: '/home/bruno'.
 **Commandes courtes** (demande explicite : retrouver le reflexe `$APP_BIN/order.sh` cote Linux) : nouveau `jobs_windows\wef_profile_functions.ps1` (source de verite unique, versionnee, 100% generique - lit `$env:APP_HOME`/`$env:APP_BIN` a l'appel, jamais un chemin fige) definissant `wef` (lance la chaine), `wef-monitor`, `wef-summary`. Installe par `env.ps1` via un bloc MARQUE idempotent dans le vrai `$PROFILE` de l'operateur (jamais le profil entier ecrase - c'est un fichier personnel qui peut deja contenir d'autres personnalisations).
 
 **Verifie** : parseur PowerShell (`[System.Management.Automation.Language.Parser]::ParseFile`) propre sur les 4 fichiers touches - aucune execution reelle a l'instant de cette entree, a confirmer par le prochain `wef` reel sur la machine physique.
+
+## 2026-09-23 (suite) - Premier agent Windows reel + WAW_007 (surveillance VirusTotal)
+
+**Premier deploiement reel sur machine physique** (PC de l'operateur, pas une VM) : chaine `WAW_001` a `WAW_006` executee avec succes apres correction de deux incidents reels -
+1. `msiexec` (code 1603 -> Error 1925, "privileges insuffisants") : la session PowerShell n'etait en realite pas elevee malgre l'intention - confirme via `IsInRole(Administrator)`, corrige en ouvrant une vraie session "Executer en tant qu'administrateur" (le clic sur l'UAC avait ete manque).
+2. Diagnostic initial rendu difficile par l'absence de sysout par job (voir entree precedente, deja corrigee avant cet incident) - la nouvelle capture `state\history\WAW_003\*.log` + le code de sortie reel de `msiexec` (`-PassThru`, deja ajoute) ont permis de trouver la cause exacte en une seule iteration.
+
+Agent confirme `Active` cote manager (`agent_control -l`, ID 003, `wef-agent-windows-physique`) et `ossec.log` local confirme `"Connected to the server"` + `"Agent is now online"`.
+
+**Nouveau `WAW_007_VT_WATCH_DIR.ps1`** (equivalent Windows exact de `WAG_009_VT_WATCH_DIR.sh`) : ouvre Downloads/Desktop/Documents de chaque VRAI profil utilisateur sous `C:\Users` (detecte par la presence de `NTUSER.DAT`, jamais devine) a la surveillance FIM temps reel - alimente l'integration VirusTotal deja active cote manager (WAZ_050), aucune config manager necessaire (meme principe filtre-par-rule_id deja verifie avec VM2 ce soir).
+
+**Deux pieges reels evites des la conception** (verifies en lisant le vrai `ossec.conf` de cette machine AVANT d'ecrire le job, jamais devines) :
+- `WazuhSvc` tourne en tant que SYSTEM - `%USERPROFILE%` resolu par le service pointerait vers le profil systeme, jamais celui de l'operateur. Corrige : chemins reels resolus au moment ou LE JOB tourne (session interactive), ecrits en dur dans `ossec.conf`.
+- Le `ossec.conf` par defaut de cet agent exclut deja `.log$|.htm$|.jpg$|.png$|.chm$|.pnf$|.evtx$` - meme piege que celui trouve ce soir cote Linux (`.log$`), deja documente en tete du job pour un futur test.
+
+**Verifie** : parseur PowerShell propre sur `WAW_007.ps1`. CSV verifie via `Import-Csv` (parseur RFC4180 reel de PowerShell, contrairement au split naif `IFS=','` cote bash). Jamais encore execute en reel sur la machine physique a l'instant de cette entree.

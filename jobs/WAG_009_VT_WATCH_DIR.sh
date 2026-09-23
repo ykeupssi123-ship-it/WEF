@@ -46,21 +46,13 @@ chmod 700 "$WATCH_DIR"
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
 [ -f "$OSSEC_CONF" ] || { echo "[WAG_009_VT_WATCH_DIR] ERREUR : ${OSSEC_CONF} introuvable (WAG_003/WAG_004 doivent avoir tourne)." >&2; exit 1; }
 
-# CORRIGE LE 2026-09-23 (demande explicite, teste en reel avec la
-# creation de l'utilisateur "acyrille" sur wef-beats-sensor) : surveiller
-# CHAQUE /home/<utilisateur> individuellement (liste figee au moment de
-# l'execution) exigeait une sonde de polling (WAG_010, toutes les 10 min)
-# pour jamais manquer un compte cree APRES coup. Le FIM Wazuh
-# (realtime="yes") est deja RECURSIF par construction : surveiller
-# directement le dossier PARENT "/home" couvre automatiquement, sans
-# aucun delai, tout nouveau sous-dossier cree dedans (confirme en reel :
-# WAG_010 detecte et applique la liste, mais devient desormais un
-# controle inerte, jamais plus necessaire pour ce cas precis). Retire
-# entierement l'enumeration - un seul "/home" statique suffit.
-WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR" "/home")
+WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR")
 for MOUNT_POINT in /media /mnt; do
   mkdir -p "$MOUNT_POINT" 2>/dev/null || true
   WATCH_DIRS_LIST+=("$MOUNT_POINT")
+done
+for HOME_DIR in /home/*/; do
+  [ -d "$HOME_DIR" ] && WATCH_DIRS_LIST+=("${HOME_DIR%/}")
 done
 FIM_DIRECTORIES="$(printf '%s\n' "${WATCH_DIRS_LIST[@]}" | sort -u | paste -sd, -)"
 echo "[WAG_009_VT_WATCH_DIR] Dossiers reellement surveilles sur cet agent (decouverts a l'instant) : ${FIM_DIRECTORIES}"

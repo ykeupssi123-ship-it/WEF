@@ -61,16 +61,13 @@ OSSEC_CONF="/var/ossec/etc/ossec.conf"
 # s'auto-declenche). Liste construite dynamiquement a chaque execution
 # (jamais devinee) : seuls les dossiers reellement presents sur CETTE
 # machine sont inclus.
-# CORRIGE LE 2026-09-23 (demande explicite, teste en reel sur
-# wef-beats-sensor) : le FIM Wazuh (realtime="yes") est deja RECURSIF -
-# surveiller le dossier PARENT "/home" couvre automatiquement tout
-# nouveau sous-dossier utilisateur, sans delai, sans sonde de polling
-# (WAZ_053) necessaire pour ce cas precis. Retire l'enumeration
-# individuelle - un seul "/home" statique suffit.
-WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR" "/home")
+WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR")
 for MOUNT_POINT in /media /mnt; do
   mkdir -p "$MOUNT_POINT" 2>/dev/null || true
   WATCH_DIRS_LIST+=("$MOUNT_POINT")
+done
+for HOME_DIR in /home/*/; do
+  [ -d "$HOME_DIR" ] && WATCH_DIRS_LIST+=("${HOME_DIR%/}")
 done
 FIM_DIRECTORIES="$(printf '%s\n' "${WATCH_DIRS_LIST[@]}" | sort -u | paste -sd, -)"
 echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Dossiers reellement surveilles (decouverts sur cette machine) : ${FIM_DIRECTORIES}"

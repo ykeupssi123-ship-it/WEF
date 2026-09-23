@@ -41,15 +41,13 @@ OSSEC_CONF="__OSSEC_CONF__"
 WATCH_DIR="__WATCH_DIR__"
 RESTART_SERVICE="__RESTART_SERVICE__"
 
-# CORRIGE LE 2026-09-23 : "/home" (parent, recursif via le FIM realtime
-# de Wazuh) remplace l'enumeration individuelle - voir WAG_009_VT_WATCH_DIR.sh
-# pour le detail complet. Cette sonde devient de fait un controle inerte
-# pour ce cas precis (elle calculera toujours la meme liste que celle
-# deja posee), conservee par prudence plutot que desinstallee.
-WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR" "/home")
+WATCH_DIRS_LIST=("/root" "/tmp" "$WATCH_DIR")
 for MOUNT_POINT in /media /mnt; do
   mkdir -p "$MOUNT_POINT" 2>/dev/null || true
   WATCH_DIRS_LIST+=("$MOUNT_POINT")
+done
+for HOME_DIR in /home/*/; do
+  [ -d "$HOME_DIR" ] && WATCH_DIRS_LIST+=("${HOME_DIR%/}")
 done
 NEW_DIRS="$(printf '%s\n' "${WATCH_DIRS_LIST[@]}" | sort -u | paste -sd, -)"
 

@@ -3120,15 +3120,3 @@ Consequence reelle : sur une infrastructure 100% Oracle Linux (WEF entier), ce m
 **Piste ouverte, honnete** : si Wazuh supporte un jour Oracle Linux pour ce module, ou si l'infrastructure change de distribution, `WAZ_057` devient obsolete - reactivation manuelle explicite alors, jamais automatique.
 
 **Verifie** : `bash -n` propre sur les 3 fichiers. Audit colonnes `jobs_table.csv` (8/8). Confirme en conditions reelles sur wef-elk-core (correctif deja applique manuellement avant d'ecrire le job - le job reproduit exactement ce qui a ete verifie fonctionner).
-
-## 2026-09-23 (suite) - VirusTotal watch : `/home` recursif remplace la sonde de polling
-
-**Constate en reel sur wef-beats-sensor** (test avec un vrai nouvel utilisateur, "acyrille") : `WAG_010_VT_WATCH_GUARDIAN` fonctionne parfaitement (detection en moins d'1 min, mise a jour appliquee, agent redemarre - confirme dans `journalctl -t wef-vt-watch-guardian`), mais reste un delai structurel par design - une sonde de polling ne peut jamais etre instantanee, seulement aussi rapide que son intervalle.
-
-**Cause racine identifiee** : `WAG_009`/`WAZ_050` enumeraient chaque `/home/<utilisateur>` individuellement (`for HOME_DIR in /home/*/`), une liste figee au moment de l'execution - d'ou le besoin d'une sonde pour rattraper les comptes crees apres coup. Or le FIM Wazuh (`realtime="yes"`) est deja **recursif par construction** : surveiller directement le dossier PARENT `/home` couvre automatiquement, sans aucun delai, tout nouveau sous-dossier cree dedans - fait deja verifiable dans la documentation Wazuh, jamais exploite jusqu'ici dans ce projet.
-
-**Corrige** (4 fichiers, la meme enumeration existait a l'identique dans chacun) : `WAG_009_VT_WATCH_DIR.sh`, `WAZ_050_VIRUSTOTAL_INTEGRATION.sh` (listes installees) + `WAG_010_VT_WATCH_GUARDIAN.sh`, `WAZ_053_VT_WATCH_GUARDIAN.sh` (scripts de sonde embarques, corriges en parallele pour eviter qu'ils ne "corrigent" la nouvelle liste simplifiee en la retransformant en ancienne liste enumeree a chaque tick). Remplace `for HOME_DIR in /home/*/; do ... done` par un simple `"/home"` ajoute directement a `WATCH_DIRS_LIST`.
-
-**Consequence honnete** : les sondes `WAG_010`/`WAZ_053` deviennent des controles **inertes** pour ce cas precis (leur propre calcul produira toujours la meme liste que celle deja posee, donc plus jamais d'ecart a corriger) - conservees par prudence plutot que desinstallees (timers systemd deja deployes, pas de raison de les toucher pour un gain marginal). Documente ici pour que ce ne soit jamais une surprise silencieuse pour un futur lecteur du code.
-
-**Verifie** : `bash -n` propre sur les 4 fichiers. Test reel prevu juste apres (nouvel utilisateur, fichier depose, reponse VirusTotal attendue en quelques secondes au lieu de dependre du prochain tick de sonde).

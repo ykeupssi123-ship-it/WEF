@@ -56,6 +56,30 @@ source "$PROJECT_ROOT/lib/commun.sh"
 # module (pas suivi d'un "Stopping" plus recent) et que wazuh-manager
 # est actif, le module est deja sain - rien a faire, jamais de
 # redemarrage inutile.
+# AJOUTE LE 2026-09-23 (incident reel, wef-elk-core, suite direct au
+# diagnostic ci-dessus mais avec une cause differente : le module
+# demarrait bien, mais ne pouvait produire AUCUNE alerte sur cette
+# infrastructure - "OS scan for platform 'ol' ... is not supported"
+# (Oracle Linux non supporte par le scanner), en plus du manager
+# lui-meme toujours exclu par defaut - tout en telechargeant en continu
+# une base CVE de ~12G qui a fait chuter la marge disque sous le seuil
+# de securite documente ci-dessus). Desactive de maniere reproductible
+# par WAZ_057_VD_DISABLE.sh. Sans cette garde, ce job tenterait de
+# relancer un module VOLONTAIREMENT eteint des qu'il ne trouve pas
+# "module started" comme dernier evenement - gaspille le controle de
+# marge disque et redemarre wazuh-manager pour rien. Verifie directement
+# la config plutot que le journal : plus simple, plus fiable, jamais
+# suppose depuis un pattern de log qui pourrait changer.
+OSSEC_CONF="/var/ossec/etc/ossec.conf"
+if [ -f "$OSSEC_CONF" ]; then
+  VD_STATE="$(sed -n '/<vulnerability-detection>/,/<\/vulnerability-detection>/ s#.*<enabled>\(yes\|no\)</enabled>.*#\1#p' "$OSSEC_CONF" | head -1)"
+  if [ "$VD_STATE" = "no" ]; then
+    echo "[WAZ_044] Vulnerability Detector desactive intentionnellement (voir WAZ_057_VD_DISABLE.sh) - aucune action a mener ici."
+    echo "[WAZ_044] OK (desactivation intentionnelle, rien fait)."
+    exit 0
+  fi
+fi
+
 OSSEC_LOG=/var/ossec/logs/ossec.log
 if systemctl is-active --quiet wazuh-manager 2>/dev/null; then
   DERNIER_EVT_VD="$(grep -E "wm_vulnerability_scanner_stop\(\)|vulnerabilityScannerFacade\.cpp:611 at start\(\)" "$OSSEC_LOG" 2>/dev/null | tail -1)"

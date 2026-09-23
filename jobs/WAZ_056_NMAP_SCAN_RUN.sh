@@ -18,11 +18,12 @@
 # Remplace par le FIM (syscheck) - le SEUL mecanisme de detection
 # externe reellement confirme fonctionner ce soir (dizaines d'alertes
 # reelles rule 550/554 observees en direct). Ce job ecrit desormais le
-# resultat du scan dans /tmp/wef-nmap-scan.log - /tmp est deja surveille
-# en temps reel par WAZ_050 (perimetre FIM du projet) : chaque
-# modification declenche une vraie alerte FIM, que WAZ_055 chaine
-# dessus (if_sid=100100,550,553,554, meme technique deja prouvee par
-# WAZ_051/regle IOC 100200).
+# resultat du scan dans /tmp/wef-nmap-scan-result.txt (voir aussi le
+# correctif du 2026-09-23 plus bas : jamais ".log", exclu par defaut) -
+# /tmp est deja surveille en temps reel par WAZ_050 (perimetre FIM du
+# projet) : chaque modification declenche une vraie alerte FIM (rule
+# 550/554), directement filtrable dans le dashboard via syscheck.path -
+# voir WAZ_055 (v5) pour la conclusion finale (regle custom abandonnee).
 #
 # Effet de bord neutre, attendu et sans consequence : ce fichier sera
 # aussi automatiquement soumis a VirusTotal par l'integration existante

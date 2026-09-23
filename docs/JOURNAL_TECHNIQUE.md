@@ -3104,3 +3104,19 @@ syscheck.path : "/tmp/wef-nmap-scan-result.txt"
 **Piste ouverte, honnete, pas fermee** : la cause racine du chainage `if_sid`-sur-FIM qui ne fonctionne jamais (`100100`/`100200`/`100300`, trois regles independantes, meme symptome) reste a investiguer un autre jour - possiblement une limite reelle de cette version Wazuh, ou une configuration globale non encore identifiee. Ne bloque plus ce playbook, mais reste une dette technique documentee pour le projet (les regles 100100/100200 restent en place, inoffensives mais silencieuses).
 
 **Verifie** : `bash -n` propre. Confirme en conditions reelles sur wef-elk-core : filtre dashboard `syscheck.path` retourne bien les alertes attendues avec le contenu complet du scan.
+
+## 2026-09-23 (suite) - Nouveau job : desactivation reproductible du Vulnerability Detector
+
+**Constate en reel sur wef-elk-core**, en verifiant pourquoi le Vulnerability Detector affichait 0 detection malgre un module "actif" : deux causes structurelles, confirmees par lecture directe d'`ossec.log`, jamais un bug de configuration -
+1. `"Vulnerability scanner in manager still disabled"` - le manager est TOUJOURS exclu du scan par defaut Wazuh (non modifiable).
+2. `"OS scan for platform 'ol' on Agent '002' is not supported."` - Wazuh 4.14.7 ne supporte pas Oracle Linux pour la correspondance paquets/CVE - limite reelle du produit.
+
+Consequence reelle : sur une infrastructure 100% Oracle Linux (WEF entier), ce module ne peut produire AUCUNE alerte, tout en telechargeant en continu une base CVE de ~12G (`/var/ossec/queue/vd`, feed-update-interval 60m) - a fait chuter la marge disque de wef-elk-core de 79% a 7,5G disponibles, sous le seuil de securite de 10G deja documente par `WAZ_044_VD_SAFE_RETRY.sh`.
+
+**Corrige manuellement en direct ce soir** (chattr -i, `<enabled>no</enabled>` dans le bloc `<vulnerability-detection>` UNIQUEMENT - jamais le bloc `<indexer>` juste en dessous qui a lui aussi un `<enabled>yes</enabled>` mais qui doit rester actif -, redemarrage, purge de `/var/ossec/queue/vd`) - **12G recuperes** (7,5G -> 20G disponibles).
+
+**Rendu reproductible** : nouveau `WAZ_057_VD_DISABLE.sh` (`ROLE=ELK_HOST`, `IN_COND=WAZ_MANAGER_UP`) - applique le meme correctif idempotemment (verifie l'etat actuel avant d'agir, jamais suppose), attend une confirmation reelle dans le journal (`"Vulnerability scanner module is disabled."`), purge la base CVE seulement apres confirmation. `WAZ_044_VD_SAFE_RETRY.sh` corrige en parallele : verifie desormais l'etat de configuration AVANT son propre controle base sur le journal - sans cette garde, il aurait tente de relancer un module volontairement eteint a chaque rejeu, gaspillant son controle de marge disque pour rien.
+
+**Piste ouverte, honnete** : si Wazuh supporte un jour Oracle Linux pour ce module, ou si l'infrastructure change de distribution, `WAZ_057` devient obsolete - reactivation manuelle explicite alors, jamais automatique.
+
+**Verifie** : `bash -n` propre sur les 3 fichiers. Audit colonnes `jobs_table.csv` (8/8). Confirme en conditions reelles sur wef-elk-core (correctif deja applique manuellement avant d'ecrire le job - le job reproduit exactement ce qui a ete verifie fonctionner).

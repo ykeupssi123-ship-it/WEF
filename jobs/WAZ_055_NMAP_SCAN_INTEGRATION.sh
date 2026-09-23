@@ -4,24 +4,33 @@
 # AJOUTE LE 2026-09-22 (demande explicite : "je veux qu'on ajoute nmap a
 # wazuh" -> "scan periodique automatique").
 #
-# REFONDU DEUX FOIS LE MEME JOUR (incidents reels sur wef-elk-core,
-# chaque fois diagnostique avant de conclure, jamais suppose corrige) :
-# v1 <localfile><log_format>command</log_format><frequency> - le
-# process nmap s'executait bien mais aucun contenu n'atteignait
-# analysisd (cause non confirmee). v2 <localfile><log_format>syslog</log_format>
-# sur un fichier custom - confirme via wazuh-logtest EN MODE INTERACTIF
-# que Wazuh rejette la ligne des le pre-decodage ("No decoder matched",
-# jamais de Phase 3) : une ligne nmap brute n'a pas l'entete syslog
-# standard attendu par ce format.
+# REFONDU TROIS FOIS LE MEME WEEK-END (incidents reels sur wef-elk-core,
+# chaque fois diagnostique en profondeur avant de conclure) :
+#   v1 : <localfile><log_format>command</log_format><frequency> - le
+#        process nmap s'executait bien mais aucun contenu n'atteignait
+#        jamais analysisd.
+#   v2 : <localfile><log_format>syslog</log_format> sur fichier custom -
+#        confirme via wazuh-logtest interactif : rejete des le
+#        pre-decodage ("No decoder matched"), pas d'entete syslog.
+#   v3 : logger -> journald - MEME echec, et surtout : le canari
+#        preexistant du projet (regle 100101, meme mecanisme, en place
+#        depuis le 2026-08-31) n'a JAMAIS produit d'alerte reelle non
+#        plus une fois verifie (grep alerts.json -> 0), meme apres
+#        chainage if_sid=1002 (rule "unknown problem" catch-all Wazuh).
+#        Conclusion honnete : logcollector/journald n'est pas fiable
+#        dans cet environnement precis, cause exacte non identifiee
+#        avec certitude.
 #
-# v3 (celle-ci) : plus AUCUN <localfile> necessaire. WAZ_056_NMAP_SCAN_RUN.sh
-# (execute par bin/scheduler.sh via schedules.csv) envoie chaque ligne
-# de resultat via "logger -t wef-nmap-scan <ligne>" - le MEME mecanisme
-# deja prouve fiable toute la soiree par le canari (regle 100101,
-# WAZ_041_ALERT_CANARY.sh) : logger ecrit dans le vrai syslog systeme,
-# avec un entete correct, deja surveille et decode par Wazuh par
-# defaut - aucune configuration supplementaire requise. Ce job se
-# limite donc desormais a poser la regle de detection (id 100300).
+# v4 (celle-ci, definitive) : plus AUCUN <localfile>/journald. Le FIM
+# (syscheck) est le SEUL mecanisme de detection externe confirme
+# fonctionner ce soir (dizaines d'alertes reelles observees). Ce job se
+# limite desormais a poser une regle qui CHAINE sur les evenements FIM
+# deja existants (if_sid=100100,550,553,554 - meme technique deja
+# prouvee par WAZ_051/regle IOC 100200) plutot que d'ajouter une
+# nouvelle source de log. WAZ_056_NMAP_SCAN_RUN.sh ecrit le resultat du
+# scan dans /tmp/wef-nmap-scan.log - /tmp est deja dans le perimetre FIM
+# du projet (WAZ_050) - aucune configuration ossec.conf supplementaire
+# requise ici.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -55,9 +64,6 @@ if grep -qF "$MARKER" "$OSSEC_CONF" 2>/dev/null; then
   chown root:wazuh "$OSSEC_CONF"
   chmod 640 "$OSSEC_CONF"
   chattr +i "$OSSEC_CONF"
-  RESTART_NEEDED=1
-else
-  RESTART_NEEDED=0
 fi
 
 RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
@@ -67,11 +73,12 @@ if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   echo "[WAZ_055_NMAP_SCAN_INTEGRATION] Regle nmap deja posee, retrait avant reecriture..."
   sed -i "\|^${MARKER_RULE//\//\\/}\$|,\|^<!-- WEF_NMAP_SCAN_RULE_END -->\$|d" "$RULES_FILE"
 fi
-echo "[WAZ_055_NMAP_SCAN_INTEGRATION] Ajout de la regle de detection (id 100300)..."
+echo "[WAZ_055_NMAP_SCAN_INTEGRATION] Ajout de la regle de detection (id 100300, chainee sur les evenements FIM)..."
 {
   echo "$MARKER_RULE"
   echo "<group name=\"nmap_scan,\">"
   echo "  <rule id=\"100300\" level=\"5\">"
+  echo "    <if_sid>100100,550,553,554</if_sid>"
   echo "    <match>Ports: .*open</match>"
   echo "    <description>Scan reseau (nmap) : port(s) ouvert(s) detecte(s) sur le sous-reseau de la Forge</description>"
   echo "    <group>nmap_scan,</group>"
@@ -89,5 +96,5 @@ if ! wait_for_service_active wazuh-manager 180 5; then
   exit 1
 fi
 
-echo "[WAZ_055_NMAP_SCAN_INTEGRATION] OK. WAZ_056_NMAP_SCAN_RUN (planifie via schedules.csv) envoie chaque ligne de scan via logger -t wef-nmap-scan ; tout port ouvert detecte declenche la regle 100300 (recherche : rule.id : 100300)."
+echo "[WAZ_055_NMAP_SCAN_INTEGRATION] OK. WAZ_056_NMAP_SCAN_RUN (planifie via schedules.csv) ecrit dans /tmp/wef-nmap-scan.log (deja surveille par le FIM) ; tout port ouvert detecte declenche la regle 100300 (recherche : rule.id : 100300)."
 exit 0

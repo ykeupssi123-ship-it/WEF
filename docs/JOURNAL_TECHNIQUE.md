@@ -3057,3 +3057,17 @@ Verifie reellement (harnais `/tmp`, pas juste relu) : rejeu reussi (marqueur raf
 **Lecon retenue** (troisieme fois ce soir sur ce meme sujet) : ne jamais faire confiance a un mecanisme Wazuh non deja verifie dans CET environnement precis, meme documente comme standard - toujours preferer un mecanisme deja PROUVE fonctionner ici (canari/logger) plutot qu'une nouvelle construction, meme plausible sur le papier.
 
 **Verifie** : `bash -n` propre sur les 2 scripts. Audit colonnes `jobs_table.csv` (8/8, 2 virgules non echappees dans les DESC trouvees et corrigees avant commit - meme classe de bug que l'entree precedente). Jamais encore confirme en conditions reelles a l'instant de cette entree - a confirmer par rejeu de WAZ_055 + WAZ_056 sur wef-elk-core.
+
+## 2026-09-23 - PB-009, 4e et derniere refonte : abandon complet de logcollector/journald, chainage FIM
+
+**Constate en reel, confirmation definitive** : meme le canari preexistant du projet (regle 100101, mecanisme `logger`/`journald`, en place et suppose fiable depuis le 2026-08-31) n'a **jamais** produit d'alerte reelle une fois verifie (`grep '"id":"100101"' alerts.json` -> 0), meme apres reparation complete de `local_rules.xml` et ajout d'un chainage `<if_sid>1002</if_sid>` (regle Wazuh native "Unknown problem", cense capter tout evenement non decode). `wazuh-logtest` lui-meme ne depasse jamais "Phase 2 : No decoder matched" pour ces sources, meme en mode interactif - outil juge non concluant pour ce cas precis. Tous les demons Wazuh confirmes actifs (`wazuh-control status`) - pas un service plante, cause plus profonde non identifiee avec certitude malgre un diagnostic approfondi (4 mecanismes testes : command, syslog-fichier, journald-nu, journald+if_sid=1002).
+
+**Decision finale, honnete** : abandon complet de toute voie passant par `logcollector`/`journald` pour ce besoin. Reconstruction autour du **seul mecanisme de detection externe confirme fonctionner ce soir** : le FIM (`syscheck`), avec des dizaines d'alertes reelles observees en direct (VirusTotal, modifications de fichiers du depot).
+
+**`WAZ_056_NMAP_SCAN_RUN.sh`** ecrit desormais le resultat du scan dans `/tmp/wef-nmap-scan.log` - `/tmp` deja dans le perimetre FIM du projet (`WAZ_050`), aucune config supplementaire. **`WAZ_055_NMAP_SCAN_INTEGRATION.sh`** pose la regle 100300 chainee sur `<if_sid>100100,550,553,554</if_sid>` (meme technique deja conçue et documentee par `WAZ_051`/regle IOC 100200, elle-meme deduite du comportement reel confirme de la regle 100100 - la VirusTotal integration fonctionne bel et bien via ce chainage exact, confirmee par de vrais resultats dashboard plus tot ce soir).
+
+**Effet de bord attendu et documente** : le fichier de scan sera aussi automatiquement soumis a VirusTotal par l'integration existante (perimetre `/tmp`) - resultat "aucun positif", sans consequence.
+
+**Lecon retenue, la plus importante de cette session** : ne jamais faire confiance a un mecanisme Wazuh non deja verifie EMPIRIQUEMENT dans cet environnement precis, meme documente comme standard, meme deja present et suppose fonctionner ailleurs dans le projet depuis des semaines - toujours preferer un mecanisme deja PROUVE ici, par une vraie alerte deja vue dans le dashboard.
+
+**Verifie** : `bash -n` propre sur les 2 scripts. Audit colonnes `jobs_table.csv` (8/8). Jamais encore confirme en conditions reelles sur wef-elk-core a l'instant de cette entree - a confirmer par rejeu de WAZ_055 + WAZ_056.

@@ -3165,3 +3165,42 @@ Agent confirme `Active` cote manager (`agent_control -l`, ID 003, `wef-agent-win
 - Le `ossec.conf` par defaut de cet agent exclut deja `.log$|.htm$|.jpg$|.png$|.chm$|.pnf$|.evtx$` - meme piege que celui trouve ce soir cote Linux (`.log$`), deja documente en tete du job pour un futur test.
 
 **Verifie** : parseur PowerShell propre sur `WAW_007.ps1`. CSV verifie via `Import-Csv` (parseur RFC4180 reel de PowerShell, contrairement au split naif `IFS=','` cote bash). Jamais encore execute en reel sur la machine physique a l'instant de cette entree.
+
+## 2026-09-24 - Travail autonome (operateur absent) : bruit + Filebeat/Metricbeat Windows
+
+**Contexte** : operateur parti se coucher, a demande un travail autonome sur trois fronts (filtrage du bruit routinier, alignement complet du kit agent Windows, avancement Filebeat/Metricbeat Windows). Limite honnete posee des le depart et respectee tout du long : **aucun acces direct a VM1/VM2 cette nuit** (toute interaction avec ces machines, toute la soiree, est passee par des copier-coller de l'operateur) - tout ce qui suit concernant VM1 est donc PREPARE et POUSSE sur GitHub, jamais EXECUTE en reel sur cette machine.
+
+### 1. Filtrage du bruit routinier - nouveau `WAZ_058_NOISE_REDUCTION.sh`
+
+Constate en reel plus tot dans la soiree (captures dashboard) : la regle `80730` ("Auditd: SELinux permission check", niveau 3) se declenche en continu (toutes les 3 a 30 secondes) sur wef-elk-core ET vm2-beats-wazuh-agent simultanement - volume bien superieur a un controle SCA periodique normal.
+
+**Technique retenue** (standard Wazuh, documentee) : jamais editer un fichier de regles vendor - une regle LOCALE chainee via `<if_sid>80730</if_sid>` avec `<level>0</level>` (niveau 0 = jamais stocke comme alerte, mais l'evenement reste traite normalement par ailleurs). Nouveau job `WAZ_058_NOISE_REDUCTION.sh` (`ROLE=ELK_HOST`, id de regle **100301**, confirme libre par grep avant ecriture), idempotent (marqueur, retrait avant reecriture a chaque rejeu).
+
+**Honnetete explicite, ecrite dans le job lui-meme** : la cause EXACTE de la frequence elevee de 80730 n'a jamais ete diagnostiquee (pas d'acces au contenu reel de l'alerte cette nuit) - ce job traite le SYMPTOME (volume d'alertes stockees), pas necessairement la cause. Le job affiche lui-meme, a la fin de son execution, le plan de verification obligatoire (rule.id:100301 doit apparaitre, rule.id:80730 doit cesser d'apparaitre APRES le redemarrage) - **jamais confirme en conditions reelles a l'ecriture de ce job**, a verifier au reveil.
+
+**A lancer, sur VM1** :
+```
+$APP_BIN/order.sh WAZ_058_NOISE_REDUCTION "premier deploiement, filtrage bruit 80730"
+```
+
+### 2. Kit agent Windows - alignement complet
+
+Relecture complete de tous les fichiers `jobs_windows/` (`WAW_001-007`, `FBW_001-007`, `MBW_001-007`, `orchestrator_windows.ps1`, `env.ps1`, `vars.ps1`, `wef_profile_functions.ps1`, `bin/monitor.ps1`, `bin/summary.ps1`) - structure et conventions deja coherentes (sysout par job deja corrige plus tot dans la soiree), aucune incoherence supplementaire trouvee a la relecture.
+
+### 3. Filebeat/Metricbeat Windows - avance jusqu'a la limite reelle, jamais force au-dela
+
+**Blocage reel trouve, confirme methodiquement** (jamais suppose) : `FBW_001`/`MBW_001` (test de connectivite vers Logstash, port 5044) echouent - port injoignable depuis la machine physique. Diagnostic pousse plus loin avant de conclure : le pare-feu Windows local est **desactive sur les 3 profils** (`Get-NetFirewallProfile` - Domain/Private/Public tous `Enabled: False`) - **le blocage ne vient donc pas de cette machine**, forcement de VM1 (Logstash a l'arret, ou son propre pare-feu/firewalld).
+
+**Impossible a diagnostiquer davantage cette nuit** (aucun acces a VM1). Commandes de diagnostic pretes pour le reveil, sur VM1 :
+```bash
+systemctl status logstash
+ss -tlnp | grep 5044
+firewall-cmd --list-ports 2>/dev/null || iptables -L -n | grep 5044
+journalctl -u logstash -n 50 --no-pager
+```
+
+**`jobs_windows\vars.ps1` remis a `$EnabledComponents = @("WAZUH_AGENT")`** (seul composant reellement confirme fonctionnel) - repasser a `FILEBEAT`/`METRICBEAT` une fois le port 5044 confirme ouvert ET `factory_ca.crt` recupere depuis VM1 (deuxieme prealable deja documente, jamais reuni non plus cette nuit).
+
+**Aucune installation de service tentee** : `msiexec`/l'enregistrement de service Windows exige une session PowerShell elevee - la session de cette nuit ne l'etait pas (aucun operateur present pour valider l'invite UAC), jamais force ni contourne.
+
+**Verifie** : `bash -n` propre sur `WAZ_058_NOISE_REDUCTION.sh`. Audit colonnes `jobs_table.csv` (8/8). ID de regle 100301 confirme unique par grep avant ecriture. Connectivite port 5044 testee deux fois (reproductible). Pare-feu Windows confirme desactive sur les 3 profils (Get-NetFirewallProfile, sortie reelle).

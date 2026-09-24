@@ -4,6 +4,17 @@ state/*
 logs/*
 !logs/.gitkeep
 
+# AJOUTE LE 2026-09-24 (trouve en verifiant l'alignement du kit Windows) :
+# un motif avec un "/" au milieu ("state/*") est ANCRE A LA RACINE du
+# depot en gitignore - jamais recursif automatiquement dans un
+# sous-dossier comme jobs_windows/. Sans ces lignes explicites, l'etat/
+# les logs/le MSI telecharge du kit Windows auraient fini par etre
+# commites par erreur au premier "git add -A" ou equivalent.
+jobs_windows/state/*
+jobs_windows/logs/*
+jobs_windows/*.msi
+jobs_windows/*.zip
+
 # Secrets generes a l'execution - jamais versionnes (voir secrets/README_SECRETS.txt)
 secrets/*
 !secrets/README_SECRETS.txt

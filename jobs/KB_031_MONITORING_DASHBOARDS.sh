@@ -63,7 +63,7 @@ cat > "${WORKDIR}/viz-cpu.json" << 'JSONEOF'
     "uiStateJSON": "{}",
     "description": "Charge CPU normalisee, une courbe par machine.",
     "kibanaSavedObjectMeta": {
-      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: metricbeat\",\"language\":\"kuery\"},\"filter\":[]}"
+      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: metricbeat\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSourceJSON.index\"}"
     }
   }
 }
@@ -77,7 +77,7 @@ cat > "${WORKDIR}/viz-memory.json" << 'JSONEOF'
     "uiStateJSON": "{}",
     "description": "Pourcentage de RAM reellement utilisee, une courbe par machine.",
     "kibanaSavedObjectMeta": {
-      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: metricbeat and metricset.name: memory\",\"language\":\"kuery\"},\"filter\":[]}"
+      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: metricbeat and metricset.name: memory\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSourceJSON.index\"}"
     }
   }
 }
@@ -91,7 +91,7 @@ cat > "${WORKDIR}/viz-network.json" << 'JSONEOF'
     "uiStateJSON": "{}",
     "description": "Trafic entrant/sortant cumule, une courbe par interface reseau.",
     "kibanaSavedObjectMeta": {
-      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: metricbeat and metricset.name: network\",\"language\":\"kuery\"},\"filter\":[]}"
+      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: metricbeat and metricset.name: network\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSourceJSON.index\"}"
     }
   }
 }
@@ -109,7 +109,7 @@ cat > "${WORKDIR}/viz-events-host.json" << 'JSONEOF'
     "uiStateJSON": "{}",
     "description": "Volume de lignes de log collectees, empile par machine.",
     "kibanaSavedObjectMeta": {
-      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: filebeat\",\"language\":\"kuery\"},\"filter\":[]}"
+      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: filebeat\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSourceJSON.index\"}"
     }
   }
 }
@@ -123,7 +123,7 @@ cat > "${WORKDIR}/viz-events-source.json" << 'JSONEOF'
     "uiStateJSON": "{}",
     "description": "Part de chaque fichier/journal source dans le volume total Filebeat.",
     "kibanaSavedObjectMeta": {
-      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: filebeat\",\"language\":\"kuery\"},\"filter\":[]}"
+      "searchSourceJSON": "{\"query\":{\"query\":\"agent.type: filebeat\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSourceJSON.index\"}"
     }
   }
 }

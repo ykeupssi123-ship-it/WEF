@@ -41,18 +41,46 @@ echo "[LS_008] Ouverture des ports agent Wazuh (${WAZ_AGENT_PORT}/${WAZ_ENROLL_P
 firewall-cmd --permanent --zone=CollectZone --add-port=${WAZ_AGENT_PORT}/tcp
 firewall-cmd --permanent --zone=CollectZone --add-port=${WAZ_ENROLL_PORT}/tcp
 firewall-cmd --permanent --zone=CollectZone --add-port=22/tcp
-if [ -n "${BEATS_HOST_IP:-}" ]; then
-  echo "[LS_008] Nettoyage des sources CollectZone perimees (differentes de ${BEATS_HOST_IP})..."
+# ETENDU LE 2026-09-24 (incident reel, wef-elk-core : port 5044
+# injoignable depuis la machine Windows physique de l'operateur, alors
+# que 1514/1515 fonctionnaient - le kit Windows, jobs_windows/, n'existait
+# pas quand ce job a ete ecrit, aucune IP Windows n'avait jamais ete
+# anticipee). BEATS_HOST_IP (une seule IP figee) devient l'ensemble
+# BEATS_HOST_IP + BEATS_EXTRA_SOURCES (vars.conf, liste separee par des
+# virgules) - MEME discipline de nettoyage deja prouvee necessaire le
+# 2026-08-31 (une source permanente jamais retiree automatiquement),
+# desormais appliquee a un ENSEMBLE plutot qu'une seule valeur : toute
+# source CollectZone deja permanente et absente de cet ensemble est
+# retiree, jamais un residu silencieux.
+DESIRED_SOURCES=()
+[ -n "${BEATS_HOST_IP:-}" ] && DESIRED_SOURCES+=("${BEATS_HOST_IP}/32")
+if [ -n "${BEATS_EXTRA_SOURCES:-}" ]; then
+  IFS=',' read -ra EXTRA_LIST <<< "$BEATS_EXTRA_SOURCES"
+  for IP in "${EXTRA_LIST[@]}"; do
+    IP="$(echo "$IP" | xargs)"
+    [ -n "$IP" ] && DESIRED_SOURCES+=("${IP}/32")
+  done
+fi
+
+if [ "${#DESIRED_SOURCES[@]}" -gt 0 ]; then
+  echo "[LS_008] Sources CollectZone souhaitees : ${DESIRED_SOURCES[*]}"
+  echo "[LS_008] Nettoyage des sources CollectZone perimees (absentes de cet ensemble)..."
   for SRC in $(firewall-cmd --permanent --zone=CollectZone --list-sources 2>/dev/null); do
-    if [ "$SRC" != "${BEATS_HOST_IP}/32" ]; then
+    KEEP=0
+    for WANTED in "${DESIRED_SOURCES[@]}"; do
+      [ "$SRC" = "$WANTED" ] && KEEP=1
+    done
+    if [ "$KEEP" -eq 0 ]; then
       echo "[LS_008]   Retrait de la source perimee ${SRC}..."
       firewall-cmd --permanent --zone=CollectZone --remove-source="$SRC"
     fi
   done
-  echo "[LS_008] Restriction de la source a BEATS_HOST_IP=${BEATS_HOST_IP}..."
-  firewall-cmd --permanent --zone=CollectZone --add-source=${BEATS_HOST_IP}/32
+  for WANTED in "${DESIRED_SOURCES[@]}"; do
+    echo "[LS_008] Autorisation de la source ${WANTED}..."
+    firewall-cmd --permanent --zone=CollectZone --add-source="$WANTED"
+  done
 else
-  echo "[LS_008] ATTENTION : BEATS_HOST_IP vide, le port reste ouvert a toute la zone CollectZone."
+  echo "[LS_008] ATTENTION : BEATS_HOST_IP et BEATS_EXTRA_SOURCES vides, le port reste ouvert a toute la zone CollectZone."
 fi
 firewall-cmd --reload
 echo "[LS_008] OK."

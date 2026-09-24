@@ -3204,3 +3204,18 @@ journalctl -u logstash -n 50 --no-pager
 **Aucune installation de service tentee** : `msiexec`/l'enregistrement de service Windows exige une session PowerShell elevee - la session de cette nuit ne l'etait pas (aucun operateur present pour valider l'invite UAC), jamais force ni contourne.
 
 **Verifie** : `bash -n` propre sur `WAZ_058_NOISE_REDUCTION.sh`. Audit colonnes `jobs_table.csv` (8/8). ID de regle 100301 confirme unique par grep avant ecriture. Connectivite port 5044 testee deux fois (reproductible). Pare-feu Windows confirme desactive sur les 3 profils (Get-NetFirewallProfile, sortie reelle).
+
+## 2026-09-24 (suite) - Cause exacte trouvee : port 5044 restreint a VM2 uniquement
+
+**Constate en reel sur wef-elk-core** (operateur reveille, verifie lui-meme) : `systemctl status logstash` confirme le service actif depuis 4 jours, `ss -tlnp | grep 5044` confirme une vraie ecoute sur `*:5044` - Logstash n'a jamais ete a l'arret, contrairement a l'hypothese posee cette nuit faute d'acces a la machine.
+
+**Cause exacte trouvee par lecture directe du code** (`LS_008.sh`) : le port 5044 est ouvert dans une zone firewalld dediee (`CollectZone`), **restreinte a la seule source `BEATS_HOST_IP` (192.168.50.130, VM2)** - `firewall-cmd --list-ports` (zone `public` par defaut) ne montre jamais ce port, puisque firewalld fait correspondre une source AVANT une interface (deja documente dans l'en-tete de `LS_008.sh` depuis le 31 aout) : tout trafic hors de cette IP precise tombe dans `public`, qui n'a jamais eu 5044 d'ouvert. Le kit Windows (`jobs_windows/`) n'existait pas quand `LS_008` a ete ecrit - aucune IP Windows n'avait jamais ete anticipee comme source legitime.
+
+**Corrige** : `BEATS_HOST_IP` (une seule IP figee) devient l'ensemble `BEATS_HOST_IP` + `BEATS_EXTRA_SOURCES` (nouvelle variable `vars.conf`, liste separee par des virgules, valeur initiale `192.168.50.1` - IP reelle de la machine physique de l'operateur, confirmee dans les alertes VirusTotal de cette nuit). `LS_008.sh` applique desormais la MEME discipline de nettoyage deja prouvee necessaire le 31 aout (aucune source permanente residuelle) a un ENSEMBLE plutot qu'une valeur unique - jamais un second job cree pour eviter de dupliquer cette logique de nettoyage deja etablie (risque reel : reintroduire la classe de bug deja corrigee si une IP change plus tard sans passer par le meme nettoyage).
+
+**A lancer, sur VM1** :
+```
+$APP_BIN/order.sh LS_008 "extension CollectZone a la machine Windows physique"
+```
+
+**Verifie** : `bash -n` propre. Jamais encore rejoue en conditions reelles a l'instant de cette entree - a confirmer par un test Filebeat reel une fois rejoue (port 5044 doit devenir joignable depuis la machine Windows physique, deja confirme injoignable cette nuit).

@@ -1,46 +1,35 @@
 #!/bin/bash
 # WAZ_037_CONVERGENT_TEST - WEF_WAZ_RUN_INJECTCNVRGN
-# Injecte une alerte reelle et verifie qu'elle ressort bien cote
-# Elasticsearch/Kibana (preuve que le mode convergent route correctement).
+# Verifie que le mode convergent route reellement les alertes Wazuh vers
+# Elasticsearch/Kibana - preuve par FRAICHEUR (une alerte plus recente
+# que le demarrage du test doit apparaitre), jamais par injection
+# synthetique.
 #
-# REECRIT EN ENTIER LE 2026-08-31 - l'ancienne version injectait un
-# simple "logger" generique puis cherchait dans un index "wazuh-alerts-*"
-# qui n'existait meme pas cote Elasticsearch sous l'ancien mecanisme
-# <syslog_output> (celui-ci alimentait "log-*", jamais "wazuh-alerts-*") -
-# le test ne pouvait donc jamais reellement passer, seulement produire un
-# AVERTISSEMENT tolerant (jamais un echec dur, jamais remarque). Corrige
-# avec le meme constat, la meme solution, que le canari WAZ_041
-# (2026-08-31, meme jour) : un "logger" generique ne genere aucune
-# alerte Wazuh persistee (log_alert_level=3, aucune regle par defaut ne
-# correspond) - reutilise ici la regle dediee id=100101 (WEF_CANARY_TEST,
-# posee idempotemment si absente) et interroge desormais le VRAI index
-# cible du nouveau pipeline (WAZ_035_MODE_CONVERGENT.sh) : wazuh-alerts-4.x-*
-# cote Elasticsearch.
+# REECRIT LE 2026-09-24 (incident reel, wef-elk-core) : la version
+# precedente (canari "logger" + regle dediee id=100101, elle-meme
+# reecrite le 2026-08-31 pour la meme raison) donnait un FAUX NEGATIF -
+# confirme en direct : "grep -c WEF_CANARY_TEST alerts.json" = 0, la
+# regle 100101 ne s'est jamais declenchee (meme constat deja documente
+# dans l'en-tete de WAZ_055_NMAP_SCAN_INTEGRATION.sh, v3 abandonnee, le
+# jour meme). Pendant ce temps, wazuh-alerts-4.x-2026.09.24 contenait
+# deja 11888 documents reels et le pipeline Logstash "wazuh-alerts"
+# tournait sans erreur - le routage convergent fonctionnait en realite,
+# seul le mecanisme de test etait casse. Plutot que de reparer une
+# troisieme fois un canari synthetique fragile (meme lecon que
+# l'abandon des regles custom pour nmap, WAZ_055 v4->v5), ce test
+# n'injecte plus rien : il verifie qu'une alerte PLUS RECENTE que son
+# propre demarrage apparait - le flux d'evenements FIM/syscheck reel de
+# la Forge (verifie tres actif dans les logs : plusieurs evenements par
+# seconde) suffit amplement, sans dependre d'une regle custom qui peut
+# se re-casser silencieusement.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
 source "$PROJECT_ROOT/lib/commun.sh"
 source "$PROJECT_ROOT/jobs/lib/es_admin_curl.sh"
 
-RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
-if ! grep -q 'id="100101"' "$RULES_FILE" 2>/dev/null; then
-  echo "[WAZ_037_CONVERGENT_TEST] Pose de la regle dediee au canari (id 100101, niveau 3, absente a ce stade de la chaine)..."
-  # CORRIGE LE 2026-09-22 (incident reel, wef-elk-core - voir
-  # WAZ_041_ALERT_CANARY.sh pour le detail complet du meme bug) : sed
-  # sans ancrage remplace le PREMIER </group> du fichier (celui de la
-  # regle vendor 100001), corrompant la structure XML. '$s#...#' =
-  # derniere ligne uniquement, identique au correctif de WAZ_025.sh.
-  sed -i '$s#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
-  systemctl restart wazuh-manager 2>/dev/null || true
-  if ! wait_for_service_active wazuh-manager 120 5; then
-    echo "[WAZ_037_CONVERGENT_TEST] ERREUR : wazuh-manager n'a pas redemarre proprement apres la pose de la regle du canari." >&2
-    exit 1
-  fi
-fi
-
-CANARY_ID="$(date +%s)-$$-convergent"
-echo "[WAZ_037_CONVERGENT_TEST] Injection d'une alerte de test reelle (id=${CANARY_ID})..."
-logger -t wazuh-canary-test "WEF_CANARY_TEST id=${CANARY_ID} - test de bascule convergente, ignorer"
+TEST_START_ISO="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+echo "[WAZ_037_CONVERGENT_TEST] Recherche d'une alerte plus recente que ${TEST_START_ISO} (preuve de fraicheur, sans injection)..."
 
 # CORRIGE LE 2026-08-31 (premier test en direct de la bascule reelle) :
 # un simple "sleep 30" fixe suivi d'un seul essai echouait de facon
@@ -64,20 +53,28 @@ logger -t wazuh-canary-test "WEF_CANARY_TEST id=${CANARY_ID} - test de bascule c
 # alloues ici. Remonte a 480s (8 min) par prudence, marge reelle sur le
 # pire cas observe.
 WAZ_CONVERGENT_TEST_TIMEOUT_SEC="${WAZ_CONVERGENT_TEST_TIMEOUT_SEC:-480}"
-echo "[WAZ_037_CONVERGENT_TEST] Verification presence dans Elasticsearch (wazuh-alerts-4.x-*, jusqu'a ${WAZ_CONVERGENT_TEST_TIMEOUT_SEC}s)..."
+echo "[WAZ_037_CONVERGENT_TEST] Sondage de wazuh-alerts-4.x-* (jusqu'a ${WAZ_CONVERGENT_TEST_TIMEOUT_SEC}s)..."
 FOUND=0
+QUERY_BODY="{\"query\":{\"range\":{\"@timestamp\":{\"gt\":\"${TEST_START_ISO}\"}}}}"
 for i in $(seq 1 $((WAZ_CONVERGENT_TEST_TIMEOUT_SEC / 10))); do
   sleep 10
-  RESULT=$(es_admin_curl "https://127.0.0.1:${ES_PORT}/wazuh-alerts-4.x-*/_search?q=WEF_CANARY_TEST+AND+${CANARY_ID}" 2>/dev/null || echo "")
-  if echo "$RESULT" | grep -q "${CANARY_ID}"; then
+  COUNT=$(es_admin_curl -X GET "https://127.0.0.1:${ES_PORT}/wazuh-alerts-4.x-*/_count" \
+    -H "Content-Type: application/json" -d "$QUERY_BODY" 2>/dev/null \
+    | python3 -c "import json,sys
+try:
+    print(json.load(sys.stdin).get('count', 0))
+except Exception:
+    print(0)" 2>/dev/null || echo 0)
+  if [ "${COUNT:-0}" -gt 0 ] 2>/dev/null; then
     FOUND=1
+    echo "[WAZ_037_CONVERGENT_TEST] ${COUNT} alerte(s) plus recente(s) que ${TEST_START_ISO} trouvee(s)."
     break
   fi
 done
 if [ "$FOUND" -eq 1 ]; then
-  echo "[WAZ_037_CONVERGENT_TEST] Alerte retrouvee dans Elasticsearch. Mode convergent valide de bout en bout."
+  echo "[WAZ_037_CONVERGENT_TEST] Mode convergent valide de bout en bout (alertes reelles, aucune injection)."
 else
-  echo "[WAZ_037_CONVERGENT_TEST] ERREUR : alerte introuvable dans Elasticsearch apres ${WAZ_CONVERGENT_TEST_TIMEOUT_SEC}s - le routage convergent ne fonctionne pas." >&2
+  echo "[WAZ_037_CONVERGENT_TEST] ERREUR : aucune alerte plus recente que ${TEST_START_ISO} apres ${WAZ_CONVERGENT_TEST_TIMEOUT_SEC}s - le routage convergent ne fonctionne pas (ou aucune activite FIM/syscheck reelle sur cette fenetre)." >&2
   exit 1
 fi
 echo "[WAZ_037_CONVERGENT_TEST] OK."

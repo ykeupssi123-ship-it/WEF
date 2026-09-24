@@ -52,6 +52,27 @@ firewall-cmd --permanent --zone=CollectZone --add-port=22/tcp
 # desormais appliquee a un ENSEMBLE plutot qu'une seule valeur : toute
 # source CollectZone deja permanente et absente de cet ensemble est
 # retiree, jamais un residu silencieux.
+#
+# CORRIGE LE 2026-09-24 (meme jour, incident reel decouvert en direct :
+# des l'instant ou la machine Windows physique de l'operateur a ete
+# ajoutee comme source CollectZone ci-dessus, Kibana (5601) ET le
+# Wazuh Dashboard (443) sont devenus injoignables - ERR_CONNECTION_TIMED_OUT
+# - depuis CETTE MEME machine, confirme deux fois par l'operateur).
+# MEME cause que le "angle mort" documente au 2026-08-31 juste au-dessus :
+# une source CollectZone perd tout acces a "public", y compris pour les
+# ports que "public" ouvre deja (KB_PORT/WAZ_DASH_PORT). Cette machine
+# joue un role double - agent Beats/Wazuh (a besoin de CollectZone) ET
+# poste de l'operateur qui navigue sur les dashboards (a besoin de
+# public) - un role que LS_008 n'avait pas anticipe en ne portant que
+# les ports d'un AGENT_HOST pur. CollectZone doit donc aussi porter les
+# ports de consultation navigateur pour rester complete, jamais juste
+# les ports agent. Ports serveur-a-serveur de "public" (indexer 9200/
+# 9300, API Wazuh 55000, etc.) volontairement PAS repris ici : jamais
+# utilises par un navigateur, aucune preuve qu'ils soient necessaires a
+# cette source - ajoutes seulement le jour ou un besoin reel apparait.
+echo "[LS_008] Ouverture des ports dashboard (Kibana ${KB_PORT}, Wazuh Dashboard ${WAZ_DASH_PORT}) sur CollectZone..."
+firewall-cmd --permanent --zone=CollectZone --add-port=${KB_PORT}/tcp
+firewall-cmd --permanent --zone=CollectZone --add-port=${WAZ_DASH_PORT}/tcp
 DESIRED_SOURCES=()
 [ -n "${BEATS_HOST_IP:-}" ] && DESIRED_SOURCES+=("${BEATS_HOST_IP}/32")
 if [ -n "${BEATS_EXTRA_SOURCES:-}" ]; then

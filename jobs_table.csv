@@ -150,6 +150,7 @@ KB_027,WEF_KB_BLD_LOGROT,ELK_HOST,ALWAYS,KB_027.sh,Contrôle Traces : Alignement
 LS_036_FINAL,WEF_LS_BLD_IMMTBLRULES,ELK_HOST,ALWAYS,LS_036_FINAL.sh,Sûreté Logstash : Passage des règles de filtrage en mode immuable,KB_ROTATE_OK,LS_RULES_LOCKED
 KB_028_FINAL,WEF_KB_BLD_LOCKCONF,ELK_HOST,ALWAYS,KB_028_FINAL.sh,Sûreté Kibana : Scellage complet de la matrice et de ses structures de rendu,LS_RULES_LOCKED,KB_CONF_LOCKED
 KB_029,WEF_KB_RUN_GTEOPEN,ELK_HOST,ALWAYS,KB_029.sh,Vanne Maîtresse : Émission du signal de disponibilité du Hub,KB_CONF_LOCKED,KIBANA_HUB_ONLINE
+KB_030_GENERIC_LOG_DATAVIEW,WEF_KB_RUN_LOGDATAVIEW,ELK_HOST,ALWAYS,KB_030_GENERIC_LOG_DATAVIEW.sh,Data view Kibana pour l'index generique catch-all (Filebeat/Metricbeat hors scenario metier),KIBANA_HUB_ONLINE,KB_LOG_DATAVIEW_OK
 INFRA_006_AGENT_RESOURCE_CHECK,WEF_INFRA_BLD_MINRESVERIFY,AGENT_HOST,ALWAYS,INFRA_006_AGENT_RESOURCE_CHECK.sh,Contrôle Capacitaire : Vérification des ressources minimales avant toute installation (VM2/agents),NONE,AGENT_RESOURCES_OK
 INFRA_008_NTP_CLIENT,WEF_INFRA_BLD_NTPCLI,AGENT_HOST,ALWAYS,INFRA_008_NTP_CLIENT.sh,Synchronisation chrony sur VM1 evite un decalage silencieux avec les timestamps Kibana,AGENT_RESOURCES_OK,NTP_CLIENT_OK
 FB_001,WEF_FB_BLD_OSPREP,AGENT_HOST,FILEBEAT,FB_001.sh,Terrassement : Alignement OS Oracle Linux 8.10 pour Filebeat,AGENT_RESOURCES_OK,FB_OS_READY

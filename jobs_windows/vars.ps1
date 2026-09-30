@@ -23,7 +23,7 @@ $LS_BEATS_PORT = 5044
 # Nom donne a CETTE machine - DOIT ETRE UNIQUE par machine. Changez
 # cette valeur avant chaque nouveau deploiement (une machine Windows =
 # une copie de ce dossier avec son propre AGENT_NAME).
-$AGENT_NAME = "agent-windows-01"
+$AGENT_NAME = "wef-agent-windows-physique"
 
 # ---------------------------------------------------------------------
 # QUELS COMPOSANTS DEPLOYER SUR CETTE MACHINE : une machine Windows ne
@@ -34,6 +34,12 @@ $AGENT_NAME = "agent-windows-01"
 #   FILEBEAT    -> logs (Journal des evenements Windows -> Logstash, port 5044)
 #   METRICBEAT  -> metriques systeme (CPU/RAM/disque/reseau -> Logstash, port 5044)
 # ---------------------------------------------------------------------
+# CORRIGE LE 2026-09-24 : les deux prealables bloquants sont desormais
+# reunis - (1) port 5044 ouvert cote VM1 pour cette machine (LS_008.sh
+# etendu, BEATS_EXTRA_SOURCES) - confirme reel (Test-NetConnection ->
+# TcpTestSucceeded True). (2) factory_ca.crt recupere depuis VM1 (scp)
+# et confirme present a $PKI_CA_LOCAL_PATH. Les 3 composants peuvent
+# desormais tourner sur cette machine.
 $EnabledComponents = @("WAZUH_AGENT", "FILEBEAT", "METRICBEAT")
 
 # ---------------------------------------------------------------------

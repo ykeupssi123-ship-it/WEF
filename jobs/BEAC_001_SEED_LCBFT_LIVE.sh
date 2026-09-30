@@ -28,6 +28,15 @@
 # doivent avoir ete (re)joues avec le code du 2026-09-13 pour que
 # Logstash reconnaisse et route ces evenements (voir
 # docs/GUIDE_EXPLOITATION.md, section scenario BEAC).
+#
+# ROLE JOUE PAR CE JOB (precise le 2026-09-30, a expliciter a la
+# soutenance, jamais cache) : ce job simule la fonction d'un logiciel de
+# detection de fraude comparable a SIRON/AML (outil reel de surveillance
+# transactionnelle bancaire, jamais installe ici) - il "traite" un flux
+# de transactions et en "detecte" certaines comme suspectes selon des
+# regles metier (seuils, zones a risque, comportements atypiques).
+# Kibana ne fait qu'INTERROGER ce que ce job a deja qualifie - il n'est
+# jamais lui-meme un moteur de detection.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"

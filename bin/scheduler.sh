@@ -42,6 +42,7 @@ source "$HERE/lib/commun.sh"
 source "$HERE/lib/run_job.sh"
 source "$HERE/lib/lock.sh"
 source "$HERE/lib/cron_match.sh"
+check_config_drift
 
 # Coupe-circuit, verifie EN PREMIER : un simple changement dans vars.conf
 # (deja recupere par le sync ci-dessus) desactive tout, sans jamais

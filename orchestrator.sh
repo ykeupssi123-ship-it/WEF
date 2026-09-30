@@ -59,6 +59,7 @@ source "$SCRIPT_DIR/lib/commun.sh"
 source "$SCRIPT_DIR/lib/run_job.sh"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR" "$WORK_TMP_DIR"
+check_config_drift
 
 source "$SCRIPT_DIR/lib/lock.sh"
 # AJOUTE LE 2026-09-18 (systeme de calendrier) : jusqu'ici, un operateur ne

@@ -95,6 +95,130 @@ print(f"ECRIT={inserted}")
 PYEOF
 }
 
+# seed_monetic_collection_file <log_file> <min_count> <max_count> <interval_sec>
+# AJOUTE LE 2026-09-30 (remplace l'ancien scenario "contournement par un
+# pays tiers", annule sur demande explicite) - repond a l'objectif
+# Architecture desormais "Fraude sur compte dormant" (Applications >
+# Conformite financiere) et au nouvel objectif "Collecte des donnees
+# financieres et monetiques" (remplace "Supervision applicative unifiee"/
+# AnkrrWEF, retire du dossier). Meme fichier, meme index, meme pipeline
+# que seed_lcbft_detections_file (AUCUN changement Logstash necessaire -
+# LS_023B_BEAC_FILTER reconnait par chemin de fichier, pas par champ).
+#
+# ROLE JOUE PAR CE JOB (a expliciter a la soutenance, jamais cache) : ce
+# job simule la fonction d'un logiciel de detection de fraude comparable
+# a SIRON/AML (outil reel de surveillance transactionnelle bancaire) -
+# il "traite" un flux de transactions monetiques et "detecte" celles qui
+# correspondent a un profil de fraude. Kibana ne fait ensuite QUE
+# rechercher/filtrer les evenements deja qualifies par ce job - jamais
+# lui-meme un moteur de detection.
+#
+# PATTERN DE FRAUDE ILLUSTRE : un compte marque DORMANT (aucun mouvement
+# depuis des mois) subit un retrait via DAB/GAB/TPE qui REUSSIT - le
+# signal n'est pas la tentative, c'est la reussite sur un compte cense
+# etre inactif.
+#
+# REVU LE 2026-09-30 (demande explicite : aucun hasard sur ce qui compte
+# vraiment - "les scenarios de job doivent donner le resultat attendu
+# selon le statut de compte") : les comptes dormants ne sont plus tires
+# au sort. DORMANT_ACCOUNTS (vars.conf, liste separee par des virgules)
+# declare EXPLICITEMENT quels comptes sont dormants - CHACUN produit,
+# de maniere garantie, UNE detection FRAUDE_COMPTE_DORMANT a chaque
+# execution. Une soutenance ne peut pas dependre d'un tirage aleatoire :
+# le statut ecrit dans vars.conf EST le resultat qu'on verra dans le
+# Dashboard, point final. Le volume normal autour (ACTIF, realiste)
+# reste genere aleatoirement - lui seul n'a pas besoin d'etre garanti.
+seed_monetic_collection_file() {
+  local log_file="$1" min_count="$2" max_count="$3" interval="$4" dormant_accounts="$5"
+  mkdir -p "$(dirname "$log_file")"
+  touch "$log_file"
+  chmod 644 "$log_file"
+  LOG_FILE="$log_file" MIN_COUNT="$min_count" MAX_COUNT="$max_count" INTERVAL="$interval" DORMANT_ACCOUNTS="$dormant_accounts" \
+  python3 << 'PYEOF'
+import os, json, random, time, uuid, datetime
+
+log_file = os.environ['LOG_FILE']
+min_count = int(os.environ['MIN_COUNT']); max_count = int(os.environ['MAX_COUNT'])
+interval = float(os.environ['INTERVAL'])
+dormant_accounts = [a.strip() for a in os.environ.get('DORMANT_ACCOUNTS', '').split(',') if a.strip()]
+noise_count = random.randint(min_count, max_count)
+
+# REVU LE 2026-09-30 (demande explicite : "financier" ne peut pas se
+# reduire a "monetique" - GUICHET (operation en agence) et
+# VIREMENT_EN_LIGNE (appli mobile/web banking) ajoutes, pour que le nom
+# de l'objectif ("donnees financieres ET monetiques") corresponde a une
+# vraie donnee generee, jamais seulement a un mot.
+canaux = ["DAB", "GAB", "TPE", "GUICHET", "VIREMENT_EN_LIGNE"]
+statuts_dossier = ["OUVERT"] * 5 + ["ESCALADE"] * 3 + ["EN_ANALYSE"] * 2
+analystes = ["A. NGONO", "B. MBARGA", "C. IYODI", "D. BEYALA", "E. FOUDA"]
+localisations_physiques = ["Agence Douala-Bonanjo", "Agence Yaounde-Bastos", "DAB Aeroport Douala",
+                            "TPE Supermarche CentreVille", "GAB Marche Central", "TPE Station-service Akwa"]
+
+def make_doc(i, total, compte_ref, is_fraud):
+    canal = random.choice(canaux)
+    if canal == "VIREMENT_EN_LIGNE":
+        localisation = "Application mobile (en ligne)"
+    elif canal == "GUICHET":
+        localisation = random.choice(["Agence Douala-Bonanjo", "Agence Yaounde-Bastos"])
+    else:
+        localisation = random.choice(localisations_physiques)
+    montant = round(random.uniform(10000, 500000), 2) if is_fraud else round(random.uniform(2000, 150000), 2)
+    jours_inactivite = random.randint(200, 900) if is_fraud else random.randint(0, 30)
+    date_dernier_mouvement = (datetime.datetime.utcnow() - datetime.timedelta(days=jours_inactivite)).date().isoformat()
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    return {
+        "timestamp": now,
+        "application": "LCB-FT-BEAC",
+        "detection_id": f"LCBFT-{uuid.uuid4().hex[:10].upper()}",
+        "detection_type": "FRAUDE_COMPTE_DORMANT" if is_fraud else "COLLECTE_MONETIQUE",
+        "niveau_risque": "CRITIQUE" if is_fraud else "FAIBLE",
+        "client_ref": f"CLI-{random.randint(100000, 999999)}",
+        "compte_ref": compte_ref,
+        "statut_compte": "DORMANT" if is_fraud else "ACTIF",
+        "date_dernier_mouvement": date_dernier_mouvement,
+        "canal": canal,
+        "localisation": localisation,
+        "montant": montant,
+        "devise": "XAF",
+        "resultat_operation": "REUSSI",
+        "statut_dossier": random.choice(statuts_dossier) if is_fraud else "CLOTURE",
+        "analyste_assigne": random.choice(analystes) if is_fraud else "N/A",
+        "full_log": (f"Detection LCB-FT {i}/{total} - FRAUDE_COMPTE_DORMANT - compte {compte_ref} - "
+                     f"retrait {canal} REUSSI sur compte dormant depuis {jours_inactivite}j"
+                     if is_fraud else
+                     f"Collecte monetique {i}/{total} - compte {compte_ref} - {canal} - compte actif"),
+        "wef_test_seed": True,
+    }
+
+total = len(dormant_accounts) + noise_count
+inserted = 0
+with open(log_file, 'a') as f:
+    # 1) Une detection GARANTIE par compte declare dans DORMANT_ACCOUNTS -
+    #    jamais soumise au hasard, le statut vars.conf EST le resultat.
+    for compte_ref in dormant_accounts:
+        doc = make_doc(inserted + 1, total, compte_ref, is_fraud=True)
+        f.write(json.dumps(doc) + "\n")
+        f.flush()
+        inserted += 1
+        print(f"[seed_monetic] {inserted}/{total} transaction(s) ecrite(s) dans {log_file} (FRAUDE COMPTE DORMANT GARANTIE, compte {compte_ref})")
+        if inserted < total:
+            time.sleep(interval)
+    # 2) Volume normal (ACTIF) autour du signal - realiste, jamais garanti.
+    for i in range(noise_count):
+        compte_ref = f"CPT-{random.randint(1000000000, 9999999999)}"
+        doc = make_doc(inserted + 1, total, compte_ref, is_fraud=False)
+        f.write(json.dumps(doc) + "\n")
+        f.flush()
+        inserted += 1
+        print(f"[seed_monetic] {inserted}/{total} transaction(s) ecrite(s) dans {log_file} (collecte normale, compte {compte_ref})")
+        if inserted < total:
+            time.sleep(interval)
+
+print(f"ECRIT={inserted}")
+print(f"COMPTES_DORMANTS_GARANTIS={len(dormant_accounts)}")
+PYEOF
+}
+
 # seed_cyriellemoney_transfers_file <log_file> <count> <interval_sec>
 # Ajoute (append) <count> evenements de transfert CyrielleMoney, une
 # ligne JSON a la fois, <interval_sec> de pause reelle entre chaque -

@@ -14,6 +14,42 @@ set -uo pipefail
 job_done(){ [ -f "${STATE_DIR}/$1.ok" ]; }
 mark_done(){ date -Iseconds > "${STATE_DIR}/$1.ok"; }
 
+# check_config_drift - AJOUTE LE 2026-09-30 (demande explicite : une
+# trace, un sysout, pour chaque changement de plage horaire, de statut
+# de compte, ou de toute autre variable de politique - "à la demande",
+# jamais a retenir manuellement de tracer). Compare la valeur ACTUELLE
+# de chaque variable suivie (deja dans l'environnement via `source
+# vars.conf`) a la derniere valeur observee (state/config_watch.snapshot)
+# et journalise CHAQUE ecart dans state/CONFIG_AUDIT_TRAIL.csv, avec
+# horodatage, ancienne et nouvelle valeur - jamais besoin de lancer un
+# outil d'audit a part : appelee automatiquement au demarrage
+# d'orchestrator.sh, bin/order.sh ET bin/scheduler.sh (donc a chaque
+# tick du calendrier natif, au plus tard 60s apres un changement reel).
+CONFIG_WATCH_VARS="ADMIN_WORKHOURS_START ADMIN_WORKHOURS_END USER_WORKHOURS_START USER_WORKHOURS_END ADMIN_USERS STANDARD_USERS LEAVE_USERS LEAVE_USER LEAVE_END_DATE DORMANT_ACCOUNTS KNOWN_HOSTS_LIST NMAP_SCAN_TARGET"
+
+check_config_drift(){
+  local snapshot="${STATE_DIR}/config_watch.snapshot"
+  local audit_trail="${STATE_DIR}/CONFIG_AUDIT_TRAIL.csv"
+  mkdir -p "$STATE_DIR"
+  [ -f "$audit_trail" ] || printf '"timestamp","variable","ancienne_valeur","nouvelle_valeur"\n' > "$audit_trail"
+  local var current old
+  for var in $CONFIG_WATCH_VARS; do
+    current="${!var:-}"
+    if [ -f "$snapshot" ] && grep -q "^${var}=" "$snapshot" 2>/dev/null; then
+      old="$(grep "^${var}=" "$snapshot" | tail -1 | cut -d= -f2-)"
+      if [ "$current" != "$old" ]; then
+        printf '"%s","%s","%s","%s"\n' "$(date -Iseconds)" "$var" "$old" "$current" >> "$audit_trail"
+      fi
+    else
+      printf '"%s","%s","%s","%s"\n' "$(date -Iseconds)" "$var" "(premiere observation)" "$current" >> "$audit_trail"
+    fi
+  done
+  : > "$snapshot"
+  for var in $CONFIG_WATCH_VARS; do
+    echo "${var}=${!var:-}" >> "$snapshot"
+  done
+}
+
 # Vrai si le champ COMPONENT d'une ligne jobs_table.csv (ex: "FILEBEAT"
 # ou "FILEBEAT|METRICBEAT" pour "l'un ou l'autre suffit") autorise
 # l'execution sur cette machine, compte tenu de AGENT_COMPONENTS.

@@ -59,6 +59,7 @@ source "$VARS_FILE"
 source "$HERE/lib/commun.sh"
 source "$HERE/lib/run_job.sh"
 source "$HERE/lib/lock.sh"
+check_config_drift
 
 JOB_ID="${1:-}"
 RAISON="${2:-}"
@@ -241,6 +242,29 @@ JOB_LOG="$HISTORY_DIR/$JOB_ID/${JOB_TS}.log"
 # suffixe cosmetique).
 run_job "$JOB_ID" "$C_JOB_NAME (FORCE)" "$SCRIPT_PATH" "$JOB_LOG" "$C_OUT_COND" "FORCE_OK" "FORCE_ECHEC"
 JOB_EXIT=$?
+
+# REGISTRE DE CHANGEMENT (Change Enablement, ITIL 4) - AJOUTE LE
+# 2026-09-30, demande explicite. Chaque forcage manuel EST deja une
+# demande de changement au sens ITIL (une action hors du cycle normal,
+# avec justification et confirmation humaine deja exigees plus haut) -
+# ceci ne fait qu'en garder une fiche structuree et consultable, en plus
+# du log dedie (SYSOUT) qui reste la source de verite du detail texte.
+# Niveau de risque CALCULE, jamais devine : ELEVE si des dependances
+# manquaient au moment du forcage (MISSING), MOYEN si c'est un rejeu qui
+# a un impact reel en aval (IMPACT), FAIBLE sinon.
+CHANGE_LOG="${STATE_DIR}/CHANGE_LOG.csv"
+[ -f "$CHANGE_LOG" ] || printf '"timestamp","job_id","operateur","raison","niveau_risque","dependances_manquantes","impact_aval","resultat"\n' > "$CHANGE_LOG"
+RAISON_CSV="${RAISON_SAFE//\"/\'}"
+if [ -n "$MISSING" ]; then
+  CHANGE_RISK="ELEVE"
+elif [ "$ALREADY_DONE" -eq 1 ] && [ -n "$IMPACT" ]; then
+  CHANGE_RISK="MOYEN"
+else
+  CHANGE_RISK="FAIBLE"
+fi
+CHANGE_RESULT="ECHEC"; [ "$JOB_EXIT" -eq 0 ] && CHANGE_RESULT="OK"
+printf '"%s","%s","%s","%s","%s","%s","%s","%s"\n' \
+  "$(date -Iseconds)" "$JOB_ID" "$OPERATEUR" "$RAISON_CSV" "$CHANGE_RISK" "${MISSING:-aucune}" "${IMPACT:-aucun}" "$CHANGE_RESULT" >> "$CHANGE_LOG"
 
 echo "--- Sortie de $JOB_ID ---"
 cat "$JOB_LOG"

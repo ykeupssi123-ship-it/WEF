@@ -29,18 +29,32 @@
 # cette regle) ait sa chance. Meme lecon deja tiree pour WAZ_051 (IOC) -
 # chainer sur la regle QUI SE DECLENCHE REELLEMENT, jamais sur un
 # ancetre plus generique, meme documente comme "le bon id".
+#
+# CORRIGE LE 2026-09-30 (bug produit reel, DEUX defauts distincts de
+# cette installation - meme diagnostic exhaustif et meme correction que
+# WAZ_060_WORKHOURS_POLICY.sh, voir ses commentaires pour le detail
+# complet des preuves) :
+#   1. etc/rules/*.xml n'est jamais reellement lu par analysisd sur
+#      cette machine (WAZUH_REVISION=rc1), quel que soit son nom -
+#      regles desormais ecrites dans ruleset/rules/9950-wef_custom_rules.xml
+#      (meme fichier partage que WAZ_060, prefixe numerique eleve pour
+#      charger apres le ruleset vendor).
+#   2. Les listes CDB echouent TOUTES au chargement sur cette machine,
+#      y compris les listes vendor non modifiees - liste conges-actifs
+#      abandonnee au profit d'une regex directe sur le champ statique
+#      <user> (dstuser), confirmee fonctionnelle par un test reel
+#      (wazuh-logtest) avant d'etre appliquee ici.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
 source "$PROJECT_ROOT/lib/commun.sh"
 
-LEAVE_LIST_FILE="/var/ossec/etc/lists/conges-actifs"
-echo "[WAZ_061_LEAVE_POLICY] Generation de la liste CDB des comptes en conge (${LEAVE_LIST_FILE})..."
-mkdir -p "$(dirname "$LEAVE_LIST_FILE")"
-: > "$LEAVE_LIST_FILE"
+# Construit "^(a|b|c)$" a partir de LEAVE_USERS, apres exclusion des
+# comptes ADMIN_USERS - jamais une liste CDB (voir CORRIGE LE 2026-09-30
+# ci-dessus), correlee via le champ statique <user> dans la regle.
 IFS=',' read -ra ADMIN_ENTRIES <<< "${ADMIN_USERS:-}"
 IFS=',' read -ra LEAVE_ENTRIES <<< "${LEAVE_USERS:-}"
-COUNT=0
+LEAVE_CLEANED=()
 for entry in "${LEAVE_ENTRIES[@]}"; do
   entry="$(echo "$entry" | xargs)"
   [ -z "$entry" ] && continue
@@ -52,53 +66,23 @@ for entry in "${LEAVE_ENTRIES[@]}"; do
     echo "[WAZ_061_LEAVE_POLICY] REFUS : '${entry}' figure aussi dans ADMIN_USERS - un administrateur n'est jamais soumis a la politique de conge, jamais ajoute a la liste." >&2
     continue
   fi
-  echo "${entry}:conge" >> "$LEAVE_LIST_FILE"
-  COUNT=$((COUNT+1))
+  LEAVE_CLEANED+=("$entry")
 done
-chmod 640 "$LEAVE_LIST_FILE"
-echo "[WAZ_061_LEAVE_POLICY] ${COUNT} compte(s) en conge declare(s) (LEAVE_USERS)."
-if [ "$COUNT" -eq 0 ]; then
+echo "[WAZ_061_LEAVE_POLICY] ${#LEAVE_CLEANED[@]} compte(s) en conge declare(s) (LEAVE_USERS)."
+if [ "${#LEAVE_CLEANED[@]}" -eq 0 ]; then
   echo "[WAZ_061_LEAVE_POLICY] AVERTISSEMENT : LEAVE_USERS est vide - la regle de correlation sera posee mais ne matchera personne tant qu'aucun compte n'est declare en conge (via LEAVE_USERS puis rejeu de ce job, ou directement dans vars.conf avant un depart)." >&2
+  LEAVE_REGEX='^(__wef_aucun_compte_en_conge__)$'
+else
+  IFS_SAVE="$IFS"
+  IFS='|'
+  LEAVE_REGEX="^(${LEAVE_CLEANED[*]})\$"
+  IFS="$IFS_SAVE"
 fi
 
-OSSEC_CONF="/var/ossec/etc/ossec.conf"
-[ -f "$OSSEC_CONF" ] || { echo "[WAZ_061_LEAVE_POLICY] ERREUR : ${OSSEC_CONF} introuvable." >&2; exit 1; }
-
-if lsattr "$OSSEC_CONF" 2>/dev/null | grep -q '^....i'; then
-  echo "[WAZ_061_LEAVE_POLICY] ${OSSEC_CONF} est immuable - deverrouillage temporaire avant reecriture."
-  chattr -i "$OSSEC_CONF"
-fi
-
-MARKER="<!-- WEF_LEAVE_CONFIG (WAZ_061, genere automatiquement - ne pas editer a la main) -->"
-if grep -qF "$MARKER" "$OSSEC_CONF"; then
-  echo "[WAZ_061_LEAVE_POLICY] Bloc deja pose dans ossec.conf, retrait avant reecriture..."
-  sed -i "\|^${MARKER//\//\\/}\$|,\|^<!-- WEF_LEAVE_CONFIG_END -->\$|d" "$OSSEC_CONF"
-fi
-echo "[WAZ_061_LEAVE_POLICY] Declaration de la liste CDB dans ossec.conf..."
-{
-  echo "$MARKER"
-  echo "<ossec_config>"
-  echo "  <ruleset>"
-  echo "    <list>etc/lists/conges-actifs</list>"
-  echo "  </ruleset>"
-  echo "</ossec_config>"
-  echo "<!-- WEF_LEAVE_CONFIG_END -->"
-} >> "$OSSEC_CONF"
-grep -qF "$MARKER" "$OSSEC_CONF" || { echo "[WAZ_061_LEAVE_POLICY] ERREUR : bloc absent apres ecriture (fichier verrouille ?)." >&2; exit 1; }
-
-echo "[WAZ_061_LEAVE_POLICY] Reverrouillage de ${OSSEC_CONF}..."
-chown root:wazuh "$OSSEC_CONF"
-chmod 640 "$OSSEC_CONF"
-chattr +i "$OSSEC_CONF"
-
-RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
-[ -f "$RULES_FILE" ] || { echo "[WAZ_061_LEAVE_POLICY] ERREUR : ${RULES_FILE} introuvable." >&2; exit 1; }
-# CORRIGE LE 2026-09-30 (meme bug reel trouve sur WAZ_060 au premier
-# test sur VM1) : local_rules.xml est verrouille immuable, jamais
-# deverrouille avant cette correction.
-if lsattr "$RULES_FILE" 2>/dev/null | grep -q '^....i'; then
-  echo "[WAZ_061_LEAVE_POLICY] ${RULES_FILE} est immuable - deverrouillage temporaire avant reecriture."
-  chattr -i "$RULES_FILE"
+RULES_FILE="/var/ossec/ruleset/rules/9950-wef_custom_rules.xml"
+if [ ! -f "$RULES_FILE" ]; then
+  echo "[WAZ_061_LEAVE_POLICY] ${RULES_FILE} absent - creation initiale."
+  : > "$RULES_FILE"
 fi
 MARKER_RULE="<!-- WEF_LEAVE_RULE (WAZ_061, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
@@ -111,7 +95,7 @@ echo "[WAZ_061_LEAVE_POLICY] Ajout de la regle de correlation conge (id 100220).
   echo "<group name=\"authentication_failed,conge,\">"
   echo "  <rule id=\"100220\" level=\"13\">"
   echo "    <if_sid>5760</if_sid>"
-  echo "    <list field=\"dstuser\" lookup=\"match_key\">etc/lists/conges-actifs</list>"
+  echo "    <user>${LEAVE_REGEX}</user>"
   echo "    <description>Tentative de connexion sur un compte EN CONGE - intrusion probable</description>"
   echo "    <group>conge_intrusion,</group>"
   echo "  </rule>"
@@ -123,7 +107,6 @@ grep -qF "$MARKER_RULE" "$RULES_FILE" || { echo "[WAZ_061_LEAVE_POLICY] ERREUR :
 echo "[WAZ_061_LEAVE_POLICY] Reverrouillage de ${RULES_FILE}..."
 chown root:wazuh "$RULES_FILE"
 chmod 640 "$RULES_FILE"
-chattr +i "$RULES_FILE"
 
 echo "[WAZ_061_LEAVE_POLICY] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

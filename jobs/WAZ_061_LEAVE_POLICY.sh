@@ -19,9 +19,16 @@
 # personnel d'un compte en conge declenche deja les regles FIM
 # existantes (550/553/554).
 #
-# LIMITE HONNETE, non contournee : s'appuie sur la regle vendor 5716
-# (authentification SSH echouee) - meme reserve que WAZ_060 sur l'id
-# exact, jamais confirme contre le ruleset reellement installe sur VM1.
+# CORRIGE LE 2026-09-30 (bug reel trouve en testant une vraie tentative
+# de connexion echouee sur VM2, confirme via wazuh-bin/wazuh-logtest) :
+# chaine desormais sur 5760, pas 5716. Verifie que 5716 EXISTE et que
+# 5760 en est un vrai enfant (<if_sid>5700,5716</if_sid>), MAIS Wazuh ne
+# retient que le PREMIER enfant qui matche pour un parent donne - 5760
+# (vendor, aucune condition supplementaire au-dela du message) gagne
+# toujours avant qu'un enfant plus specifique de 5716 (comme l'etait
+# cette regle) ait sa chance. Meme lecon deja tiree pour WAZ_051 (IOC) -
+# chainer sur la regle QUI SE DECLENCHE REELLEMENT, jamais sur un
+# ancetre plus generique, meme documente comme "le bon id".
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -103,7 +110,7 @@ echo "[WAZ_061_LEAVE_POLICY] Ajout de la regle de correlation conge (id 100220).
   echo "$MARKER_RULE"
   echo "<group name=\"authentication_failed,conge,\">"
   echo "  <rule id=\"100220\" level=\"13\">"
-  echo "    <if_sid>5716</if_sid>"
+  echo "    <if_sid>5760</if_sid>"
   echo "    <list field=\"dstuser\" lookup=\"match_key\">etc/lists/conges-actifs</list>"
   echo "    <description>Tentative de connexion sur un compte EN CONGE - intrusion probable</description>"
   echo "    <group>conge_intrusion,</group>"

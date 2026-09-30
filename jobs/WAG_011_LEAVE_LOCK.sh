@@ -77,10 +77,21 @@ else
 fi
 
 GECOS_BACKUP="/etc/wef-leave-gecos-${LEAVE_USER}.bak"
-if [ ! -f "$GECOS_BACKUP" ]; then
-  ORIGINAL_GECOS="$(getent passwd "$LEAVE_USER" | cut -d: -f5)"
-  echo "$ORIGINAL_GECOS" > "$GECOS_BACKUP"
-  chmod 600 "$GECOS_BACKUP"
+CURRENT_GECOS="$(getent passwd "$LEAVE_USER" | cut -d: -f5)"
+# CORRIGE LE 2026-09-30 (bug reel trouve au 2e test sur VM2) : l'idempotence
+# se fiait uniquement a "le fichier de sauvegarde existe" - or ce fichier
+# est cree AVANT la tentative usermod -c, pas apres son succes. Un premier
+# essai qui echoue (ex. GECOS invalide) laisse la sauvegarde en place SANS
+# que le commentaire ait reellement change - le rejeu sautait alors la
+# correction en la croyant deja faite. Verifie desormais l'etat REEL du
+# GECOS actuel, jamais seulement la presence du fichier.
+if [[ "$CURRENT_GECOS" == EN\ CONGE* ]]; then
+  echo "[WAG_011_LEAVE_LOCK] Commentaire de compte deja pose (job deja joue pour ce conge) - rien a faire de ce cote."
+else
+  if [ ! -f "$GECOS_BACKUP" ]; then
+    echo "$CURRENT_GECOS" > "$GECOS_BACKUP"
+    chmod 600 "$GECOS_BACKUP"
+  fi
   echo "[WAG_011_LEAVE_LOCK] Pose du commentaire de compte (GECOS) - modification /etc/passwd, deja surveillee par le FIM..."
   # CORRIGE LE 2026-09-30 (bug reel trouve au premier test sur VM2) :
   # GECOS (/etc/passwd, champ 5) refuse ":" et "," - ce sont les
@@ -91,8 +102,6 @@ if [ ! -f "$GECOS_BACKUP" ]; then
     echo "[WAG_011_LEAVE_LOCK] ERREUR : echec de la pose du commentaire de compte (GECOS) - verrouillage mot de passe/cle deja effectif, mais ce signal FIM restera absent." >&2
     exit 1
   fi
-else
-  echo "[WAG_011_LEAVE_LOCK] Commentaire de compte deja pose (job deja joue pour ce conge) - rien a faire de ce cote."
 fi
 
 if [ -n "${LEAVE_END_DATE:-}" ]; then

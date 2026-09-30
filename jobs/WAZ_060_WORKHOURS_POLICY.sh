@@ -37,7 +37,7 @@ source "$PROJECT_ROOT/lib/commun.sh"
 
 write_cdb_list() {
   local list_file="$1" csv_value="$2" tag="$3" label="$4"
-  echo "[WAZ_060_WORKHOURS_POLICY] Generation de la liste CDB ${label} (${list_file})..."
+  echo "[WAZ_060_WORKHOURS_POLICY] Generation de la liste CDB ${label} (${list_file})..." >&2
   mkdir -p "$(dirname "$list_file")"
   : > "$list_file"
   IFS=',' read -ra ENTRIES <<< "$csv_value"
@@ -49,7 +49,13 @@ write_cdb_list() {
     count=$((count+1))
   done
   chmod 640 "$list_file"
-  echo "[WAZ_060_WORKHOURS_POLICY] ${count} compte(s) ${label} declare(s)."
+  # CORRIGE LE 2026-09-30 (bug reel trouve au premier test sur VM1) :
+  # cette fonction est appelee via "VAR=$(write_cdb_list ...)" - TOUT
+  # ce qu'elle envoie sur stdout est capture dans VAR, y compris les
+  # messages informatifs si on les laisse sur stdout (pas seulement le
+  # dernier echo). Redirige donc CE message sur stderr - seul le compte
+  # final reste sur stdout, capturable proprement comme un entier.
+  echo "[WAZ_060_WORKHOURS_POLICY] ${count} compte(s) ${label} declare(s)." >&2
   echo "$count"
 }
 
@@ -102,6 +108,15 @@ USER_END="${USER_WORKHOURS_END:?ERREUR : USER_WORKHOURS_END doit etre defini dan
 
 RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
 [ -f "$RULES_FILE" ] || { echo "[WAZ_060_WORKHOURS_POLICY] ERREUR : ${RULES_FILE} introuvable." >&2; exit 1; }
+# CORRIGE LE 2026-09-30 (bug reel trouve au premier test sur VM1,
+# "Operation non permise") : local_rules.xml est LUI AUSSI verrouille
+# immuable sur cette machine (meme motif que ossec.conf, deja gere plus
+# haut) - jamais verifie avant ce premier test reel, WAZ_051 (dont ce
+# job s'inspirait) ne l'avait jamais rencontre.
+if lsattr "$RULES_FILE" 2>/dev/null | grep -q '^....i'; then
+  echo "[WAZ_060_WORKHOURS_POLICY] ${RULES_FILE} est immuable - deverrouillage temporaire avant reecriture."
+  chattr -i "$RULES_FILE"
+fi
 MARKER_RULE="<!-- WEF_WORKHOURS_RULE (WAZ_060, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   echo "[WAZ_060_WORKHOURS_POLICY] Regles heures ouvrees deja posees, retrait avant reecriture..."
@@ -143,6 +158,11 @@ echo "[WAZ_060_WORKHOURS_POLICY] Ajout des regles de correlation (admin ${ADMIN_
   echo "<!-- WEF_WORKHOURS_RULE_END -->"
 } >> "$RULES_FILE"
 grep -qF "$MARKER_RULE" "$RULES_FILE" || { echo "[WAZ_060_WORKHOURS_POLICY] ERREUR : regles absentes apres ecriture." >&2; exit 1; }
+
+echo "[WAZ_060_WORKHOURS_POLICY] Reverrouillage de ${RULES_FILE}..."
+chown root:wazuh "$RULES_FILE"
+chmod 640 "$RULES_FILE"
+chattr +i "$RULES_FILE"
 
 echo "[WAZ_060_WORKHOURS_POLICY] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

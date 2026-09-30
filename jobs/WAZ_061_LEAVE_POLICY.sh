@@ -86,6 +86,13 @@ chattr +i "$OSSEC_CONF"
 
 RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
 [ -f "$RULES_FILE" ] || { echo "[WAZ_061_LEAVE_POLICY] ERREUR : ${RULES_FILE} introuvable." >&2; exit 1; }
+# CORRIGE LE 2026-09-30 (meme bug reel trouve sur WAZ_060 au premier
+# test sur VM1) : local_rules.xml est verrouille immuable, jamais
+# deverrouille avant cette correction.
+if lsattr "$RULES_FILE" 2>/dev/null | grep -q '^....i'; then
+  echo "[WAZ_061_LEAVE_POLICY] ${RULES_FILE} est immuable - deverrouillage temporaire avant reecriture."
+  chattr -i "$RULES_FILE"
+fi
 MARKER_RULE="<!-- WEF_LEAVE_RULE (WAZ_061, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   echo "[WAZ_061_LEAVE_POLICY] Regle conge deja posee, retrait avant reecriture..."
@@ -105,6 +112,11 @@ echo "[WAZ_061_LEAVE_POLICY] Ajout de la regle de correlation conge (id 100220).
   echo "<!-- WEF_LEAVE_RULE_END -->"
 } >> "$RULES_FILE"
 grep -qF "$MARKER_RULE" "$RULES_FILE" || { echo "[WAZ_061_LEAVE_POLICY] ERREUR : regle absente apres ecriture." >&2; exit 1; }
+
+echo "[WAZ_061_LEAVE_POLICY] Reverrouillage de ${RULES_FILE}..."
+chown root:wazuh "$RULES_FILE"
+chmod 640 "$RULES_FILE"
+chattr +i "$RULES_FILE"
 
 echo "[WAZ_061_LEAVE_POLICY] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

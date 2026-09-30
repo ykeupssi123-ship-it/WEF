@@ -104,7 +104,7 @@ echo "[WAZ_061_LEAVE_POLICY] Ajout de la regle de correlation conge (id 100220).
   echo "<group name=\"authentication_failed,conge,\">"
   echo "  <rule id=\"100220\" level=\"13\">"
   echo "    <if_sid>5716</if_sid>"
-  echo "    <list field=\"srcuser\" lookup=\"match_key\">etc/lists/conges-actifs</list>"
+  echo "    <list field=\"dstuser\" lookup=\"match_key\">etc/lists/conges-actifs</list>"
   echo "    <description>Tentative de connexion sur un compte EN CONGE - intrusion probable</description>"
   echo "    <group>conge_intrusion,</group>"
   echo "  </rule>"

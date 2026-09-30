@@ -51,7 +51,15 @@
 #      directe sur le champ statique <user> (dstuser, decode nativement
 #      par Wazuh) - confirme fonctionnel par un test reel identique
 #      (wazuh-logtest) une fois ce contournement applique.
-# Les deux corrections ont ete validees ENSEMBLE par un test reel
+#   3. TROUVAILLE COMPLEMENTAIRE (meme test reel) : le moteur regex par
+#      DEFAUT de Wazuh (OSRegex, utilise par <user>/<field>/<match> sans
+#      attribut explicite) ne supporte PAS les parentheses de
+#      groupement/alternance "(a|b)" - "^(wef_user1)$" ne matchait
+#      JAMAIS, meme charge sans erreur ni avertissement. Isole en
+#      comparant deux regles de test identiques, l'une sans attribut,
+#      l'autre avec type="pcre2" - seule la seconde matchait. Corrige en
+#      ajoutant explicitement type="pcre2" a chaque <user>.
+# Les trois corrections ont ete validees ENSEMBLE par un test reel
 # complet (wazuh-logtest sur un evenement de connexion reel) avant
 # d'etre appliquees ici.
 set -uo pipefail
@@ -106,28 +114,28 @@ echo "[WAZ_060_WORKHOURS_POLICY] Ajout des regles de correlation (admin ${ADMIN_
   echo "  <rule id=\"100210\" level=\"12\">"
   echo "    <if_sid>5715</if_sid>"
   echo "    <time>00:00-${ADMIN_START}</time>"
-  echo "    <user>${ADMIN_REGEX}</user>"
+  echo "    <user type=\"pcre2\">${ADMIN_REGEX}</user>"
   echo "    <description>Connexion ADMINISTRATEUR hors des heures ouvrees (nuit/matin, plage autorisee ${ADMIN_START}-${ADMIN_END})</description>"
   echo "    <group>hors_heures,admin,</group>"
   echo "  </rule>"
   echo "  <rule id=\"100211\" level=\"12\">"
   echo "    <if_sid>5715</if_sid>"
   echo "    <time>${ADMIN_END}-23:59</time>"
-  echo "    <user>${ADMIN_REGEX}</user>"
+  echo "    <user type=\"pcre2\">${ADMIN_REGEX}</user>"
   echo "    <description>Connexion ADMINISTRATEUR hors des heures ouvrees (soir, plage autorisee ${ADMIN_START}-${ADMIN_END})</description>"
   echo "    <group>hors_heures,admin,</group>"
   echo "  </rule>"
   echo "  <rule id=\"100212\" level=\"8\">"
   echo "    <if_sid>5715</if_sid>"
   echo "    <time>00:00-${USER_START}</time>"
-  echo "    <user>${STANDARD_REGEX}</user>"
+  echo "    <user type=\"pcre2\">${STANDARD_REGEX}</user>"
   echo "    <description>Connexion UTILISATEUR STANDARD hors des heures ouvrees (nuit/matin, plage autorisee ${USER_START}-${USER_END})</description>"
   echo "    <group>hors_heures,utilisateur,</group>"
   echo "  </rule>"
   echo "  <rule id=\"100213\" level=\"8\">"
   echo "    <if_sid>5715</if_sid>"
   echo "    <time>${USER_END}-23:59</time>"
-  echo "    <user>${STANDARD_REGEX}</user>"
+  echo "    <user type=\"pcre2\">${STANDARD_REGEX}</user>"
   echo "    <description>Connexion UTILISATEUR STANDARD hors des heures ouvrees (soir, plage autorisee ${USER_START}-${USER_END})</description>"
   echo "    <group>hors_heures,utilisateur,</group>"
   echo "  </rule>"

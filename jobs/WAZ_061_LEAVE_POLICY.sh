@@ -44,6 +44,14 @@
 #      abandonnee au profit d'une regex directe sur le champ statique
 #      <user> (dstuser), confirmee fonctionnelle par un test reel
 #      (wazuh-logtest) avant d'etre appliquee ici.
+#   3. TROUVAILLE COMPLEMENTAIRE (meme test reel) : le moteur regex par
+#      DEFAUT de Wazuh (OSRegex, utilise par <user>/<field>/<match> sans
+#      attribut explicite) ne supporte PAS les parentheses de
+#      groupement/alternance "(a|b)" - "^(wef_user1)$" ne matchait
+#      JAMAIS, meme charge sans erreur ni avertissement. Isole en
+#      comparant deux regles de test identiques, l'une sans attribut,
+#      l'autre avec type="pcre2" - seule la seconde matchait. Corrige en
+#      ajoutant explicitement type="pcre2" a chaque <user>.
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -95,7 +103,7 @@ echo "[WAZ_061_LEAVE_POLICY] Ajout de la regle de correlation conge (id 100220).
   echo "<group name=\"authentication_failed,conge,\">"
   echo "  <rule id=\"100220\" level=\"13\">"
   echo "    <if_sid>5760</if_sid>"
-  echo "    <user>${LEAVE_REGEX}</user>"
+  echo "    <user type=\"pcre2\">${LEAVE_REGEX}</user>"
   echo "    <description>Tentative de connexion sur un compte EN CONGE - intrusion probable</description>"
   echo "    <group>conge_intrusion,</group>"
   echo "  </rule>"

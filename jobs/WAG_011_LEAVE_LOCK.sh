@@ -82,7 +82,15 @@ if [ ! -f "$GECOS_BACKUP" ]; then
   echo "$ORIGINAL_GECOS" > "$GECOS_BACKUP"
   chmod 600 "$GECOS_BACKUP"
   echo "[WAG_011_LEAVE_LOCK] Pose du commentaire de compte (GECOS) - modification /etc/passwd, deja surveillee par le FIM..."
-  usermod -c "EN CONGE depuis le $(date +%Y-%m-%d) - retour prevu: ${LEAVE_END_DATE:-indetermine} - compte verrouille" "$LEAVE_USER"
+  # CORRIGE LE 2026-09-30 (bug reel trouve au premier test sur VM2) :
+  # GECOS (/etc/passwd, champ 5) refuse ":" et "," - ce sont les
+  # separateurs du fichier lui-meme (usermod -c echoue silencieusement
+  # sinon, "invalid field", jamais verifie avant ce test reel).
+  GECOS_MSG="EN CONGE depuis le $(date +%Y-%m-%d) - retour prevu ${LEAVE_END_DATE:-indetermine} - compte verrouille"
+  if ! usermod -c "$GECOS_MSG" "$LEAVE_USER"; then
+    echo "[WAG_011_LEAVE_LOCK] ERREUR : echec de la pose du commentaire de compte (GECOS) - verrouillage mot de passe/cle deja effectif, mais ce signal FIM restera absent." >&2
+    exit 1
+  fi
 else
   echo "[WAG_011_LEAVE_LOCK] Commentaire de compte deja pose (job deja joue pour ce conge) - rien a faire de ce cote."
 fi

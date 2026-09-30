@@ -48,7 +48,10 @@ chage -E -1 "$LEAVE_USER"
 GECOS_BACKUP="/etc/wef-leave-gecos-${LEAVE_USER}.bak"
 if [ -f "$GECOS_BACKUP" ]; then
   echo "[WAG_012_LEAVE_UNLOCK] Restauration du commentaire de compte (GECOS) d'origine..."
-  usermod -c "$(cat "$GECOS_BACKUP")" "$LEAVE_USER"
+  if ! usermod -c "$(cat "$GECOS_BACKUP")" "$LEAVE_USER"; then
+    echo "[WAG_012_LEAVE_UNLOCK] ERREUR : echec de la restauration du commentaire de compte (GECOS) - deverrouillage mot de passe/cle deja effectif." >&2
+    exit 1
+  fi
   rm -f "$GECOS_BACKUP"
 else
   echo "[WAG_012_LEAVE_UNLOCK] Aucune sauvegarde de commentaire trouvee - rien a restaurer de ce cote."

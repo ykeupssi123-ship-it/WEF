@@ -118,12 +118,39 @@ for j in "${ORDERED_JOBS[@]}"; do
 done
 ORDERED_JOBS=("${RUNNABLE_HERE[@]}")
 
+# AJOUTE LE 2026-10-02, demande explicite : le bilan complet d'un rejeu de
+# lot (liste ordonnee, jobs exclus par role, confirmation, resultat final)
+# ne vivait jusqu'ici que dans le terminal - perdu des que la fenetre se
+# ferme, alors que chaque job INDIVIDUEL a deja son propre log persistant
+# (state/history/<JOB_ID>/<horodatage>.log). Meme principe applique ici au
+# niveau du LOT entier, jamais un nouveau format invente : un fichier par
+# execution de ce script, dans le meme repertoire state/history/.
+#
+# CORRIGE LE 2026-10-02 (teste reellement avant de pousser, jamais suppose
+# suffisant) : la premiere version utilisait "exec > >(tee -a ...) 2>&1"
+# puis "wait" sur le PID du tee en sortie - motif courant sous Linux, mais
+# BLOQUE INDEFINIMENT lors du test reel dans cet environnement (process
+# substitution geree differemment). Remplace par un motif plus simple et
+# plus portable : tout le reste du script (jusqu'a la fin) est enveloppe
+# dans un bloc "{ ... } | tee -a fichier" - aucun PID a suivre, aucune
+# race possible (le pipe reste ouvert tant que le bloc ecrit, tee ne voit
+# EOF qu'apres la derniere ligne). "set -o pipefail" (deja actif en tete
+# de ce script) fait remonter le vrai code de sortie du bloc a travers le
+# tee - verifie reellement : un "exit 3" dans le bloc ressort bien comme
+# code 3 apres le pipe, jamais celui de tee.
+REPLAY_BATCH_DIR="$STATE_DIR/history/_replay_batches"
+mkdir -p "$REPLAY_BATCH_DIR"
+BATCH_TS=$(date +%Y%m%d_%H%M%S)
+BATCH_LOG="$REPLAY_BATCH_DIR/${VARNAME}_${BATCH_TS}.log"
+{
+
 echo "=================================================="
 echo " REJEU CIBLE - variable $VARNAME"
 echo "=================================================="
 echo "Operateur      : $OPERATEUR"
 echo "Cette machine  : ROLE=$ROLE"
 echo "Raison         : $RAISON_SAFE"
+echo "Journal de ce lot (ce bilan complet, archive) : $BATCH_LOG"
 echo ""
 echo "${#ORDERED_JOBS[@]} job(s) consomment reellement $VARNAME ET s'executent sur CETTE machine"
 echo "(recherche reelle, ordre de dependance reel calcule sur IN_COND/OUT_COND) :"
@@ -165,6 +192,10 @@ if [ ! -t 0 ]; then
 fi
 read -r -p "Tapez exactement '$VARNAME' pour confirmer le rejeu de ces ${#ORDERED_JOBS[@]} job(s) : " CONFIRM
 CONFIRM="${CONFIRM%$'\r'}"
+# Le terminal de l'operateur affiche deja ce qu'il tape (echo local du TTY),
+# mais ce texte ne passe jamais par le stdout/stderr DE CE SCRIPT - donc
+# jamais capture par le "tee" ci-dessus sans cette ligne explicite.
+echo "Confirmation saisie : $CONFIRM"
 if [ "$CONFIRM" != "$VARNAME" ]; then
   echo "Confirmation incorrecte. Rejeu annule, rien n'a ete execute."
   exit 1
@@ -261,3 +292,10 @@ fi
 echo ""
 echo "Tous les jobs du lot ont reussi (${#ORDERED_JOBS[@]}/${#ORDERED_JOBS[@]})."
 exit 0
+
+} | tee -a "$BATCH_LOG"
+# "set -o pipefail" (deja actif, voir "set -uo pipefail" en tete de ce
+# script) fait remonter ici le vrai code de sortie du bloc ci-dessus,
+# jamais celui de tee - verifie reellement avant de pousser (voir le
+# commentaire plus haut, au point ou $BATCH_LOG est defini).
+exit $?

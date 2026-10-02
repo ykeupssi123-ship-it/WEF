@@ -156,9 +156,16 @@ fi
 # sorties a la fois). Uniquement si la sortie ES est activee : sans
 # elle, ce routage n'a pas de sens (memes coordonnees de connexion que
 # le bloc generique).
+#
+# REVU LE 2026-10-01 (canal GlassFish, voir LS_023E_BEAC_GLASSFISH_UNWRAP) :
+# glassfish_server.log route vers LE MEME index que lcbft_detections.log -
+# ce sont les memes evenements (transaction_brute puis qualification par
+# LS_023D), simplement arrives par un chemin different (DAB/GAB/TPE/
+# caisse/mobile via un serveur d'applications, plutot qu'un fichier
+# ecrit directement) - jamais un second index pour la meme donnee.
 if [ "${LS_OUTPUT_ES_ENABLED:-true}" = "true" ]; then
   FINAL_OUTPUT="
-  if [log][file][path] =~ \"lcbft_detections\.log\$\" {
+  if [log][file][path] =~ \"lcbft_detections\.log\$\" or [log][file][path] =~ \"glassfish_server\.log\$\" {
     elasticsearch {
       hosts => [\"https://127.0.0.1:${ES_PORT}\"]
 ${ES_AUTH_LINES}

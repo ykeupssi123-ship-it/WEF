@@ -101,33 +101,35 @@ PYEOF
 # Architecture desormais "Fraude sur compte dormant" (Applications >
 # Conformite financiere) et au nouvel objectif "Collecte des donnees
 # financieres et monetiques" (remplace "Supervision applicative unifiee"/
-# AnkrrWEF, retire du dossier). Meme fichier, meme index, meme pipeline
-# que seed_lcbft_detections_file (AUCUN changement Logstash necessaire -
-# LS_023B_BEAC_FILTER reconnait par chemin de fichier, pas par champ).
+# AnkrrWEF, retire du dossier). Meme fichier, meme index que
+# seed_lcbft_detections_file.
 #
-# ROLE JOUE PAR CE JOB (a expliciter a la soutenance, jamais cache) : ce
-# job simule la fonction d'un logiciel de detection de fraude comparable
-# a SIRON/AML (outil reel de surveillance transactionnelle bancaire) -
-# il "traite" un flux de transactions monetiques et "detecte" celles qui
-# correspondent a un profil de fraude. Kibana ne fait ensuite QUE
-# rechercher/filtrer les evenements deja qualifies par ce job - jamais
-# lui-meme un moteur de detection.
+# REFONDU LE 2026-10-01 (demande explicite : "l'alerte ne doit pas monter
+# directement... c'est quand on va entrer manuellement la ligne dans le
+# fichier qu'une fois Logstash va faire la correlation") : cette fonction
+# N'ECRIT PLUS DE JUGEMENT - elle ecrit des transactions BRUTES
+# (type_evenement=transaction_brute, aucun detection_type/niveau_alerte/
+# statut_compte/statut_traitement). La correlation reelle (compte dans
+# DORMANT_ACCOUNTS + operation REUSSIE => fraude) est desormais faite par
+# Logstash lui-meme (jobs/LS_023C_BEAC_DORMANT_DICT.sh +
+# jobs/LS_023D_BEAC_DORMANT_CORRELATION.sh, filtre translate + condition)
+# - Kibana affiche enfin le resultat d'une VRAIE corrélation, jamais plus
+# une etiquette deja collee par ce script. L'ancien role "simule un
+# logiciel SIRON/AML" est donc retire d'ici : c'est desormais LE PIPELINE
+# ELK (Logstash) qui joue ce role, pas ce job d'alimentation.
 #
-# PATTERN DE FRAUDE ILLUSTRE : un compte marque DORMANT (aucun mouvement
-# depuis des mois) subit un retrait via DAB/GAB/TPE qui REUSSIT - le
-# signal n'est pas la tentative, c'est la reussite sur un compte cense
-# etre inactif.
+# PATTERN DE FRAUDE ILLUSTRE (inchange) : un compte marque DORMANT (aucun
+# mouvement depuis des mois) subit une operation qui REUSSIT - le signal
+# n'est pas la tentative, c'est la reussite sur un compte cense etre
+# inactif. La garantie reste la MEME (DORMANT_ACCOUNTS, vars.conf) : ce
+# job ecrit toujours une transaction REUSSIE sur chaque compte declare
+# dormant a chaque execution - seule la QUALIFICATION de cette
+# transaction (fraude ou non) n'est plus decidee ici.
 #
-# REVU LE 2026-09-30 (demande explicite : aucun hasard sur ce qui compte
-# vraiment - "les scenarios de job doivent donner le resultat attendu
-# selon le statut de compte") : les comptes dormants ne sont plus tires
-# au sort. DORMANT_ACCOUNTS (vars.conf, liste separee par des virgules)
-# declare EXPLICITEMENT quels comptes sont dormants - CHACUN produit,
-# de maniere garantie, UNE detection FRAUDE_COMPTE_DORMANT a chaque
-# execution. Une soutenance ne peut pas dependre d'un tirage aleatoire :
-# le statut ecrit dans vars.conf EST le resultat qu'on verra dans le
-# Dashboard, point final. Le volume normal autour (ACTIF, realiste)
-# reste genere aleatoirement - lui seul n'a pas besoin d'etre garanti.
+# CHAMPS AJOUTES LE 2026-09-30/10-01 (qui a fait la transaction, depuis
+# ou) : titulaire_compte (nom simule) et, pour le canal GUICHET,
+# agent_guichet (qui a traite l'operation) - rendent la ligne manuelle
+# lisible a l'ecran au moment ou elle est tapee en demo.
 seed_monetic_collection_file() {
   local log_file="$1" min_count="$2" max_count="$3" interval="$4" dormant_accounts="$5"
   mkdir -p "$(dirname "$log_file")"
@@ -143,70 +145,66 @@ interval = float(os.environ['INTERVAL'])
 dormant_accounts = [a.strip() for a in os.environ.get('DORMANT_ACCOUNTS', '').split(',') if a.strip()]
 noise_count = random.randint(min_count, max_count)
 
-# REVU LE 2026-09-30 (demande explicite : "financier" ne peut pas se
-# reduire a "monetique" - GUICHET (operation en agence) et
-# VIREMENT_EN_LIGNE (appli mobile/web banking) ajoutes, pour que le nom
-# de l'objectif ("donnees financieres ET monetiques") corresponde a une
-# vraie donnee generee, jamais seulement a un mot.
 canaux = ["DAB", "GAB", "TPE", "GUICHET", "VIREMENT_EN_LIGNE"]
-statuts_dossier = ["OUVERT"] * 5 + ["ESCALADE"] * 3 + ["EN_ANALYSE"] * 2
-analystes = ["A. NGONO", "B. MBARGA", "C. IYODI", "D. BEYALA", "E. FOUDA"]
+titulaires = ["J. MBALLA", "S. ATANGANA", "P. ONDOA", "R. EKANI", "M. NDJOCK", "L. BIYICK"]
+agents_guichet = ["Guichet 1 - A. TALLA", "Guichet 2 - C. NGO BALLA", "Guichet 3 - D. FOTSO"]
 localisations_physiques = ["Agence Douala-Bonanjo", "Agence Yaounde-Bastos", "DAB Aeroport Douala",
                             "TPE Supermarche CentreVille", "GAB Marche Central", "TPE Station-service Akwa"]
 
-def make_doc(i, total, compte_ref, is_fraud):
+def make_doc(compte_ref, montant_range):
     canal = random.choice(canaux)
     if canal == "VIREMENT_EN_LIGNE":
         localisation = "Application mobile (en ligne)"
+        agent_guichet = "N/A"
     elif canal == "GUICHET":
         localisation = random.choice(["Agence Douala-Bonanjo", "Agence Yaounde-Bastos"])
+        agent_guichet = random.choice(agents_guichet)
     else:
         localisation = random.choice(localisations_physiques)
-    montant = round(random.uniform(10000, 500000), 2) if is_fraud else round(random.uniform(2000, 150000), 2)
-    jours_inactivite = random.randint(200, 900) if is_fraud else random.randint(0, 30)
-    date_dernier_mouvement = (datetime.datetime.utcnow() - datetime.timedelta(days=jours_inactivite)).date().isoformat()
+        agent_guichet = "N/A"
+    montant = round(random.uniform(*montant_range), 2)
     now = datetime.datetime.utcnow().isoformat() + "Z"
+    # AUCUN detection_type/niveau_risque/niveau_alerte/statut_compte/
+    # statut_dossier/statut_traitement ici - transaction brute uniquement,
+    # la qualification est le travail reel de Logstash (translate filter).
     return {
         "timestamp": now,
         "application": "LCB-FT-BEAC",
-        "detection_id": f"LCBFT-{uuid.uuid4().hex[:10].upper()}",
-        "detection_type": "FRAUDE_COMPTE_DORMANT" if is_fraud else "COLLECTE_MONETIQUE",
-        "niveau_risque": "CRITIQUE" if is_fraud else "FAIBLE",
+        "type_evenement": "transaction_brute",
+        "transaction_id": f"TXN-{uuid.uuid4().hex[:10].upper()}",
         "client_ref": f"CLI-{random.randint(100000, 999999)}",
         "compte_ref": compte_ref,
-        "statut_compte": "DORMANT" if is_fraud else "ACTIF",
-        "date_dernier_mouvement": date_dernier_mouvement,
+        "titulaire_compte": random.choice(titulaires),
         "canal": canal,
         "localisation": localisation,
+        "agent_guichet": agent_guichet,
         "montant": montant,
         "devise": "XAF",
         "resultat_operation": "REUSSI",
-        "statut_dossier": random.choice(statuts_dossier) if is_fraud else "CLOTURE",
-        "analyste_assigne": random.choice(analystes) if is_fraud else "N/A",
-        "full_log": (f"Detection LCB-FT {i}/{total} - FRAUDE_COMPTE_DORMANT - compte {compte_ref} - "
-                     f"retrait {canal} REUSSI sur compte dormant depuis {jours_inactivite}j"
-                     if is_fraud else
-                     f"Collecte monetique {i}/{total} - compte {compte_ref} - {canal} - compte actif"),
+        "full_log": f"Transaction {canal} REUSSIE - compte {compte_ref} - {montant} XAF - {localisation}",
         "wef_test_seed": True,
     }
 
 total = len(dormant_accounts) + noise_count
 inserted = 0
 with open(log_file, 'a') as f:
-    # 1) Une detection GARANTIE par compte declare dans DORMANT_ACCOUNTS -
-    #    jamais soumise au hasard, le statut vars.conf EST le resultat.
+    # 1) Une transaction REUSSIE GARANTIE par compte declare dans
+    #    DORMANT_ACCOUNTS - le statut DORMANT/fraude n'est plus ecrit ici,
+    #    c'est Logstash qui le determinera en comparant compte_ref a la
+    #    liste reelle (meme garantie de resultat, autre endroit du pipeline).
     for compte_ref in dormant_accounts:
-        doc = make_doc(inserted + 1, total, compte_ref, is_fraud=True)
+        doc = make_doc(compte_ref, (10000, 500000))
         f.write(json.dumps(doc) + "\n")
         f.flush()
         inserted += 1
-        print(f"[seed_monetic] {inserted}/{total} transaction(s) ecrite(s) dans {log_file} (FRAUDE COMPTE DORMANT GARANTIE, compte {compte_ref})")
+        print(f"[seed_monetic] {inserted}/{total} transaction(s) ecrite(s) dans {log_file} (compte {compte_ref} - correlation Logstash a suivre)")
         if inserted < total:
             time.sleep(interval)
-    # 2) Volume normal (ACTIF) autour du signal - realiste, jamais garanti.
+    # 2) Volume normal autour du signal - comptes aleatoires (hors liste
+    #    DORMANT_ACCOUNTS), Logstash les classera ACTIF par defaut (fallback).
     for i in range(noise_count):
         compte_ref = f"CPT-{random.randint(1000000000, 9999999999)}"
-        doc = make_doc(inserted + 1, total, compte_ref, is_fraud=False)
+        doc = make_doc(compte_ref, (2000, 150000))
         f.write(json.dumps(doc) + "\n")
         f.flush()
         inserted += 1

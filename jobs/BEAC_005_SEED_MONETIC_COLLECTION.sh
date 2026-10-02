@@ -9,21 +9,25 @@
 # dossier) et "Fraude sur compte dormant" (Applications > Conformite
 # financiere, ancien emplacement de "Contournement par un pays tiers").
 #
-# MECANISME : meme fichier/index/pipeline que BEAC_001 (aucune
-# modification Logstash - LS_023B_BEAC_FILTER reconnait par chemin de
-# fichier, jamais par champ). La fonction seed_monetic_collection_file
-# (jobs/lib/beac_scenario_tools.sh) genere un flux de transactions
-# financieres et monetiques (DAB, GAB, TPE, GUICHET, VIREMENT_EN_LIGNE -
-# revu le 2026-09-30 pour que "financier" corresponde a une donnee reelle,
-# pas seulement au mot) majoritairement normales, PLUS une detection
-# FRAUDE_COMPTE_DORMANT GARANTIE (jamais un tirage au sort) pour CHAQUE
-# compte declare dans DORMANT_ACCOUNTS (vars.conf) - le statut ecrit
-# dans vars.conf EST le resultat qu'on retrouve dans le Dashboard.
+# MECANISME : meme fichier/index que BEAC_001. La fonction
+# seed_monetic_collection_file (jobs/lib/beac_scenario_tools.sh) genere
+# un flux de transactions financieres et monetiques (DAB, GAB, TPE,
+# GUICHET, VIREMENT_EN_LIGNE) majoritairement normales, PLUS une
+# transaction REUSSIE GARANTIE (jamais un tirage au sort) pour CHAQUE
+# compte declare dans DORMANT_ACCOUNTS (vars.conf).
 #
-# ROLE JOUE PAR CE JOB : simule la fonction d'un logiciel de detection
-# de fraude comparable a SIRON/AML - voir l'en-tete de
-# jobs/lib/beac_scenario_tools.sh pour le detail complet de ce choix
-# narratif, applique de la meme facon a BEAC_001.
+# REFONDU LE 2026-10-01 (demande explicite : "l'alerte ne doit pas
+# monter directement... c'est Logstash qui doit faire la correlation") :
+# ce job N'ECRIT PLUS LE JUGEMENT lui-meme - les transactions ecrites
+# sont BRUTES (type_evenement=transaction_brute, aucun detection_type/
+# niveau_alerte/statut_compte/statut_traitement). C'est desormais
+# jobs/LS_023D_BEAC_DORMANT_CORRELATION.sh (filtre Logstash translate +
+# condition, lisant le dictionnaire ecrit par
+# jobs/LS_023C_BEAC_DORMANT_DICT.sh) qui determine REELLEMENT si une
+# transaction est une fraude - ce job-ci ne "joue" plus le role d'un
+# logiciel de detection, c'est desormais le PIPELINE LOGSTASH qui
+# detecte pour de vrai. Une ligne tapee a la main (voir Exploitation,
+# DATA-08) passe par exactement le meme filtre, aucun traitement special.
 #
 # JOUE SUR AGENT_HOST (VM2), meme raison que BEAC_001 : les donnees
 # naissent sur une machine cliente et remontent via Filebeat.
@@ -32,8 +36,9 @@
 # ailleurs - meme gate que BEAC_001) :
 #   $APP_BIN/order.sh BEAC_005_SEED_MONETIC_COLLECTION "demo collecte monetique / fraude compte dormant"
 #
-# PREALABLE : identique a BEAC_001 (LS_023B_BEAC_FILTER/LS_024 doivent
-# avoir tourne sur ELK_HOST).
+# PREALABLE : LS_023B_BEAC_FILTER, LS_023C_BEAC_DORMANT_DICT et
+# LS_023D_BEAC_DORMANT_CORRELATION doivent avoir tourne sur ELK_HOST
+# (chaine complete desormais exigee avant LS_024 dans jobs_table.csv).
 set -uo pipefail
 source "$VARS_FILE"
 PROJECT_ROOT="$(dirname "$VARS_FILE")"
@@ -58,5 +63,5 @@ if [ $SEED_EXIT -ne 0 ]; then
 fi
 rm -f "$SEED_LOG"
 
-echo "[BEAC_005_SEED_MONETIC_COLLECTION] OK. Filtrer le dashboard sur detection_type: FRAUDE_COMPTE_DORMANT pour isoler le signal de fraude (retrait reussi sur compte dormant)."
+echo "[BEAC_005_SEED_MONETIC_COLLECTION] OK. Transactions brutes ecrites - Logstash determine seul lesquelles sont des fraudes. Filtrer le dashboard sur detection_type: FRAUDE_COMPTE_DORMANT (niveau_alerte: 13, statut_traitement: SOUS_EMBARGO) une fois la correlation appliquee."
 exit 0

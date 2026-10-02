@@ -208,6 +208,7 @@ fi
 trap release_run_lock EXIT
 
 declare -A RESULT
+declare -A RESULT_LOG
 ATTEMPTED=()
 STOPPED_AT=""
 for j in "${ORDERED_JOBS[@]}"; do
@@ -252,6 +253,7 @@ for j in "${ORDERED_JOBS[@]}"; do
   printf '"%s","%s","%s","%s","%s","%s","%s","%s"\n' \
     "$(date -Iseconds)" "$j" "$OPERATEUR" "${RAISON_SAFE//\"/\'} (lot $VARNAME)" "MOYEN" "aucune" "aucun" "$CHANGE_RESULT" >> "$CHANGE_LOG"
 
+  RESULT_LOG["$j"]="$JOB_LOG"
   if [ "$JOB_EXIT" -eq 0 ]; then
     RESULT["$j"]="OK"
     echo "<<< $j -> REPLAY_OK."
@@ -270,17 +272,33 @@ echo ""
 echo "=================================================="
 echo " BILAN - rejeu de $VARNAME"
 echo "=================================================="
+# AJOUTE LE 2026-10-02, demande explicite : une liste en prose se lit mal
+# des que le lot depasse quelques jobs (imagine pour 50) - jamais un
+# format invente ici, repris tel quel du tableau deja utilise par
+# bin/audit.sh (memes printf "%-Ns", meme ligne de tirets) pour rester
+# coherent avec le reste du projet. Une seule ligne meme pour un lot d'UN
+# seul job. Le marqueur "!!" en tete des lignes non-OK permet de reperer
+# un echec/non-tente sans avoir a lire chaque ligne une par une, meme en
+# conservant l'ordre reel d'execution (jamais trie a part, cet ordre EST
+# l'information : il montre jusqu'ou la chaine est allee).
 NOT_ATTEMPTED=()
+printf "%-3s %-3s %-11s %-32s %s\n" "" "#" "STATUT" "JOB_ID" "LOG"
+printf "%-3s %-3s %-11s %-32s %s\n" "" "---" "-----------" "--------------------------------" "---"
+i=0
+# CORRIGE LE 2026-10-02 (teste reellement avant de pousser) : deux boucles
+# separees (jobs avec resultat, puis NOT_ATTEMPTED) incrementaient TOUTES
+# LES DEUX "i" pour le meme job quand il n'avait pas encore de resultat -
+# le numero de ligne sautait (3 puis 5, jamais 4). Une seule boucle,
+# jamais deux compteurs qui se marchent dessus.
 for j in "${ORDERED_JOBS[@]}"; do
-  if [ -z "${RESULT[$j]:-}" ]; then
+  i=$((i+1))
+  if [ -n "${RESULT[$j]:-}" ]; then
+    MARK=""; [ "${RESULT[$j]}" != "OK" ] && MARK="!!"
+    printf "%-3s %-3s %-11s %-32s %s\n" "$MARK" "$i" "${RESULT[$j]}" "$j" "${RESULT_LOG[$j]:-}"
+  else
     NOT_ATTEMPTED+=("$j")
+    printf "%-3s %-3s %-11s %-32s %s\n" "!!" "$i" "NON_TENTE" "$j" "-"
   fi
-done
-for j in "${ORDERED_JOBS[@]}"; do
-  [ -n "${RESULT[$j]:-}" ] && echo "  ${RESULT[$j]}  $j"
-done
-for j in "${NOT_ATTEMPTED[@]}"; do
-  echo "  NON TENTE  $j"
 done
 
 if [ -n "$STOPPED_AT" ]; then

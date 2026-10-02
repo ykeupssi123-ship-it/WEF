@@ -75,7 +75,8 @@ mkdir -p "$HISTORY_DIR" "$RUNNING_DIR" "$WORK_TMP_DIR"
 # Recherche reelle (jamais une liste a la main) + tri de dependance reel -
 # voir lib/consumers_for_variable.py pour le detail des deux etapes.
 ORDERED_JOBS=()
-CONSUMER_OUT="$(python3 "$HERE/lib/consumers_for_variable.py" "$VARNAME")"
+declare -A MISSING_DEPS
+CONSUMER_OUT="$(STATE_DIR="$STATE_DIR" python3 "$HERE/lib/consumers_for_variable.py" "$VARNAME")"
 CONSUMER_RC=$?
 if [ "$CONSUMER_RC" -eq 2 ]; then
   echo "Aucun job de cette usine ne consomme $VARNAME (verifie par recherche reelle dans le code)."
@@ -91,9 +92,17 @@ fi
 # Python sous Windows en mode texte") - sans ce nettoyage, chaque JOB_ID
 # porte un \r invisible en fin de chaine, et plus aucun "grep ^${j}," ne
 # retrouve jamais la ligne correspondante dans jobs_table.csv plus bas.
-while IFS= read -r line; do
-  line="${line%$'\r'}"
-  [ -n "$line" ] && ORDERED_JOBS+=("$line")
+# Format reel de chaque ligne depuis consumers_for_variable.py :
+# "JOB_ID<TAB>COND_MANQUANTE1,COND_MANQUANTE2" (deuxieme champ vide si rien
+# ne manque) - voir ce fichier pour pourquoi cette verification existe
+# (incident reel WAZ_035B_CUT_INDEXER_TO_ES).
+while IFS=$'\t' read -r jid missing; do
+  jid="${jid%$'\r'}"
+  missing="${missing%$'\r'}"
+  if [ -n "$jid" ]; then
+    ORDERED_JOBS+=("$jid")
+    MISSING_DEPS["$jid"]="$missing"
+  fi
 done <<< "$CONSUMER_OUT"
 
 # CORRIGE LE 2026-10-02 (trouve en verifiant un cas reel a 10 jobs avant
@@ -159,6 +168,31 @@ for j in "${ORDERED_JOBS[@]}"; do
   i=$((i+1))
   echo "  $i. $j"
 done
+# AJOUTE LE 2026-10-02 (incident reel : WAZ_035B_CUT_INDEXER_TO_ES a
+# echoue car sa vraie precondition WAZ_PIPELINE_ELK_ACTIVE n'est produite
+# QUE par WAZ_035C_REROUTE_PIPELINE_ES - un job hors de ce lot, jamais
+# verifie jusqu'ici. Meme principe que le bloc MISSING de bin/order.sh :
+# avertit, ne bloque jamais - c'est a l'operateur de juger si c'est
+# correct de continuer (ex: condition deja remplie manuellement, ou le
+# job tourne volontairement hors de sa sequence habituelle).
+ANY_MISSING=0
+for j in "${ORDERED_JOBS[@]}"; do
+  [ -n "${MISSING_DEPS[$j]:-}" ] && ANY_MISSING=1
+done
+if [ "$ANY_MISSING" -eq 1 ]; then
+  echo ""
+  echo "ATTENTION : au moins un job de ce lot a une precondition REELLE non encore satisfaite"
+  echo "sur cette machine (jamais geree par l'ordre interne de ce lot - verifiee contre l'etat"
+  echo "reel du systeme) :"
+  for j in "${ORDERED_JOBS[@]}"; do
+    if [ -n "${MISSING_DEPS[$j]:-}" ]; then
+      echo "  - $j attend : ${MISSING_DEPS[$j]}"
+    fi
+  done
+  echo "Ce lot ne verifie que la variable $VARNAME - un job peut tres bien appartenir a une"
+  echo "sequence plus large (ex: WAZ_035A/B/C/D) dont les autres etapes ne sont jamais incluses"
+  echo "ici. A vous de juger si c'est correct de continuer malgre tout."
+fi
 if [ "${#OTHER_ROLE[@]}" -gt 0 ]; then
   echo ""
   echo "${#OTHER_ROLE[@]} job(s) consomment aussi $VARNAME mais appartiennent a l'AUTRE role -"

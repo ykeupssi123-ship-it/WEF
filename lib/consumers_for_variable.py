@@ -10,10 +10,11 @@
 # joue jamais un job avant celui dont il depend reellement.
 #
 # Usage :
-#   python3 lib/consumers_for_variable.py NOM_VARIABLE
-#     -> imprime les JOB_ID trouves, UN PAR LIGNE, dans un ordre de
-#        dependance sur VERAI (jamais juste l'ordre alphabetique des
-#        fichiers). Code de sortie 0.
+#   STATE_DIR=... python3 lib/consumers_for_variable.py NOM_VARIABLE
+#     -> imprime une ligne par JOB_ID trouve, dans l'ordre de dependance
+#        REEL (jamais juste l'ordre alphabetique des fichiers), au format
+#        "JOB_ID<TAB>COND_MANQUANTE1,COND_MANQUANTE2" (deuxieme champ vide
+#        si rien ne manque). Code de sortie 0.
 #   Rien trouve dans le systeme de jobs (variable consommee uniquement
 #        hors jobs/, cf OUTSIDE_JOB_CONSUMERS de vars_pilotage_analysis.py,
 #        ou variable non consommee du tout) -> rien sur stdout, code de
@@ -23,6 +24,20 @@
 #        arriver si jobs_table.csv est sain, mais jamais suppose) ->
 #        message d'erreur explicite sur stderr listant les jobs impliques,
 #        code de sortie 1.
+#
+# AJOUTE LE 2026-10-02 (incident reel : WAZ_035B_CUT_INDEXER_TO_ES rejoue
+# seul via ce lot a echoue, parce que sa vraie precondition
+# WAZ_PIPELINE_ELK_ACTIVE n'est produite que par WAZ_035C_REROUTE_
+# PIPELINE_ES - un job qui ne consomme meme pas la variable rejouee, donc
+# totalement hors du lot). Le tri topologique ne protegeait QUE contre les
+# dependances INTERNES au lot - jamais contre une precondition EXTERNE non
+# satisfaite. Meme principe que le bloc "MISSING" deja construit dans
+# bin/order.sh (job_done() sur chaque IN_COND), applique ici a chaque job
+# du lot : une IN_COND non produite par un autre job DU LOT et pas encore
+# marquee faite sur le systeme reel (state/<COND>.ok absent) est signalee
+# comme manquante - jamais un blocage automatique (l'operateur reste libre
+# de forcer, exactement comme order.sh), juste un avertissement visible
+# AVANT la confirmation plutot qu'un echec decouvert apres coup.
 import csv
 import glob
 import os
@@ -116,6 +131,38 @@ def topological_order(jobids, in_cond_by_job, out_cond_by_job):
     return ordered
 
 
+def external_missing_deps(ordered, in_cond_by_job, out_cond_by_job, state_dir):
+    """Pour chaque job du lot, liste ses IN_COND qui (a) ne sont PAS
+    produites par un autre job DU MEME LOT (celles-la sont deja garanties
+    par le tri topologique) ET (b) ne sont pas encore marquees faites sur
+    le systeme reel (state/<COND>.ok absent). Jamais calcule sur des
+    conditions internes au lot - un job plus loin dans l'ordre depend
+    souvent, legitimement, d'un job plus tot dans ce MEME lot qui n'a pas
+    encore tourne au moment de cette verification (c'est precisement ce
+    que le tri topologique organise), jamais une vraie precondition
+    manquante."""
+    ordered_set = set(ordered)
+    producer_of = {}
+    for j in ordered:
+        oc = out_cond_by_job.get(j, "NONE")
+        if oc and oc != "NONE":
+            producer_of[oc] = j
+
+    missing_by_job = {}
+    for j in ordered:
+        ic = in_cond_by_job.get(j, "NONE")
+        missing = []
+        if ic and ic != "NONE":
+            for cond in ic.split("|"):
+                producer = producer_of.get(cond)
+                if producer and producer in ordered_set:
+                    continue  # geree par l'ordre interne du lot, jamais une precondition externe
+                if not os.path.exists(os.path.join(state_dir, cond + ".ok")):
+                    missing.append(cond)
+        missing_by_job[j] = missing
+    return missing_by_job
+
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: consumers_for_variable.py NOM_VARIABLE", file=sys.stderr)
@@ -129,8 +176,11 @@ def main():
     except ValueError as e:
         print("ERREUR: " + str(e), file=sys.stderr)
         sys.exit(1)
+    state_dir = os.environ.get("STATE_DIR", "")
+    missing_by_job = external_missing_deps(ordered, in_cond_by_job, out_cond_by_job, state_dir) if state_dir else {}
     for j in ordered:
-        print(j)
+        missing = ",".join(missing_by_job.get(j, []))
+        print(f"{j}\t{missing}")
 
 
 if __name__ == "__main__":

@@ -311,7 +311,20 @@ echo ""
 echo "Tous les jobs du lot ont reussi (${#ORDERED_JOBS[@]}/${#ORDERED_JOBS[@]})."
 exit 0
 
-} | tee -a "$BATCH_LOG"
+} 2>&1 | tee -a "$BATCH_LOG"
+# CORRIGE LE 2026-10-02 (incident reel signale par l'operateur : le
+# contexte - en-tete, liste des jobs - s'affichait APRES l'invite de
+# confirmation, jamais avant, dans un rejeu reel sur wef-elk-core).
+# CAUSE REELLE : "read -p" ecrit son invite sur STDERR (comportement
+# documente de bash), jamais sur stdout - sans ce "2>&1" AVANT le pipe,
+# stdout (les echo du bilan) et stderr (l'invite) empruntaient deux
+# chemins separes vers le terminal, sans ordre garanti entre les deux ;
+# stderr arrivait plus vite, affichant l'invite SEULE, sans aucun contexte
+# - un operateur pourrait alors confirmer un rejeu destructeur sans avoir
+# vu ce qu'il confirme reellement. Fusionner stderr dans stdout AVANT le
+# pipe force un seul flux serialise, ordre garanti, jamais plus de course
+# possible entre les deux. Benefice secondaire : l'invite elle-meme est
+# desormais aussi archivee dans le fichier de lot.
 # "set -o pipefail" (deja actif, voir "set -uo pipefail" en tete de ce
 # script) fait remonter ici le vrai code de sortie du bloc ci-dessus,
 # jamais celui de tee - verifie reellement avant de pousser (voir le

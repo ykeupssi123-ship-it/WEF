@@ -50,10 +50,16 @@ if [ "$HTTP_CODE" != "200" ]; then
   exit 1
 fi
 
-echo "[WAZ_035B_CUT_INDEXER_TO_ES] Verification reelle que wazuh-indexer (source) est joignable..."
-HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --cacert "${PKI_DIR}/factory_ca.crt" -u "${WAZ_INDEXER_ADMIN_USER}:${WAZUH_INDEXER_ADMIN_PW}" "https://127.0.0.1:${WAZ_INDEXER_PORT}/_cluster/health" 2>/dev/null)
-if [ "$HTTP_CODE" != "200" ]; then
-  echo "[WAZ_035B_CUT_INDEXER_TO_ES] ERREUR : wazuh-indexer injoignable ou authentification en echec (HTTP ${HTTP_CODE})." >&2
+# CORRIGE LE 2026-10-02 (incident reel : echec HTTP 503 juste apres un
+# redemarrage de wazuh-indexer par WAZ_014, qui accepte deliberement ce
+# meme 503 comme preuve de vie suffisante pour lui-meme - voir son propre
+# en-tete. Ce job, lui, a reellement besoin d'une authentification
+# REUSSIE, pas juste d'un signe de vie - une seule tentative echouait a
+# tort pendant la fenetre d'initialisation du plugin de securite. Voir
+# lib/commun.sh:wait_for_indexer_auth pour le detail complet.
+echo "[WAZ_035B_CUT_INDEXER_TO_ES] Verification reelle que wazuh-indexer (source) est joignable (jusqu'a 60s, le temps que son plugin de securite finisse de s'initialiser si un redemarrage vient d'avoir lieu)..."
+if ! wait_for_indexer_auth "${WAZ_INDEXER_ADMIN_USER}" "${WAZUH_INDEXER_ADMIN_PW}" "${WAZ_INDEXER_PORT}" "${PKI_DIR}/factory_ca.crt"; then
+  echo "[WAZ_035B_CUT_INDEXER_TO_ES] ERREUR : wazuh-indexer injoignable ou authentification en echec." >&2
   exit 1
 fi
 

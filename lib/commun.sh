@@ -230,6 +230,39 @@ wait_for_service_active(){
   return 1
 }
 
+# ATTENTE REELLE DE L'AUTHENTIFICATION WAZUH-INDEXER, ajoutee le 2026-10-02
+# suite a un incident reel (bin/replay_for_variable.sh, lot WAZ_INDEXER_PORT) :
+# WAZ_035B_CUT_INDEXER_TO_ES a echoue (HTTP 503) juste apres que WAZ_014
+# ait redemarre wazuh-indexer. Cause reelle, jamais un hasard : WAZ_014
+# accepte DELIBEREMENT le 503 comme preuve de vie suffisante pour LUI-MEME
+# (son propre en-tete l'explique : c'est le role de WAZ_014A d'attendre la
+# vraie disponibilite du plugin de securite) - mais aucun job SUIVANT
+# n'herite de cette attente si son IN_COND ne passe pas formellement par
+# WAZ_014A. Plusieurs jobs (WAZ_035B, WAZ_039C, WAZ_039_MODE_SOUVERAIN)
+# faisaient une SEULE tentative puis abandonnaient immediatement sur 503,
+# alors que ce code precis signifie "pas encore pret", pas "ne sera jamais
+# pret". Point unique desormais, jamais une boucle dupliquee a chaque job.
+# Usage : wait_for_indexer_auth <user> <password> <port> <ca_file> [max_secondes=60] [intervalle=5]
+# Retourne 0 des que l'authentification reussit reellement (HTTP 200), 1
+# si elle echoue encore apres le delai (le dernier code HTTP observe est
+# affiche pour diagnostic - 401/403 apres le delai signale un vrai probleme
+# d'identifiants, jamais seulement une question de timing, mais ce n'est
+# decide qu'a la toute fin, jamais suppose avant l'heure).
+wait_for_indexer_auth(){
+  local user="$1" password="$2" port="$3" ca_file="$4"
+  local max_secondes="${5:-60}" intervalle="${6:-5}"
+  local tentatives=$(( max_secondes / intervalle ))
+  [ "$tentatives" -lt 1 ] && tentatives=1
+  local i http_code
+  for i in $(seq 1 "$tentatives"); do
+    http_code=$(curl -sk -o /dev/null -w '%{http_code}' --cacert "$ca_file" -u "${user}:${password}" "https://127.0.0.1:${port}/_cluster/health" 2>/dev/null)
+    [ "$http_code" = "200" ] && return 0
+    sleep "$intervalle"
+  done
+  echo "[wait_for_indexer_auth] ERREUR : wazuh-indexer n'authentifie toujours pas (dernier code observe : ${http_code:-000}) apres ${max_secondes}s." >&2
+  return 1
+}
+
 # LECTURE DE SECRET DEPUIS FICHIER SEPARE, ajoutee le 2026-08-30 suite a
 # un audit reel de vars.conf : WAZ_INDEXER_ADMIN_PASSWORD, WAZ_API_PASSWORD,
 # LDAP_BIND_PASSWORD et FACTORY_SSH_PASSWORD vivaient en clair dans

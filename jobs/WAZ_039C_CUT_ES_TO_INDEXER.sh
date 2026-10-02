@@ -24,10 +24,11 @@ ES_BOOTSTRAP_PW_FILE="${STATE_DIR}/es_bootstrap_password.secret"
 [ -f "$ES_BOOTSTRAP_PW_FILE" ] || { echo "[WAZ_039C_CUT_ES_TO_INDEXER] ERREUR : ${ES_BOOTSTRAP_PW_FILE} absent (ES_022 doit avoir tourne)." >&2; exit 1; }
 ES_BOOTSTRAP_PW="$(cat "$ES_BOOTSTRAP_PW_FILE")"
 
-echo "[WAZ_039C_CUT_ES_TO_INDEXER] Verification reelle que wazuh-indexer (destination) est joignable..."
-HTTP_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --cacert "${PKI_DIR}/factory_ca.crt" -u "${WAZ_INDEXER_ADMIN_USER}:${WAZUH_INDEXER_ADMIN_PW}" "https://127.0.0.1:${WAZ_INDEXER_PORT}/_cluster/health" 2>/dev/null)
-if [ "$HTTP_CODE" != "200" ]; then
-  echo "[WAZ_039C_CUT_ES_TO_INDEXER] ERREUR : wazuh-indexer injoignable ou authentification en echec (HTTP ${HTTP_CODE})." >&2
+# CORRIGE LE 2026-10-02 (meme incident reel et meme correctif que
+# WAZ_035B_CUT_INDEXER_TO_ES - voir lib/commun.sh:wait_for_indexer_auth).
+echo "[WAZ_039C_CUT_ES_TO_INDEXER] Verification reelle que wazuh-indexer (destination) est joignable (jusqu'a 60s, le temps que son plugin de securite finisse de s'initialiser si un redemarrage vient d'avoir lieu)..."
+if ! wait_for_indexer_auth "${WAZ_INDEXER_ADMIN_USER}" "${WAZUH_INDEXER_ADMIN_PW}" "${WAZ_INDEXER_PORT}" "${PKI_DIR}/factory_ca.crt"; then
+  echo "[WAZ_039C_CUT_ES_TO_INDEXER] ERREUR : wazuh-indexer injoignable ou authentification en echec." >&2
   exit 1
 fi
 

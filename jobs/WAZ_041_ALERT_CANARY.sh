@@ -77,7 +77,16 @@ if ! grep -q 'id="100101"' "$RULES_FILE" 2>/dev/null; then
   # de la regle d'exemple vendor 100001, corrompant la structure XML de
   # tout ce qui suit pour analysisd. Corrige avec '$s#...#' (adresse "$"
   # = derniere ligne uniquement), identique au correctif de WAZ_025.sh.
-  sed -i '$s#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  # CORRIGE LE 2026-10-05 (meme bug reel que WAZ_051_IOC_CDB_LIST : local_rules.xml
+  # peut deja etre verrouille immuable par un job anterieur - sed -i echouait
+  # silencieusement ("Operation non permise"), jamais verifie ici avant.
+  RULES_WAS_IMMUTABLE=0
+  if lsattr "$RULES_FILE" 2>/dev/null | grep -q '^....i'; then
+    chattr -i "$RULES_FILE"
+    RULES_WAS_IMMUTABLE=1
+  fi
+sed -i '$s#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  [ "$RULES_WAS_IMMUTABLE" -eq 1 ] && chattr +i "$RULES_FILE"
   systemctl restart wazuh-manager 2>/dev/null || true
   if ! wait_for_service_active wazuh-manager 120 5; then
     echo "[WAZ_041] ERREUR : wazuh-manager n'a pas redemarre proprement apres la pose de la regle du canari." >&2

@@ -102,6 +102,15 @@ fi
 # "Public API request rate limit reached", en boucle). Corrige par
 # une exclusion FIM explicite de ses propres fichiers de travail -
 # la seule source reelle du bruit, jamais les vrais fichiers utilisateur.
+# CORRIGE LE 2026-10-05 (demande explicite : "je ne veux plus que
+# virustotal surveille les choses dans $APP_HOME, ca remplit virustotal
+# pour rien") - inversion partielle de l'elargissement du 2026-09-18 :
+# $APP_HOME (PROJECT_ROOT) est desormais exclu du declenchement FIM/VT
+# via un <ignore> dedie, sans retirer /root du perimetre surveille -
+# un fichier depose directement dans /root (hors du depot WEF) continue
+# de declencher VirusTotal normalement ; seule l'activite interne du
+# projet (git sync, state/*.ok, logs) ne consomme plus le quota gratuit
+# (4 requetes/minute) pour rien.
 echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de la surveillance FIM temps reel de : ${FIM_DIRECTORIES}..."
 {
   echo "$MARKER_FIM"
@@ -109,6 +118,7 @@ echo "[WAZ_050_VIRUSTOTAL_INTEGRATION] Ajout de la surveillance FIM temps reel d
   echo "  <syscheck>"
   echo "    <directories realtime=\"yes\" report_changes=\"yes\">${FIM_DIRECTORIES}</directories>"
   echo "    <ignore type=\"sregex\">^/tmp/virustotal-</ignore>"
+  echo "    <ignore type=\"sregex\">^${PROJECT_ROOT}</ignore>"
   echo "  </syscheck>"
   echo "</ossec_config>"
   echo "<!-- WEF_VT_FIM_CONFIG_END -->"

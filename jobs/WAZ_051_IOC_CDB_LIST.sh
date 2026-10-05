@@ -77,6 +77,18 @@ chattr +i "$OSSEC_CONF"
 
 RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
 [ -f "$RULES_FILE" ] || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : ${RULES_FILE} introuvable (deja inclus par defaut dans ossec.conf vendor)." >&2; exit 1; }
+
+# CORRIGE LE 2026-10-05 (bug reel trouve en rejouant ce job avant la demo :
+# "Operation non permise" sur local_rules.xml - deja verrouille immuable
+# par un job anterieur, jamais deverrouille ici contrairement a OSSEC_CONF
+# ci-dessus. Meme motif WAS_IMMUTABLE deja etabli dans WAZ_055/WAZ_019/
+# WAZ_058 pour ce meme fichier partage).
+RULES_WAS_IMMUTABLE=0
+if lsattr "$RULES_FILE" 2>/dev/null | grep -q '^....i'; then
+  echo "[WAZ_051_IOC_CDB_LIST] ${RULES_FILE} est immuable - deverrouillage temporaire avant reecriture."
+  chattr -i "$RULES_FILE"
+  RULES_WAS_IMMUTABLE=1
+fi
 MARKER_RULE="<!-- WEF_IOC_RULE (WAZ_051, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   echo "[WAZ_051_IOC_CDB_LIST] Regle IOC deja posee, retrait avant reecriture..."
@@ -106,6 +118,7 @@ echo "[WAZ_051_IOC_CDB_LIST] Ajout de la regle de correlation IOC (id 100200)...
   echo "<!-- WEF_IOC_RULE_END -->"
 } >> "$RULES_FILE"
 grep -qF "$MARKER_RULE" "$RULES_FILE" || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : regle IOC absente apres ecriture dans ${RULES_FILE}." >&2; exit 1; }
+[ "$RULES_WAS_IMMUTABLE" -eq 1 ] && chattr +i "$RULES_FILE"
 
 echo "[WAZ_051_IOC_CDB_LIST] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

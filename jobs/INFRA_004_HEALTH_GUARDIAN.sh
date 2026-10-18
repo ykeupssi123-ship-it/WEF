@@ -29,6 +29,15 @@
 #     remarque avant que TOUT le TLS interne casse d'un coup.
 #   - Espace disque sur / : cause racine reelle et deja vecue
 #     aujourd'hui (incident disque plein pendant l'orchestrateur).
+#   - Archivage a froid (ES_065/066/067, AJOUTE LE 2026-10-18, meme
+#     incident disque) : un seul signal, mais le bon - l'age de la
+#     DERNIERE sauvegarde reussie (last_success). Si elle est trop
+#     vieille ou n'a jamais eu lieu, l'archivage est casse en silence -
+#     exactement le risque qui a cause l'incident du jour. Jamais de
+#     verification de l'etat ILM/SLM detaille ici (trop touffu pour un
+#     controle toutes les 5 min) : ce seul signal suffit a declencher
+#     une investigation humaine, le detail se regarde alors a la main
+#     (voir README, section archivage a froid).
 set -uo pipefail
 source "$VARS_FILE"
 
@@ -77,6 +86,31 @@ if [ -n "\$DISK_PCT" ] && [ "\$DISK_PCT" -ge 85 ]; then
   # exploitable au lieu de devoir la redemander.
   TOP_CONSO=\$(du -x --max-depth=3 / 2>/dev/null | sort -rn | head -1 | awk '{printf "%.1fG %s", \$1/1048576, \$2}')
   logger -t wef-health-guardian "ALERTE : disque / a \${DISK_PCT}% d'utilisation (plus gros poste : \${TOP_CONSO:-inconnu})."
+fi
+
+# Archivage a froid - un seul signal (age de la derniere sauvegarde
+# reussie), relu depuis vars.conf a CHAQUE execution (jamais fige a
+# l'installation) pour rester pilotable en direct, meme logique que les
+# jobs ES_065/066/067 eux-memes.
+if [ -f "$VARS_FILE" ]; then
+  source "$VARS_FILE"
+  if [ "\${ES_COLD_ARCHIVE_ENABLED:-false}" = "true" ]; then
+    SLM_POLICY="\${ES_COLD_ARCHIVE_POLICY_NAME:-wef_cold_archive_slm}"
+    STALE_H="\${ES_COLD_ARCHIVE_ALERT_STALE_HOURS:-36}"
+    PWFILE="\${STATE_DIR}/es_bootstrap_password.secret"
+    if [ -f "\$PWFILE" ]; then
+      SLM_JSON=\$(curl -s --cacert "\${PKI_DIR}/factory_ca.crt" -u "elastic:\$(cat "\$PWFILE")" "https://127.0.0.1:\${ES_PORT}/_slm/policy/\${SLM_POLICY}?human" 2>/dev/null)
+      LAST_MS=\$(echo "\$SLM_JSON" | grep -o '"last_success"[^}]*"time"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*\$')
+      if [ -z "\$LAST_MS" ]; then
+        logger -t wef-health-guardian "ALERTE : archivage a froid (\${SLM_POLICY}) actif mais aucune sauvegarde reussie enregistree (last_success absent)."
+      else
+        AGE_H=\$(( ( \$(date +%s) - LAST_MS / 1000 ) / 3600 ))
+        if [ "\$AGE_H" -ge "\$STALE_H" ]; then
+          logger -t wef-health-guardian "ALERTE : derniere sauvegarde a froid reussie il y a \${AGE_H}h (seuil \${STALE_H}h, voir ES_COLD_ARCHIVE_ALERT_STALE_HOURS) - verifier _slm/policy/\${SLM_POLICY}."
+        fi
+      fi
+    fi
+  fi
 fi
 SCRIPTEOF
 chmod 755 "$CHECK_SCRIPT"

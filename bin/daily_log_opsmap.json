@@ -1,0 +1,553 @@
+[
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "File health",
+"id": "USAGE-01",
+"title": "Pair file-integrity alerts with a reputation check (VirusTotal)",
+"jobs": [
+"WAZ_050_VIRUSTOTAL_INTEGRATION",
+"WAG_009_VT_WATCH_DIR"
+],
+"tech": "Wazuh · VirusTotal"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "File health",
+"id": "USAGE-02",
+"title": "Match every file change against a known-bad hash list (IOC)",
+"jobs": [
+"WAZ_051_IOC_CDB_LIST"
+],
+"tech": "Wazuh"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "File health",
+"id": "USAGE-03",
+"title": "Prove file-integrity monitoring on its three real events",
+"jobs": [],
+"tech": "Wazuh"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "Intrusion detection",
+"id": "USAGE-04",
+"title": "Rootcheck every 5 minutes + command auditing (auditd) on the sensor",
+"jobs": [
+"WAG_007_ROOTCHECK",
+"WAG_008_AUDITD_INTEGRATION"
+],
+"tech": "Wazuh · auditd"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "Intrusion detection",
+"id": "USAGE-05",
+"title": "Tell a successful login from a failed one, for the same account",
+"jobs": [],
+"tech": "Wazuh"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "Intrusion detection",
+"id": "USAGE-06",
+"title": "Two working-hour windows, two trust levels (admin / standard)",
+"jobs": [
+"WAZ_060"
+],
+"tech": "Wazuh"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "Intrusion detection",
+"id": "USAGE-07",
+"title": "Lock an account for a declared leave, then restore it",
+"jobs": [
+"WAG_011_LEAVE_LOCK",
+"WAG_012_LEAVE_UNLOCK",
+"WAZ_061",
+"WAG_011",
+"WAG_012"
+],
+"tech": "Wazuh · Linux PAM"
+},
+{
+"fam": "SECOPS",
+"disc": "System & Network Security",
+"obj": "Intrusion detection",
+"id": "USAGE-08",
+"title": "Spot a device that joins the network without being declared",
+"jobs": [
+"WAZ_062"
+],
+"tech": "Wazuh · nmap"
+},
+{
+"fam": "SECOPS",
+"disc": "Penetration Testing",
+"obj": "Vulnerability detection",
+"id": "USAGE-09",
+"title": "Scan the fleet and report what is exposed",
+"jobs": [
+"WAZ_055_NMAP_SCAN_INTEGRATION",
+"WAZ_056_NMAP_SCAN_RUN"
+],
+"tech": "Wazuh · nmap"
+},
+{
+"fam": "SECOPS",
+"disc": "Penetration Testing",
+"obj": "Vulnerability detection",
+"id": "WAZ-059",
+"title": "Flag the known CVEs found by the scan",
+"jobs": [
+"WAZ_059_NMAP_VULN_ADVISORY"
+],
+"tech": "Wazuh · nmap · vulners"
+},
+{
+"fam": "BANKING OPERATIONS",
+"disc": "Financial Compliance",
+"obj": "Pipeline setup",
+"id": "FONC-10",
+"title": "Build the transaction pipeline: clock, indices, parsing, dormant-account correlation",
+"jobs": [
+"INFRA_007_NTP_SERVER",
+"ES_041",
+"LS_023B_BEAC_FILTER",
+"LS_023C_BEAC_DORMANT_DICT",
+"LS_023D_BEAC_DORMANT_CORRELATION",
+"LS_024",
+"LS_026_FINAL",
+"BEAC_004"
+],
+"tech": "ELK · NTP"
+},
+{
+"fam": "BANKING OPERATIONS",
+"disc": "Financial Compliance",
+"obj": "Transaction flow",
+"id": "USAGE-10",
+"title": "Collect ATM / POS / counter / online-transfer transactions",
+"jobs": [
+"BEAC_005_SEED_MONETIC_COLLECTION",
+"BEAC_005"
+],
+"tech": "ELK"
+},
+{
+"fam": "BANKING OPERATIONS",
+"disc": "Financial Compliance",
+"obj": "Transaction flow",
+"id": "USAGE-12",
+"title": "Collect national and international money transfers",
+"jobs": [
+"BEAC_002_SEED_CYRIELLEMONEY_LIVE",
+"BEAC_002"
+],
+"tech": "ELK"
+},
+{
+"fam": "BANKING OPERATIONS",
+"disc": "Fight against fraud (AML / CFT)",
+"obj": "Fraud detection",
+"id": "USAGE-11",
+"title": "Produce AML / CFT detections from the live flow",
+"jobs": [
+"BEAC_001_SEED_LCBFT_LIVE",
+"BEAC_001",
+"BEAC_003"
+],
+"tech": "ELK"
+},
+{
+"fam": "BANKING OPERATIONS",
+"disc": "Fight against fraud (AML / CFT)",
+"obj": "Fraud detection",
+"id": "USAGE-13",
+"title": "Catch a transaction on a dormant account (manual entry)",
+"jobs": [
+"BEAC_006"
+],
+"tech": "ELK · Logstash"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Connecting to the machines",
+"id": "PUTTY",
+"title": "Reach a machine (saved SSH session per VM)",
+"jobs": [],
+"tech": "SSH"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-01",
+"title": "Load the standard $APP_* environment on the machine",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-02",
+"title": "Give the machine its role (ELK_HOST / AGENT_HOST)",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-04",
+"title": "Check RAM / CPU / disk before installing anything",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-03",
+"title": "Deploy the whole task chain of the machine with one command",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-05",
+"title": "Synchronise the clocks (NTP server on VM1, client on VM2)",
+"jobs": [
+"INFRA_007_NTP_SERVER",
+"INFRA_008_NTP_CLIENT"
+],
+"tech": "WEF · NTP"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-06",
+"title": "Open the firewall by trust zone for a new source machine",
+"jobs": [
+"LS_008"
+],
+"tech": "WEF · firewalld"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-08",
+"title": "Deploy a Windows workstation (agent + Beats)",
+"jobs": [],
+"tech": "WEF · PowerShell"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-09",
+"title": "Install the native scheduler (60-second tick)",
+"jobs": [
+"INFRA_010_SCHEDULER_INSTALL"
+],
+"tech": "WEF · systemd"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Deployment & infrastructure",
+"id": "INFRA-07",
+"title": "Hand the internal CA certificate to a new machine",
+"jobs": [],
+"tech": "WEF · PKI"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Versions & updates",
+"id": "UPG-01",
+"title": "Move a pinned component version, then replay its install job",
+"jobs": [
+"ES_017"
+],
+"tech": "WEF · ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Versions & updates",
+"id": "UPG-02",
+"title": "Apply OS updates with a controlled exclusion list",
+"jobs": [
+"ES_001"
+],
+"tech": "WEF · dnf"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Backup & authentication",
+"id": "INFRA-10",
+"title": "Send index snapshots off-site (S3 object storage)",
+"jobs": [
+"ES_062_SNAPSHOTS3REPO",
+"ES_063_SNAPSHOTPOLICY"
+],
+"tech": "ELK · S3"
+},
+{
+"fam": "ITOPS",
+"disc": "Infrastructure & Network",
+"obj": "Backup & authentication",
+"id": "INFRA-11",
+"title": "Choose the authentication source (internal / LDAP / SAML)",
+"jobs": [],
+"tech": "WEF · Kibana"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-01",
+"title": "Run one task now, with a dated reason",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-02",
+"title": "Hold / free a task for the orchestrator",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-06",
+"title": "Watch the chain live",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-05",
+"title": "List every task state, then only the failures",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-07",
+"title": "Regenerate the closing summary of every service",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-04",
+"title": "Show the full execution history of a task",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-09",
+"title": "System Monitoring and Log Activity dashboards",
+"jobs": [
+"KB_030_GENERIC_LOG_DATAVIEW",
+"KB_031_MONITORING_DASHBOARDS"
+],
+"tech": "ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "NOTIF-01",
+"title": "Check that e-mail reporting reaches its recipients",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Task piloting",
+"id": "FONC-03",
+"title": "Mark a task done (fixed by hand) without re-running it",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Continuous health watch",
+"id": "GUARD-01",
+"title": "Health guardian: services, DNS, PKI certificate, disk - every 5 minutes",
+"jobs": [
+"INFRA_004_HEALTH_GUARDIAN"
+],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Continuous health watch",
+"id": "GUARD-02",
+"title": "Weekly disk hygiene and /dev/null guard",
+"jobs": [
+"INFRA_005_DISK_HYGIENE",
+"INFRA_003_DEVNULL_GUARDIAN"
+],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Synthetic data seeding & reset",
+"id": "USAGE-14",
+"title": "Prepare a working session with visible synthetic data",
+"jobs": [
+"WAZ_048_SEED_INDEXER_LIVE",
+"WAZ_049_SEED_ES_LIVE"
+],
+"tech": "Wazuh · ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Piloting & Supervision",
+"obj": "Synthetic data seeding & reset",
+"id": "USAGE-15",
+"title": "Clean up synthetic data after a working session",
+"jobs": [
+"WAZ_046_PURGE_INDEXER_DATA",
+"ES_064_PURGE_ALL_EXCEPT_WAZUH"
+],
+"tech": "Wazuh · ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Data Continuity",
+"obj": "Data cutover",
+"id": "FONC-08",
+"title": "Switch the active dashboard (Wazuh Dashboard <-> Kibana), verified, no loss",
+"jobs": [
+"WAZ_035_KIBANA_TRIGGER",
+"WAZ_039_WAZUH_TRIGGER"
+],
+"tech": "Wazuh · ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Data Continuity",
+"obj": "Backup & restore",
+"id": "FONC-11",
+"title": "Archive to local cold storage before any delete",
+"jobs": [
+"ES_065_COLDARCHIVE_REPOSET",
+"ES_066_COLDARCHIVE_SLMPOLICY",
+"ES_067_COLDARCHIVE_ILMPOLICY"
+],
+"tech": "ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Verification",
+"id": "SENS-01",
+"title": "Never assume, always verify - read the real state first",
+"jobs": [],
+"tech": "ELK"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Verification",
+"id": "SENS-05",
+"title": "Protect the disk before any installation",
+"jobs": [
+"WAZ_057_VD_DISABLE"
+],
+"tech": "Wazuh"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Verification",
+"id": "SENS-03",
+"title": "Replay only with a written reason and an explicit confirmation",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Secrets",
+"id": "SENS-02",
+"title": "Keep secrets out of version control",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Incidents & records",
+"id": "SENS-06",
+"title": "Write the honest limits down, never hide them",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Incidents & records",
+"id": "SENS-07",
+"title": "Generate the incident cards, retrieve one by its ID",
+"jobs": [
+"INFRA_011_INCIDENT_CARDS"
+],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Incidents & records",
+"id": "INC-02",
+"title": "Read the three registers behind the cards",
+"jobs": [],
+"tech": "WEF"
+},
+{
+"fam": "ITOPS",
+"disc": "Governance in action",
+"obj": "Incidents & records",
+"id": "SENS-04",
+"title": "Document every incident in the technical journal",
+"jobs": [],
+"tech": "WEF"
+}
+]

@@ -260,7 +260,7 @@ def build(kind, key, a, b):
         L.append('VERDICT   ✓ CLEAN    the plan ran on time, nothing is failing' + ('  ·  %d human action(s), all traced' % hum if hum else ''))
 
     # 1 at a glance
-    L += title('1', 'AT A GLANCE', 'vs the previous %s' % ('day' if kind == 'day' else 'period of the same length'))
+    L += title('1', 'GLANCE')
     ok = len(R) - len(FA)
     avg = sum(r['dur'] for r in R) / len(R) if R else 0
     pavg = sum(r['dur'] for r in PR) / len(PR) if PR else 0
@@ -300,7 +300,7 @@ def build(kind, key, a, b):
                          dur(sum(r['dur'] for r in rs) / len(rs)) if rs else ''))
 
     # 2 the plan
-    L += title('2', 'THE PLAN', 'what must run by itself - on time or not')
+    L += title('2', 'PLAN')
     if kind == 'day':
         L.append('   %-30s %-13s %6s %5s %6s %6s  %s' % ('job', 'rhythm', 'expect', 'ran', 'first', 'last', 'verdict'))
         for job, rhythm, rl, vs in pv:
@@ -318,7 +318,7 @@ def build(kind, key, a, b):
                                               for j, d, v in late_items[:12]) + (' …' if len(late_items) > 12 else ''))
 
     # 3 the factory tree
-    L += title('3', 'THE FACTORY', 'family › discipline › operation › job     start → end · duration · result')
+    L += title('3', 'FACTORY')
     byjob = defaultdict(list)
     for r in R: byjob[r['job']].append(r)
     covered = set()
@@ -355,7 +355,7 @@ def build(kind, key, a, b):
                            W, initial_indent='   ', subsequent_indent='      ')
 
     # 4 failures with their sysout
-    L += title('4', 'FAILURES', 'each with the end of its log (sysout) and what happened next')
+    L += title('4', 'FAILURES')
     if not FA:
         L.append('   none')
     shown = FA[-12:] if kind == 'day' else FA[-10:]
@@ -377,7 +377,7 @@ def build(kind, key, a, b):
             L.append('        │ (log not readable from here)')
 
     # 5 human actions
-    L += title('5', 'HUMAN ACTIONS', 'who touched what, and why - the reason is the one typed with the command')
+    L += title('5', 'ACTIONS')
     if not (HU or chg or cfg or inc): L.append('   none - the factory ran alone')
     for r in HU[-15:]:
         L.append('   %s  %-34s %s' % (r['end'].strftime('%d/%m %H:%M'), cut(r['job'], 34), r['status']))
@@ -395,7 +395,7 @@ def build(kind, key, a, b):
 
     # 6 handover (day) / 7 trajectory
     if kind == 'day':
-        L += title('6', 'HANDOVER', 'for the next shift')
+        L += title('6', 'HANDOVER')
         L.append('   still failing   ' + (', '.join(still) if still else 'nothing'))
         nxt = []
         base = dt.datetime.combine(a, dt.time(23, 59)) if a < TODAY else NOW
@@ -411,7 +411,7 @@ def build(kind, key, a, b):
                 nxt.append((t, job))
         L.append('   next in plan    ' + '   '.join('%s %s' % (t.strftime('%a %H:%M'), j) for t, j in sorted(nxt)))
         L.append('   always running  ' + ', '.join('%s (%s)' % (j, r) for j, r, (k, _) in PLAN if k == 'every'))
-    L += title('7' if kind == 'day' else '6', 'TRAJECTORY & OPPORTUNITIES', 'what changes, what to seize - computed, not guessed')
+    L += title('7' if kind == 'day' else '6', 'TRAJECTORY')
     opp = []
     pb_ = defaultdict(list)
     for r in PR: pb_[r['job']].append(r['dur'])

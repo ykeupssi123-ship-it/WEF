@@ -27,6 +27,25 @@ Usage:
 Standard library only. Read-only on the engine. No network (mail is sent by daily_log.sh).
 """
 import csv, datetime as dt, hashlib, json, os, re, socket, sys, textwrap
+
+# ANSI colour - this file is meant to be cat'd in a real terminal (PuTTY),
+# never opened as plain text. Applied as the LAST step, after every column
+# is already padded on plain text - colour codes are invisible width, so
+# they ride along without breaking alignment.
+_A = dict(g='\033[32m', y='\033[33m', r='\033[31m', d='\033[2m', c='\033[36m', b='\033[1m', z='\033[0m')
+def _c(s, k): return _A[k] + s + _A['z']
+_DOT_COLOR = {'OK': 'g', 'NOT DUE': 'd', 'NOT YET': 'y', 'LATE': 'y', 'MISSED': 'r'}
+_STATUS_COLOR = {'OK': 'g', 'CLEAN': 'g', 'FORCE_OK': 'g', 'SCHEDULED_OK': 'g', 'MARQUE_OK': 'g',
+                 'LATE': 'y', 'NOT YET': 'y', 'WARN': 'y',
+                 'MISSED': 'r', 'FAILED': 'r', 'ECHEC': 'r', 'FORCE_ECHEC': 'r', 'SCHEDULED_ECHEC': 'r', 'ACTION': 'r',
+                 'NOT DUE': 'd'}
+_STATUS_RE = re.compile(r'\b(' + '|'.join(sorted(_STATUS_COLOR, key=len, reverse=True)) + r')\b')
+_ANSI_RE = re.compile(r'\033\[\d+m')
+def vlen(s): return len(_ANSI_RE.sub('', s))
+def dot(verdict): return _c('●', _DOT_COLOR.get(verdict, 'd'))
+def paint(line):
+    line = line.replace('✓', _c('✓', 'g')).replace('✗', _c('✗', 'r'))
+    return _STATUS_RE.sub(lambda m: _c(m.group(1), _STATUS_COLOR[m.group(1)]), line)
 from collections import defaultdict, Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -302,10 +321,10 @@ def build(kind, key, a, b):
     # 2 the plan
     L += title('2', 'PLAN')
     if kind == 'day':
-        L.append('   %-30s %-13s %6s %5s %6s %6s  %s' % ('job', 'rhythm', 'expect', 'ran', 'first', 'last', 'verdict'))
+        L.append('     %-28s %-13s %6s %5s %6s %6s  %s' % ('job', 'rhythm', 'expect', 'ran', 'first', 'last', 'verdict'))
         for job, rhythm, rl, vs in pv:
             v, why, exp, rs, f_, l_ = vs[0]
-            L.append('   %-30s %-13s %6s %5d %6s %6s  %s' % (cut(job, 30), rhythm, exp if exp else '-', len(rs), hm(f_), hm(l_),
+            L.append('   %s %-28s %-13s %6s %5d %6s %6s  %s' % (dot(v), cut(job, 28), rhythm, exp if exp else '-', len(rs), hm(f_), hm(l_),
                      (v + '  ' + why).strip() + (' → see 5' if v in ('LATE', 'MISSED') else '')))
     else:
         L.append('   %-34s %-14s %6s %8s %6s %7s  %s' % ('job', 'rhythm', 'due', 'on time', 'late', 'missed', 'on-time rate'))
@@ -440,11 +459,11 @@ def build(kind, key, a, b):
     L.append(rule('═'))
     out = []
     for ln in L:
-        if len(ln) <= W:
+        if vlen(ln) <= W:
             out.append(ln); continue
         ind = len(ln) - len(ln.lstrip(' '))
         out += textwrap.wrap(ln, W, initial_indent='', subsequent_indent=' ' * (ind + 6), drop_whitespace=True)
-    return '\n'.join(out) + '\n'
+    return '\n'.join(paint(ln) for ln in out) + '\n'
 
 def job_line(j, js, kind):
     nko = sum(map(failed, js))

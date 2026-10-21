@@ -78,6 +78,16 @@ for c in claims['commands']:
         r = subprocess.run(['bash', '-n', '-c', test], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         if r.returncode != 0:
             problems['SYNTAX'].append((where, (r.stderr.strip().splitlines() or ['?'])[-1][:90]))
+def normalize(v):
+    # Same real value, two honest spellings - never a real drift:
+    #   "22:00:00" (workbook, HH:MM:SS) vs "22:00" (vars.conf, HH:MM)
+    #   "True"/"False" (workbook, Python-exported) vs "true"/"false" (bash)
+    v = v.strip()
+    m = re.match(r'^(\d{2}:\d{2}):\d{2}$', v)
+    if m: v = m.group(1)
+    if v.lower() in ('true', 'false'): v = v.lower()
+    return v
+
 for lv in claims['levers']:
     counts['LEVER'] += 1
     n, doc = lv['name'], lv['value']
@@ -85,7 +95,7 @@ for lv in claims['levers']:
         counts['LEVER'] -= 1; continue
     if n not in VARS:
         problems['LEVER'].append((n, 'not in vars.conf'))
-    elif VARS[n] != doc:
+    elif normalize(VARS[n]) != normalize(doc):
         problems['LEVER'].append((n, f'workbook "{doc[:30]}"  ->  machine "{VARS[n][:30]}"'))
 
 # ---- report

@@ -158,6 +158,24 @@ def find_root_cause_link(date_str, job_id):
             return f"docs/JOURNAL_TECHNIQUE.md, section \"{d} - {titre}\""
     return None
 
+# AJOUTE LE 2026-10-21 (demande explicite : le pourquoi doit etre visible
+# IMMEDIATEMENT sur la fiche, pas seulement dans le log qu'il faut aller
+# ouvrir separement). bin/order.sh ecrit deja "Raison : <texte>" dans
+# l'en-tete du JOB_LOG avant tout forcage (voir bin/order.sh, "la raison
+# est obligatoire"). Un job normal ou planifie n'a jamais cette ligne -
+# jamais invente une raison qui n'existe pas, le champ dit alors
+# clairement qu'il n'y en a pas.
+def find_reason(log_path):
+    if not log_path or not os.path.isfile(log_path):
+        return None
+    try:
+        with open(log_path, encoding='utf-8', errors='replace') as f:
+            head = f.read(2000)  # l'en-tete est toujours dans les premieres lignes
+    except OSError:
+        return None
+    m = re.search(r'^Raison\s*:\s*(.+)$', head, re.MULTILINE)
+    return m.group(1).strip() if m else None
+
 # --- Identifiants stables : charges une fois, jamais renumerotes ---
 id_map = {}  # (job_id, detected_ts) -> incident_id (ex "INC-0007")
 if os.path.isfile(id_map_file):
@@ -261,6 +279,8 @@ for i, (ts, job_id, job_name, result, log_path, duree) in enumerate(executions):
         card.append(f"Job                : {job_id}")
         card.append(f"Libelle job        : {job_name}")
         card.append(f"Type d'echec       : {result}")
+        reason = find_reason(log_path)
+        card.append(f"Raison (operateur) : {reason if reason else '(aucune - execution normale ou planifiee, jamais forcee a la main)'}")
         card.append(f"Severite           : {sev}  (rayon d'impact : {impact_line})")
         card.append(f"Statut             : {statut}")
         card.append(f"Resolu le          : {resolved_ts or '-'}")

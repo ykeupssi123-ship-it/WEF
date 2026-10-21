@@ -16,6 +16,7 @@
 #   ./bin/incident_card.sh INC-0007           -> affiche la fiche complete
 #   ./bin/incident_card.sh --open             -> liste uniquement OUVERT
 #   ./bin/incident_card.sh --severity P1      -> liste uniquement une severite
+#   ./bin/incident_card.sh --job WAZ_050_VIRUSTOTAL_INTEGRATION  -> un seul automatisme
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CARDS_DIR="$HERE/state/incidents"
@@ -51,17 +52,25 @@ arg2 = os.environ.get('ARG2', '')
 
 filter_statut = "OUVERT" if arg1 == "--open" else ""
 filter_sev = arg2 if arg1 == "--severity" else ""
+# AJOUTE LE 2026-10-21 (demande explicite : un auditeur doit pouvoir dire
+# "je veux les fiches de TEL automatisme" et les obtenir directement -
+# jamais filtrer a la main dans INCIDENTS.csv).
+filter_job = arg2 if arg1 == "--job" else ""
 
-if arg1 not in ("", "--open", "--severity"):
+if arg1 not in ("", "--open", "--severity", "--job"):
     print(f"ERREUR : argument inconnu '{arg1}'.", file=__import__('sys').stderr)
-    print("Usage : incident_card.sh [INC-xxxx | --open | --severity P1|P2|P3]", file=__import__('sys').stderr)
+    print("Usage : incident_card.sh [INC-xxxx | --open | --severity P1|P2|P3 | --job JOB_ID]", file=__import__('sys').stderr)
+    raise SystemExit(1)
+if arg1 in ("--severity", "--job") and not arg2:
+    print(f"ERREUR : '{arg1}' exige un second argument.", file=__import__('sys').stderr)
     raise SystemExit(1)
 
 with open(registry_file, encoding='utf-8') as f:
     rows = list(csv.DictReader(f))
 
 rows = [r for r in rows if (not filter_statut or r['statut'] == filter_statut)
-        and (not filter_sev or r['severite'] == filter_sev)]
+        and (not filter_sev or r['severite'] == filter_sev)
+        and (not filter_job or r['job_id'] == filter_job)]
 
 if not rows:
     print("Aucune fiche ne correspond a ce filtre.")

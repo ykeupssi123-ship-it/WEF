@@ -119,6 +119,21 @@ run_job(){
     echo "$(date -Iseconds),$job_id,$job_name,$ok_label,$job_log,$job_duration_sec" >> "$HISTORY_LEDGER"
   else
     echo "$(date -Iseconds),$job_id,$job_name,$fail_label,$job_log,$job_duration_sec" >> "$HISTORY_LEDGER"
+    # AJOUTE LE 2026-10-21 (demande explicite : une fiche d'incident a
+    # CHAQUE echec, generee en meme temps que le sysout - jamais une
+    # seule fois par jour via INFRA_011_INCIDENT_CARDS). bin/incidents.sh
+    # reste l'UNIQUE logique d'ecriture (jamais dupliquee ici) - filtre
+    # sur ce seul job_id (rapide, jamais un re-traitement de tout
+    # l'historique). Meme interrupteur que le lot quotidien
+    # (INCIDENT_CARDS_ENABLED) - un client qui ne veut pas de cette
+    # automatisation la desactive d'un seul "false", ici comme la-bas.
+    # Ne touche jamais au code de sortie reel du job (|| true) - cette
+    # fonction ne decide jamais d'arreter une chaine, voir l'en-tete.
+    if [ "${INCIDENT_CARDS_ENABLED:-true}" = "true" ]; then
+      local incidents_sh
+      incidents_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/incidents.sh"
+      [ -f "$incidents_sh" ] && bash "$incidents_sh" "$job_id" >/dev/null 2>&1 || true
+    fi
   fi
   return "$job_exit"
 }

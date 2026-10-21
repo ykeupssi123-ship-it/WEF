@@ -277,6 +277,10 @@ def build(kind, key, a, b):
         L.append('VERDICT   ▲ ACTION   ' + '  ·  '.join(bad) + ('  ·  %d human action(s)' % hum if hum else ''))
     else:
         L.append('VERDICT   ✓ CLEAN    the plan ran on time, nothing is failing' + ('  ·  %d human action(s), all traced' % hum if hum else ''))
+    _dc = P(STATE, 'dossier_check.log')
+    if os.path.exists(_dc):
+        _v = [l for l in open(_dc, encoding='utf-8', errors='replace') if l.startswith('VERDICT')]
+        if _v: L.append('WORKBOOK  ' + _v[0][10:].strip()[:88])
 
     # 1 at a glance
     L += title('1', 'GLANCE')

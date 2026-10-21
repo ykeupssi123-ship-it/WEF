@@ -18,13 +18,21 @@
 #      des machines differentes (c'est aussi possible - a vous de
 #      choisir par machine via AGENT_COMPONENTS dans vars.conf).
 #
-#  ARRET AU PREMIER ECHEC (fail-fast), DELIBERE : les jobs suivants
-#  dependent souvent de la reussite du precedent (config ecrite,
-#  service demarre...) - continuer apres un echec risquerait
-#  d'enchainer des jobs sur une base deja cassee. Chaque machine
-#  (VM1, VM2, chaque hote d'agent) execute SA PROPRE instance de cet
-#  orchestrateur : un echec sur une machine n'arrete jamais les autres,
-#  qui tournent independamment.
+#  ISOLATION PAR CHAINE DE DEPENDANCE, CORRIGE LE 2026-10-22 (demande
+#  explicite, trouve en voulant rejouer des operations concretes : un
+#  job SANS AUCUN LIEN avec un job en echec ailleurs dans les 322 ne
+#  doit jamais etre empeche de tourner). Avant cette date, un "exit 1"
+#  immediat au premier echec arretait TOUT, y compris des jobs
+#  independants (SecOps vs CloudOps, zero dependance entre eux) -
+#  jamais justifie, voir docs/JOURNAL_TECHNIQUE.md. Desormais : un job
+#  qui echoue bloque UNIQUEMENT ses dependants reels (son OUT_COND
+#  n'est jamais marque fait, donc rien qui en depend ne devient jamais
+#  "pret") - deja le mecanisme naturel de la boucle IN_COND/OUT_COND,
+#  il suffisait de ne plus l'interrompre de force. Un job qui a deja
+#  echoue n'est JAMAIS rejoue dans une passe suivante du meme run (voir
+#  FAILED_JOBS plus bas). Le script continue toutes les passes
+#  possibles puis sort avec un code non nul si au moins un echec reel a
+#  eu lieu - jamais un code 0 qui cacherait un echec.
 #
 #  A LA FIN (succes OU echec), un rapport est toujours ecrit dans
 #  state/RAPPORT_EXECUTION.txt : jobs termines, job en echec le cas
@@ -121,6 +129,13 @@ mkdir -p "$STATE_DIR/HELD"
 
 FAILED_JOB_ID=""
 FAILED_JOB_NAME=""
+# AJOUTE LE 2026-10-22 : source de verite complete de TOUS les echecs du
+# run (FAILED_JOB_ID/FAILED_JOB_NAME restent, inchanges, le premier
+# echec seulement - compat avec le "if [ -z "$FAILED_JOB_ID" ]" plus bas
+# qui decide d'afficher ou non le tableau de bord final). Cle = JOB_ID,
+# valeur = JOB_NAME - sert aussi a ne JAMAIS rejouer un job deja en
+# echec dans une passe suivante (voir plus bas dans la boucle).
+declare -A FAILED_JOBS=()
 
 # Ecrit le rapport final, quelle que soit l'issue (succes, echec, Ctrl+C).
 write_report() {
@@ -134,9 +149,11 @@ write_report() {
     [ "$ROLE" = "AGENT_HOST" ] && echo "Composants  : ${AGENT_COMPONENTS:-(aucun)}"
     echo "Log complet : $RUN_LOG"
     echo ""
-    if [ -n "$FAILED_JOB_ID" ]; then
-      echo "RESULTAT : ARRET SUR ECHEC"
-      echo "Job en echec : $FAILED_JOB_ID ($FAILED_JOB_NAME)"
+    if [ "${#FAILED_JOBS[@]}" -gt 0 ]; then
+      echo "RESULTAT : TERMINE AVEC ${#FAILED_JOBS[@]} ECHEC(S) - les chaines independantes des jobs en echec ont ete menees a terme"
+      for FJ in "${!FAILED_JOBS[@]}"; do
+        echo "Job en echec : $FJ (${FAILED_JOBS[$FJ]})"
+      done
     else
       echo "RESULTAT : TERMINE SANS ECHEC (tous les jobs prets pour ce ROLE/composants ont ete rejoues jusqu'a stabilisation)"
     fi
@@ -237,6 +254,17 @@ for pass in $(seq 1 $MAX_PASSES); do
     fi
     job_done "$OUT_COND" && continue
 
+    # AJOUTE LE 2026-10-22 : un job deja en echec DANS CE RUN n'est
+    # jamais re-tente dans une passe suivante - son OUT_COND ne sera
+    # jamais marque fait (job_done ci-dessus reste faux pour toujours),
+    # donc sans ce garde-fou il serait retente a chaque passe jusqu'a
+    # MAX_PASSES. Un seul essai par job par run, exactement le
+    # comportement d'avant (qui arretait tout APRES le premier essai) -
+    # seule la portee du blocage change.
+    if [ -n "${FAILED_JOBS[$JOB_ID]:-}" ]; then
+      continue
+    fi
+
     ready=1
     if [ -n "$IN_COND" ] && [ "$IN_COND" != "NONE" ]; then
       IFS='|' read -ra deps <<< "$IN_COND"
@@ -327,22 +355,28 @@ for pass in $(seq 1 $MAX_PASSES); do
       log "$JOB_ID -> OK ($OUT_COND) [historique: ./bin/history.sh $JOB_ID]"
       progressed=1
     else
-      log "$JOB_ID -> ECHEC. Voir $JOB_LOG (ou $RUN_LOG). Arret orchestrateur."
-      FAILED_JOB_ID="$JOB_ID"
-      FAILED_JOB_NAME="$JOB_NAME"
+      log "$JOB_ID -> ECHEC. Voir $JOB_LOG (ou $RUN_LOG). Ses dependants reels restent bloques ; les chaines independantes continuent."
+      FAILED_JOBS["$JOB_ID"]="$JOB_NAME"
+      [ -z "$FAILED_JOB_ID" ] && { FAILED_JOB_ID="$JOB_ID"; FAILED_JOB_NAME="$JOB_NAME"; }
       # Alerte email (bin/notify.sh, ajoute le 2026-08-12) - ne bloque et
       # ne casse JAMAIS l'orchestrateur, meme si l'envoi echoue ou si
       # NOTIF_ENABLED n'est pas configure.
       if [ -x "$SCRIPT_DIR/bin/notify.sh" ]; then
         "$SCRIPT_DIR/bin/notify.sh" "$JOB_ID" "$JOB_NAME" "ECHEC" "$JOB_LOG" >> "$RUN_LOG" 2>&1 || true
       fi
-      exit 1
     fi
   done < "$JOBS_CSV"
   [ $progressed -eq 0 ] && break
 done
 
 log "=== Fin orchestrateur ==="
+# AJOUTE LE 2026-10-22 : le code de sortie reel du script, decide
+# seulement APRES que toutes les passes possibles ont ete menees
+# (jamais plus un "exit 1" premature qui coupait des chaines
+# independantes encore en attente). Code non nul si au moins un echec
+# reel a eu lieu dans ce run - jamais cache.
+ORCH_EXIT=0
+[ "${#FAILED_JOBS[@]}" -gt 0 ] && ORCH_EXIT=1
 
 # CORRIGE LE 2026-09-09 (demande explicite : "je ne veux plus voir ça"
 # - le defilement de ~270 lignes "*.ok" en fin de run n'apportait rien
@@ -360,3 +394,5 @@ if [ -z "$FAILED_JOB_ID" ] && [ -x "$SCRIPT_DIR/bin/summary.sh" ]; then
   log "Tableau de bord final ecrit dans $SUMMARY_FILE"
   cat "$SUMMARY_FILE" | tee -a "$RUN_LOG"
 fi
+
+exit "$ORCH_EXIT"

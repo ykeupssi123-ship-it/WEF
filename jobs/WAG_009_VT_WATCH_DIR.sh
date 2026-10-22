@@ -71,11 +71,20 @@ if grep -qF "$MARKER" "$OSSEC_CONF"; then
 fi
 
 echo "[WAG_009_VT_WATCH_DIR] Ajout de la surveillance FIM temps reel de : ${FIM_DIRECTORIES}..."
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-23 : contrairement a WAZ_050 cote
+# ELK_HOST (qui exclut ^/root/WEF depuis l'origine), ce bloc ne portait
+# aucune exclusion - chaque fichier de verrouillage interne de
+# l'orchestrateur (/root/WEF/state/*.ok, *.running, .wef_run.owner)
+# declenchait une fausse alerte FIM (rule 100100) a CHAQUE run de job,
+# confirme en reel ce soir (vm2-beats-wazuh-agent, WAG_ROOTCHECK_OK.ok,
+# .wef_run.owner, RUNNING/WAG_007_ROOTCHECK.running). Meme exclusion
+# desormais posee ici, par symetrie avec WAZ_050.
 {
   echo "$MARKER"
   echo "<ossec_config>"
   echo "  <syscheck>"
   echo "    <directories realtime=\"yes\" report_changes=\"yes\">${FIM_DIRECTORIES}</directories>"
+  echo "    <ignore type=\"sregex\">^/root/WEF</ignore>"
   echo "  </syscheck>"
   echo "</ossec_config>"
   echo "<!-- WEF_AGENT_VT_WATCH_CONFIG_END -->"

@@ -114,11 +114,57 @@ run_job(){
   [ -n "$tmp_root" ] && rm -rf "$tmp_root"
   job_duration_sec=$(( $(date +%s) - job_start_epoch ))
 
+  local result_label
   if [ "$job_exit" -eq 0 ]; then
     mark_done "$out_cond"
+    result_label="$ok_label"
     echo "$(date -Iseconds),$job_id,$job_name,$ok_label,$job_log,$job_duration_sec" >> "$HISTORY_LEDGER"
   else
+    result_label="$fail_label"
     echo "$(date -Iseconds),$job_id,$job_name,$fail_label,$job_log,$job_duration_sec" >> "$HISTORY_LEDGER"
+    # AJOUTE LE 2026-10-21 (demande explicite : une fiche d'incident a
+    # CHAQUE echec, generee en meme temps que le sysout - jamais une
+    # seule fois par jour via INFRA_011_INCIDENT_CARDS). bin/incidents.sh
+    # reste l'UNIQUE logique d'ecriture (jamais dupliquee ici) - filtre
+    # sur ce seul job_id (rapide, jamais un re-traitement de tout
+    # l'historique). Meme interrupteur que le lot quotidien
+    # (INCIDENT_CARDS_ENABLED) - un client qui ne veut pas de cette
+    # automatisation la desactive d'un seul "false", ici comme la-bas.
+    # Ne touche jamais au code de sortie reel du job (|| true) - cette
+    # fonction ne decide jamais d'arreter une chaine, voir l'en-tete.
+    if [ "${INCIDENT_CARDS_ENABLED:-true}" = "true" ]; then
+      local incidents_sh
+      incidents_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bin/incidents.sh"
+      [ -f "$incidents_sh" ] && bash "$incidents_sh" "$job_id" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  # AJOUTE LE 2026-10-22 (demande explicite : l'auditeur veut filtrer
+  # l'historique des jobs dans Elasticsearch/Kibana, comme le reste des
+  # donnees - jamais un fichier CSV a part qu'il faut aller grep sur la
+  # machine). JAMAIS un deuxieme mecanisme d'envoi invente ici : on
+  # ecrit une ligne JSON dans un fichier sous /var/log/ (meme famille
+  # que lcbft_detections.log etc.) et on laisse le pipeline Filebeat/
+  # Logstash DEJA EN PLACE et DEJA PROUVE l'acheminer - voir
+  # /etc/logstash/conf.d/14-jobs-history-filter.conf et 30-outputs.conf
+  # (route vers wef-jobs-history-*). Sur VM1 (pas de Filebeat, ELK_HOST
+  # heberge Logstash lui-meme), c'est Logstash qui lit ce fichier en
+  # direct (input file{} dedie) - meme fichier, meme format, deux
+  # chemins de lecture selon la machine, un seul format de sortie.
+  # Toggle dedie (vars.conf) - un client qui n'en veut pas le desactive
+  # d'un seul "false", jamais un comportement impose.
+  if [ "${JOBS_HISTORY_ES_ENABLED:-true}" = "true" ]; then
+    local reason="" jh_log="/var/log/wef_jobs_history.log"
+    if [ -f "$job_log" ]; then
+      reason="$(head -c 2000 "$job_log" | grep -m1 -E '^Raison' | sed -E 's/^Raison[[:space:]]*:[[:space:]]*//')"
+    fi
+    reason="${reason//\"/\'}"
+    {
+      printf '{"timestamp":"%s","job_id":"%s","job_name":"%s","result":"%s","duration_sec":%s,"log_path":"%s"' \
+        "$(date -Iseconds)" "$job_id" "$job_name" "$result_label" "$job_duration_sec" "$job_log"
+      [ -n "$reason" ] && printf ',"reason":"%s"' "$reason"
+      printf '}\n'
+    } >> "$jh_log" 2>/dev/null || true
   fi
   return "$job_exit"
 }

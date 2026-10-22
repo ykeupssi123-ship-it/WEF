@@ -79,7 +79,13 @@ with open(raw_file) as f:
 current_host = None
 current_service = None
 findings = []
-cve_re = re.compile(r'^\s*(CVE-\d{4}-\d+)\s+([\d.]+)')
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-22 : les lignes vulners de nmap
+# commencent par "|" (dessin de tableau), jamais par un espace - l'ancien
+# regex ^\s* ne matchait donc AUCUNE ligne CVE, et le resume affichait
+# systematiquement "aucune correspondance" meme quand le rapport brut
+# juste au-dessus en listait des dizaines (confirme sur le run reel du
+# 2026-10-22T18:39:53, 79 correspondances retrouvees apres correction).
+cve_re = re.compile(r'^\|?[\s\t]*(CVE-\d{4}-\d+)\s+([\d.]+)')
 service_re = re.compile(r'^\d+/tcp\s+open\s+(\S+)\s+(.*)$')
 host_re = re.compile(r'^Nmap scan report for (\S+)')
 

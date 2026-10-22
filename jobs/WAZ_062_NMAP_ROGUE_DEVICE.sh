@@ -90,7 +90,19 @@ if 'Nmap scan report for' not in text:
 
 # Un bloc par hote : "Nmap scan report for <ip>" suivi, plus loin, d'une
 # eventuelle ligne "MAC Address: XX:XX:XX:XX:XX:XX (Constructeur)".
-blocks = re.split(r'(?=Nmap scan report for )', text)
+# CORRIGE LE 2026-10-22 (bug reel trouve en testant pour de vrai, pas a
+# la relecture) : re.split() avec un motif a largeur nulle "(?=...)"
+# leve ValueError sous Python 3.6 (autorise seulement depuis 3.7,
+# bpo-32308) - cette VM tourne 3.6.8 (meme classe de bug que
+# dossier_check.py plus tot ce soir). Le crash etait AVALE : la boucle
+# plantait avant d'ecrire "ROGUE_FOUND=1" ou "=0", et le script bash
+# appelant retombait silencieusement sur "ROGUE_FOUND=0" (aucune ligne
+# trouvee par grep) - un vrai appareil intrus n'aurait JAMAIS ete
+# signale, a chaque execution, depuis la creation de ce job. Remplace
+# par un split() ordinaire (motif non-vide), compatible 3.6.
+MARKER = 'Nmap scan report for '
+pieces = text.split(MARKER)
+blocks = [MARKER + p for p in pieces[1:]]
 rogue_found = False
 for block in blocks:
     m_ip = re.search(r'Nmap scan report for (?:\S+ )?\(?([\d.]+)\)?', block)

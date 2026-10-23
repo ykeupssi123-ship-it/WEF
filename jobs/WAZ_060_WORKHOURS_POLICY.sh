@@ -97,6 +97,25 @@ ADMIN_END="${ADMIN_WORKHOURS_END:?ERREUR : ADMIN_WORKHOURS_END doit etre defini 
 USER_START="${USER_WORKHOURS_START:?ERREUR : USER_WORKHOURS_START doit etre defini dans vars.conf}"
 USER_END="${USER_WORKHOURS_END:?ERREUR : USER_WORKHOURS_END doit etre defini dans vars.conf}"
 
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-23 (incident reel, manager en panne
+# complete) : l'element Wazuh <time> n'accepte QUE le format HH:MM - une
+# valeur HH:MM:SS (ex: "04:11:10", produite par un `date +%H:%M:%S` tape a
+# la main pour la demo) rend le fichier de regles invalide, et
+# analysisd refuse de demarrer - wazuh-manager tombe ENTIEREMENT, pas
+# seulement cette regle. Jamais valide avant ce soir (vars.conf ne
+# contenait jusque-la que des valeurs HH:MM ecrites a la main). Controle
+# strict desormais AVANT toute ecriture ou redemarrage, pour ne plus
+# jamais pouvoir casser le manager avec une valeur mal formee.
+TIME_RE='^[0-2][0-9]:[0-5][0-9]$'
+for pair in "ADMIN_WORKHOURS_START:$ADMIN_START" "ADMIN_WORKHOURS_END:$ADMIN_END" "USER_WORKHOURS_START:$USER_START" "USER_WORKHOURS_END:$USER_END"; do
+  name="${pair%%:*}"
+  value="${pair#*:}"
+  if ! echo "$value" | grep -qE "$TIME_RE"; then
+    echo "[WAZ_060_WORKHOURS_POLICY] ERREUR : ${name}=\"${value}\" n'est pas au format HH:MM attendu par Wazuh (<time>) - jamais HH:MM:SS. Corrigez vars.conf avant de rejouer. Aucune ecriture faite, manager non touche." >&2
+    exit 1
+  fi
+done
+
 RULES_FILE="/var/ossec/ruleset/rules/9950-wef_custom_rules.xml"
 if [ ! -f "$RULES_FILE" ]; then
   echo "[WAZ_060_WORKHOURS_POLICY] ${RULES_FILE} absent - creation initiale."

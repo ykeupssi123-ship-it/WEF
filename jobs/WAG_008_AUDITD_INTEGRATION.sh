@@ -44,7 +44,16 @@ done
 systemctl is-active --quiet auditd || { echo "[WAG_008_AUDITD_INTEGRATION] ERREUR : auditd n'a pas demarre." >&2; exit 1; }
 
 RULE_FILE="/etc/audit/rules.d/wef-command-audit.rules"
-RULE_LINE="-a always,exit -F arch=b64 -S execve -k wef_commands"
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-23 : la regle sans filtre captait
+# TOUT execve du systeme, y compris l'activite interne de l'agent Wazuh
+# lui-meme (ps/sh lances par wazuh-agentd, aucune session de connexion -
+# auid reste "unset"=4294967295), au rythme d'environ 1 evenement/seconde -
+# confirme reel (33000+ lignes dans audit.log, 0 alerte "wef_commands"
+# jamais arrivee au manager, noyee par ce volume). "-F auid!=4294967295"
+# ne garde que les commandes tapees dans une vraie session de connexion
+# (SSH, console) - exactement "qui a tape quoi", jamais le bruit des
+# scripts/services qui n'ont pas de session.
+RULE_LINE="-a always,exit -F arch=b64 -S execve -F auid!=4294967295 -F key=wef_commands"
 if [ -f "$RULE_FILE" ] && grep -qF "$RULE_LINE" "$RULE_FILE"; then
   echo "[WAG_008_AUDITD_INTEGRATION] Regle d'audit deja presente, ignore."
 else

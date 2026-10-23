@@ -63,10 +63,16 @@ echo "[WAZ_059_NMAP_VULN_ADVISORY] Scan de vulnerabilites (vulners, detection de
 RAW_OUTPUT="$(mktemp)"
 nmap -sV --version-intensity 9 --script vulners -oN "$RAW_OUTPUT" "$NMAP_TARGET" 2>/dev/null
 
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-23 (meme cause que WAZ_056,
+# confirme via la croissance identique de ce fichier - 58 Ko ce soir) :
+# l'append faisait grossir ADVISORY_LOG indefiniment, jusqu'a epuiser le
+# quota de diff FIM de Wazuh (voir le correctif global sur disk_quota).
+# Ecrase desormais (>) au lieu d'accumuler - le resume du dernier scan
+# est ce qui compte, pas l'historique complet.
 {
   echo "--- WEF_NMAP_VULN_ADVISORY $(date -Iseconds) ---"
   cat "$RAW_OUTPUT"
-} >> "$ADVISORY_LOG"
+} > "$ADVISORY_LOG"
 
 echo "[WAZ_059_NMAP_VULN_ADVISORY] Extraction du resume lisible (logiciel -> CVE)..."
 RAW_FILE="$RAW_OUTPUT" python3 << 'PYEOF' >> "$ADVISORY_LOG"

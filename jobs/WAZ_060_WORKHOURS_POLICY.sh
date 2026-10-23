@@ -108,6 +108,17 @@ if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   sed -i "\|^${MARKER_RULE//\//\\/}\$|,\|^<!-- WEF_WORKHOURS_RULE_END -->\$|d" "$RULES_FILE"
 fi
 echo "[WAZ_060_WORKHOURS_POLICY] Ajout des regles de correlation (admin ${ADMIN_START}-${ADMIN_END}, standard ${USER_START}-${USER_END})..."
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-23 : 100212/100213 etaient en
+# level="8", sous le level="9" de la regle generique Wazuh 17101
+# ("Successful login during non-business hours"), qui matche AUSSI le
+# meme evenement (meme parent if_sid 5715). Entre deux regles soeurs qui
+# matchent le meme evenement, Wazuh ne remonte que la plus severe -
+# 17101 ecrasait donc silencieusement 100212/100213 a chaque connexion
+# standard hors heures, confirme via wazuh-logtest (le niveau 8 ne
+# ressortait jamais dans les alertes, seul 17101 apparaissait). Releve a
+# level="10" : au-dessus de 17101 (9), en dessous des regles admin
+# 100210/100211 (12) - garde la hierarchie voulue (plus fort pour un
+# administrateur).
 {
   echo "$MARKER_RULE"
   echo "<group name=\"authentication_success,hors_heures,\">"
@@ -125,14 +136,14 @@ echo "[WAZ_060_WORKHOURS_POLICY] Ajout des regles de correlation (admin ${ADMIN_
   echo "    <description>Connexion ADMINISTRATEUR hors des heures ouvrees (soir, plage autorisee ${ADMIN_START}-${ADMIN_END})</description>"
   echo "    <group>hors_heures,admin,</group>"
   echo "  </rule>"
-  echo "  <rule id=\"100212\" level=\"8\">"
+  echo "  <rule id=\"100212\" level=\"10\">"
   echo "    <if_sid>5715</if_sid>"
   echo "    <time>00:00-${USER_START}</time>"
   echo "    <user type=\"pcre2\">${STANDARD_REGEX}</user>"
   echo "    <description>Connexion UTILISATEUR STANDARD hors des heures ouvrees (nuit/matin, plage autorisee ${USER_START}-${USER_END})</description>"
   echo "    <group>hors_heures,utilisateur,</group>"
   echo "  </rule>"
-  echo "  <rule id=\"100213\" level=\"8\">"
+  echo "  <rule id=\"100213\" level=\"10\">"
   echo "    <if_sid>5715</if_sid>"
   echo "    <time>${USER_END}-23:59</time>"
   echo "    <user type=\"pcre2\">${STANDARD_REGEX}</user>"
@@ -157,5 +168,5 @@ if ! wait_for_service_active wazuh-manager 180 5; then
 fi
 
 echo "[WAZ_060_WORKHOURS_POLICY] OK. Administrateurs (${ADMIN_USERS}) autorises ${ADMIN_START}-${ADMIN_END} (alerte niveau 12 hors plage)."
-echo "[WAZ_060_WORKHOURS_POLICY] OK. Utilisateurs standards (${STANDARD_USERS:-aucun}) autorises ${USER_START}-${USER_END} (alerte niveau 8 hors plage)."
+echo "[WAZ_060_WORKHOURS_POLICY] OK. Utilisateurs standards (${STANDARD_USERS:-aucun}) autorises ${USER_START}-${USER_END} (alerte niveau 10 hors plage)."
 exit 0

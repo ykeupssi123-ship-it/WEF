@@ -75,8 +75,14 @@ chown root:wazuh "$OSSEC_CONF"
 chmod 640 "$OSSEC_CONF"
 chattr +i "$OSSEC_CONF"
 
-RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
-[ -f "$RULES_FILE" ] || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : ${RULES_FILE} introuvable (deja inclus par defaut dans ossec.conf vendor)." >&2; exit 1; }
+# CORRIGE LE 2026-10-05 (bug reel trouve en rejouant la cascade avant la
+# demo : la regle 100200 ecrite dans local_rules.xml ne declenchait JAMAIS
+# - ce fichier n'est pas charge par analysisd sur cette installation
+# (confirme le 2026-09-30). Redirige vers le meme fichier que WAZ_025/
+# WAZ_060/WAZ_061, reellement charge et deja prouve fonctionner ce soir.
+RULES_FILE="/var/ossec/ruleset/rules/9950-wef_custom_rules.xml"
+mkdir -p "$(dirname "$RULES_FILE")"
+[ -f "$RULES_FILE" ] || : > "$RULES_FILE"
 MARKER_RULE="<!-- WEF_IOC_RULE (WAZ_051, genere automatiquement - ne pas editer a la main) -->"
 if grep -qF "$MARKER_RULE" "$RULES_FILE"; then
   echo "[WAZ_051_IOC_CDB_LIST] Regle IOC deja posee, retrait avant reecriture..."
@@ -106,6 +112,8 @@ echo "[WAZ_051_IOC_CDB_LIST] Ajout de la regle de correlation IOC (id 100200)...
   echo "<!-- WEF_IOC_RULE_END -->"
 } >> "$RULES_FILE"
 grep -qF "$MARKER_RULE" "$RULES_FILE" || { echo "[WAZ_051_IOC_CDB_LIST] ERREUR : regle IOC absente apres ecriture dans ${RULES_FILE}." >&2; exit 1; }
+chown root:wazuh "$RULES_FILE"
+chmod 640 "$RULES_FILE"
 
 echo "[WAZ_051_IOC_CDB_LIST] Redemarrage de wazuh-manager pour appliquer..."
 systemctl restart wazuh-manager

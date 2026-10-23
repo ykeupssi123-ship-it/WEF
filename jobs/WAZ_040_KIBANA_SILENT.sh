@@ -25,15 +25,31 @@ source "$PROJECT_ROOT/jobs/lib/es_admin_curl.sh"
 WAZUH_INDEXER_ADMIN_PW="$(read_or_generate_secret "$WAZ_INDEXER_ADMIN_PASSWORD_FILE" non)" || exit 1
 WAZ_INDEXER_PORT="${WAZ_INDEXER_PORT:-9200}"
 
-RULES_FILE="/var/ossec/etc/rules/local_rules.xml"
-if ! grep -q 'id="100101"' "$RULES_FILE" 2>/dev/null; then
+# CORRIGE LE 2026-10-05 (bug reel trouve en rejouant la cascade FONC-08
+# avant la demo : la regle 100101 ecrite dans local_rules.xml ne
+# declenchait JAMAIS - ce fichier n'est pas charge par analysisd sur
+# cette installation (confirme le 2026-09-30, voir le commentaire laisse
+# dans ce fichier). Redirige vers le meme fichier reellement charge que
+# WAZ_025/WAZ_051/WAZ_060/WAZ_061.
+RULES_FILE="/var/ossec/ruleset/rules/9950-wef_custom_rules.xml"
+mkdir -p "$(dirname "$RULES_FILE")"
+[ -f "$RULES_FILE" ] || : > "$RULES_FILE"
+MARKER_RULE_101="<!-- WEF_CANARY_RULE (WAZ_040/WAZ_041, genere automatiquement - ne pas editer a la main) -->"
+if ! grep -qF "$MARKER_RULE_101" "$RULES_FILE" 2>/dev/null; then
   echo "[WAZ_040_KIBANA_SILENT] Pose de la regle dediee au canari (id 100101, niveau 3, absente a ce stade de la chaine)..."
-  # CORRIGE LE 2026-09-22 (incident reel, wef-elk-core - voir
-  # WAZ_041_ALERT_CANARY.sh pour le detail complet du meme bug) : sed
-  # sans ancrage remplace le PREMIER </group> du fichier (celui de la
-  # regle vendor 100001), corrompant la structure XML. '$s#...#' =
-  # derniere ligne uniquement, identique au correctif de WAZ_025.sh.
-  sed -i '$s#</group>#  <rule id="100101" level="3">\n    <match>WEF_CANARY_TEST</match>\n    <description>Test d'"'"'alerte synthetique quotidien de l'"'"'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>\n    <group>canary,</group>\n  </rule>\n</group>#' "$RULES_FILE"
+  {
+    echo "$MARKER_RULE_101"
+    echo '<group name="canary,">'
+    echo '  <rule id="100101" level="3">'
+    echo '    <match>WEF_CANARY_TEST</match>'
+    echo "    <description>Test d'alerte synthetique quotidien de l'usine (WAZ_041_ALERT_CANARY) - ignorer, jamais un incident reel.</description>"
+    echo '  </rule>'
+    echo '</group>'
+    echo "<!-- WEF_CANARY_RULE_END -->"
+  } >> "$RULES_FILE"
+  grep -qF "$MARKER_RULE_101" "$RULES_FILE" || { echo "[WAZ_040_KIBANA_SILENT] ERREUR : regle canari absente apres ecriture dans ${RULES_FILE}." >&2; exit 1; }
+  chown root:wazuh "$RULES_FILE"
+  chmod 640 "$RULES_FILE"
   systemctl restart wazuh-manager 2>/dev/null || true
   if ! wait_for_service_active wazuh-manager 120 5; then
     echo "[WAZ_040_KIBANA_SILENT] ERREUR : wazuh-manager n'a pas redemarre proprement apres la pose de la regle du canari." >&2

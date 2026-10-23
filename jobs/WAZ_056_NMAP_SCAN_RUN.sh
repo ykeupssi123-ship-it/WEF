@@ -50,10 +50,20 @@ if ! command -v nmap &>/dev/null; then
 fi
 
 echo "[WAZ_056_NMAP_SCAN_RUN] Scan de ${NMAP_TARGET}..."
+# BUG REEL TROUVE ET CORRIGE LE 2026-10-23 : l'append (>>) faisait grossir
+# ce fichier indefiniment (5 Ko le 2026-10-05, 124+ Ko ce soir) - au-dela
+# d'un certain seuil, Wazuh refuse de calculer le diff FIM
+# ("Unable to calculate diff due to 'disk_quota' limit has been reached"),
+# confirme reel en comparant une alerte du 2026-10-05 (diff lisible :
+# "52a53\n> --- WEF_NMAP_SCAN ...") a celles de ce soir (toutes cassees).
+# Ecrase desormais (>) au lieu d'accumuler : le fichier reste petit, le
+# diff FIM reste lisible indefiniment - au prix de l'historique complet
+# des scans passes (seul le dernier compte pour la detection "ce qui est
+# expose maintenant").
 {
   echo "--- WEF_NMAP_SCAN $(date -Iseconds) ---"
   nmap -sV -oG - "$NMAP_TARGET" 2>/dev/null
-} >> "$SCAN_LOG"
+} > "$SCAN_LOG"
 
-echo "[WAZ_056_NMAP_SCAN_RUN] OK. Resultat ajoute a ${SCAN_LOG} (surveille par le FIM, voir WAZ_055 pour la regle de detection)."
+echo "[WAZ_056_NMAP_SCAN_RUN] OK. Resultat ecrit dans ${SCAN_LOG} (surveille par le FIM, voir WAZ_055 pour la regle de detection)."
 exit 0
